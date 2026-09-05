@@ -479,6 +479,12 @@
     html += '<div class="gd-head">' + catDot2(node.cat) + "<h4>" + esc2(node.title) + '</h4></div>';
     html += '<div class="gd-cat" style="margin-bottom:8px"><span style="color:' + color + ';font-size:11.5px">' + esc2(CAT_LABELS[node.cat] || node.cat || "节点") + '</span></div>';
 
+    /* 跳转到第二部分节点包详解（由 app 注册解析器） */
+    if (window.ComfyGraph.detailLinkResolver) {
+      var DL = window.ComfyGraph.detailLinkResolver(node.title || node.name || "");
+      if (DL) html += '<a class="gd-pkg-link" href="' + esc2(DL.href) + '">📖 节点包详解：' + esc2(DL.label) + " →</a>";
+    }
+
     /* 作用（默认展开） */
     html += '<div class="gd-role"><b style="color:#dfe4f2">作用：</b>' + esc2(node.brief || "") +
       (node.desc ? "<br>" + esc2(node.desc) : "") + "</div>";

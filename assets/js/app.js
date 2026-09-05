@@ -85,6 +85,8 @@
     cats.forEach(function (c) {
       html += '<button class="filter-btn' + (c === activeCat ? " active" : "") + '" data-cat="' + esc(c) + '">' + esc(c) + "</button>";
     });
+    html += '<span class="spacer" style="flex:1"></span>'
+      + '<input id="pkgQ" type="text" placeholder="在节点包内搜索…" value="' + esc(nodeFilter.q || "") + '" style="height:32px;background:var(--panel);border:1px solid var(--border);border-radius:9px;color:var(--text);padding:0 12px;font-size:13px;outline:none;width:200px;font-family:inherit">';
     html += "</div>";
     html += '<div class="pkg-grid" id="pkgGrid"></div>';
     html += '<div class="callout tip" style="margin-top:26px"><span class="co-ico">💡</span><div><span class="co-title">看不懂某个节点？</span>到工作流图鉴里找一条用到它的工作流，在图上点它——结合上下文理解节点是最快的方式。</div></div>';
@@ -335,10 +337,12 @@
       html += '<div class="section"><div class="sec-head"><h2>逐节点全量分析</h2><span class="sec-en">NODE-BY-NODE</span></div><div class="node-list">';
       w.nodeAnalysis.forEach(function (a, i) {
         var n = nodeById[a.node] || { title: a.node, cat: "util" };
+        var lk = lookupNode(n.title);
         html += '<details class="node-card"' + (i === 0 ? " open" : "") + '><summary>'
           + catDot(n.cat) + '<span class="node-name">' + esc(n.title) + '</span><span class="node-brief">' + esc(n.brief || "") + '</span><span class="node-chevron">▶</span></summary>'
           + '<div class="node-body"><div class="nb-row"><div class="nb-label">在本工作流中</div><div>' + esc(a.detail) + "</div></div>"
           + (n.widgets && n.widgets.length ? '<div class="nb-row"><div class="nb-label">图中参数</div><div class="mono" style="font-size:12.5px;color:#a5b0c8">' + n.widgets.map(esc).join(" · ") + "</div></div>" : "")
+          + (lk ? '<div class="nb-row"><div class="nb-label">节点包详解</div><div><a href="#/nodes/' + esc(lk.pkg.id) + '" style="font-size:12.5px">📖 ' + esc(lk.pkg.name) + " · " + esc(lk.node.name) + " →</a></div></div>" : "")
           + "</div></details>";
       });
       html += "</div></div>";
@@ -443,6 +447,39 @@
     return out.slice(0, 24);
   }
 
+  /* ============ 节点名 → 节点包 跳转索引（工作流 → 第二部分联动） ============ */
+  var NODE_INDEX = null;
+  function normName(s) {
+    return String(s || "").toLowerCase().replace(/[\s_\-+()\[\]（）·:：.，,]/g, "");
+  }
+  function nodeIndex() {
+    if (NODE_INDEX) return NODE_INDEX;
+    NODE_INDEX = {};
+    pkgs().forEach(function (p) {
+      (p.nodes || []).forEach(function (n) {
+        var k = normName(n.name);
+        if (k && !NODE_INDEX[k]) NODE_INDEX[k] = { pkg: p, node: n };
+      });
+    });
+    return NODE_INDEX;
+  }
+  function lookupNode(title) {
+    var idx = nodeIndex();
+    var t = normName(title);
+    if (!t) return null;
+    if (idx[t]) return idx[t];
+    var keys = Object.keys(idx);
+    for (var i = 0; i < keys.length; i++) {
+      if (keys[i].length >= 5 && (keys[i].indexOf(t) >= 0 || t.indexOf(keys[i]) >= 0)) return idx[keys[i]];
+    }
+    return null;
+  }
+  window.ComfyGraph.detailLinkResolver = function (title) {
+    var r = lookupNode(title);
+    if (r) return { href: "#/nodes/" + r.pkg.id, label: r.pkg.name + " · " + r.node.name };
+    return { href: "#/nodes/q=" + encodeURIComponent(title), label: "收录中暂无 · 去节点包列表搜「" + title + "」" };
+  };
+
   /* ============ 路由 ============ */
   function currentRoute() {
     var h = location.hash.replace(/^#/, "");
@@ -462,6 +499,15 @@
 
     if (!parts.length) { app.innerHTML = renderHome(); return; }
     if (parts[0] === "arch") { app.innerHTML = window.PAGE_ARCH ? window.PAGE_ARCH.render() : "<div class=container>加载中…</div>"; if (window.PAGE_ARCH) window.PAGE_ARCH.mount(); return; }
+    if (parts[0] === "nodes" && parts[1] && parts[1].indexOf("q=") === 0) {
+      try { nodeFilter.q = decodeURIComponent(parts[1].slice(2)); } catch (e) { nodeFilter.q = parts[1].slice(2); }
+      nodeFilter.cat = "全部";
+      app.innerHTML = renderNodes();
+      paintPkgGrid();
+      var qInput = $("#pkgQ");
+      if (qInput) qInput.addEventListener("input", function () { nodeFilter.q = qInput.value; paintPkgGrid(); });
+      return;
+    }
     if (parts[0] === "nodes" && parts[1]) {
       app.innerHTML = renderPkgDetail(parts[1]);
       mountPkgMocks(parts[1]);
@@ -477,6 +523,8 @@
         $all("#pkgFilters .filter-btn").forEach(function (x) { x.classList.toggle("active", x === b); });
         paintPkgGrid();
       });
+      var qIn = $("#pkgQ");
+      if (qIn) qIn.addEventListener("input", function () { nodeFilter.q = qIn.value; paintPkgGrid(); });
       return;
     }
     if (parts[0] === "workflows" && parts[1]) {
