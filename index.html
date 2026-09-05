@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ComfyUI 全景解析 · 架构 / 节点 / 工作流</title>
+<meta name="description" content="ComfyUI 架构解析、官方与第三方节点包全解、常见工作流全量分析 — 一个可查询的中文可视化知识库">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%237c5cff'/><path d='M28 32h20v10H38v26h10v10H28zM58 32h14l8 18-8 18H58l8-18z' fill='white'/></svg>">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div class="read-progress" id="readProgress"></div>
+<button class="back-top" id="backTop" title="返回顶部 (双击图中空白可复位视图)">↑</button>
+<header class="site-header">
+  <div class="header-inner">
+    <a class="logo" href="#/"><span class="logo-mark">⚡</span>ComfyUI 全景解析</a>
+    <nav class="main-nav" id="mainNav">
+      <a href="#/" data-route="/">首页</a>
+      <a href="#/arch" data-route="/arch">一 · 架构解析</a>
+      <a href="#/nodes" data-route="/nodes">二 · 节点包全解</a>
+      <a href="#/workflows" data-route="/workflows">三 · 工作流图鉴</a>
+      <a href="#/about" data-route="/about">关于</a>
+    </nav>
+    <div class="search-wrap">
+      <span class="search-ico">🔍</span>
+      <input id="globalSearch" type="text" placeholder="搜索节点 / 包 / 工作流…" autocomplete="off">
+      <kbd>Ctrl K</kbd>
+      <div class="search-results" id="searchResults"></div>
+    </div>
+  </div>
+</header>
+
+<main id="app" class="page"></main>
+
+<footer class="site-footer">
+  <div class="footer-links">
+    <a href="#/arch">架构解析</a>
+    <a href="#/nodes">节点包全解</a>
+    <a href="#/workflows">工作流图鉴</a>
+    <a href="https://github.com/winter971" target="_blank" rel="noopener">GitHub</a>
+  </div>
+  <div>ComfyUI 全景解析 · 一个可查询的中文可视化知识库 · 数据基于 ComfyUI v0.34.2 与主流社区节点包整理</div>
+</footer>
+
+<script src="assets/js/data/nodes-core.js"></script>
+<script src="assets/js/data/nodes-pkg2.js"></script>
+<script src="assets/js/data/nodes-pkg3.js"></script>
+<script src="assets/js/data/nodes-pkg4.js"></script>
+<script src="assets/js/data/workflows1.js"></script>
+<script src="assets/js/data/workflows2.js"></script>
+<script src="assets/js/page-arch.js"></script>
+<script src="assets/js/nodegraph.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>
