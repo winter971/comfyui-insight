@@ -135,26 +135,46 @@
     html += '<div class="bulk-bar"><button class="bulk-btn" onclick="__pkgBulk(true)">⊕ 展开全部</button><button class="bulk-btn" onclick="__pkgBulk(false)">⊖ 收起全部</button><span class="spacer"></span><span style="font-size:12px;color:var(--faint)">共 ' + (p.nodes || []).length + ' 个节点 · 点击卡片展开详情</span></div>';
     html += '<div class="node-list" id="pkgNodeList">';
     (p.nodes || []).forEach(function (n, i) {
+      var hasParams = (n.params && n.params.length) || (n.widgets && n.widgets.length);
       html += '<details class="node-card"' + (i === 0 ? " open" : "") + '><summary>'
         + catDot(n.cat) + '<span class="node-name">' + esc(n.name) + "</span>"
         + '<span class="node-brief">' + esc(n.brief) + '</span><span class="node-chevron">▶</span></summary>'
-        + '<div class="node-body">'
-        + '<div class="nb-row"><div class="nb-label">它做什么</div><div>' + esc(n.desc) + "</div></div>"
-        + '<div class="nb-row"><div class="nb-label">输入</div><div>'
-        + (n.inputs || []).map(function (inp) {
-            return '<div class="io-line">' + typeChip(inp.type) + ' <b>' + esc(inp.name) + "</b>"
-              + (inp.from ? '<span class="io-arrow">⬅</span><span style="color:var(--faint);font-size:12px">' + esc(inp.from) + "</span>" : "")
-              + (inp.desc ? ' <span style="color:var(--muted)">— ' + esc(inp.desc) + "</span>" : "") + "</div>";
-          }).join("") + "</div></div>"
-        + '<div class="nb-row"><div class="nb-label">输出</div><div>'
-        + (n.outputs || []).map(function (o) {
-            return '<div class="io-line">' + typeChip(o.type)
-              + (o.to ? '<span class="io-arrow">➡</span><span style="color:var(--faint);font-size:12px">' + esc(o.to) + "</span>" : "")
-              + (o.desc ? ' <span style="color:var(--muted)">— ' + esc(o.desc) + "</span>" : "") + "</div>";
-          }).join("") + "</div></div>"
-        + '<div class="nb-row"><div class="nb-label">为什么需要</div><div>' + esc(n.why) + "</div></div>"
-        + (n.tips ? '<div class="nb-row"><div class="nb-label">实用提示</div><div style="color:#a7d8b8">' + esc(n.tips) + "</div></div>" : "")
-        + "</div></details>";
+        + '<div class="node-body"><div class="np-split">'
+        + '<div class="np-mock" data-mocknode="' + i + '"></div>'
+        + '<div class="np-details">'
+
+        + '<details class="np-sec" open><summary>🎯 节点作用</summary><div class="np-sec-body"><div class="np-prose">' + esc(n.desc)
+        + (n.why ? '<div style="margin-top:8px"><b style="color:#dfe4f2">为什么需要：</b>' + esc(n.why) + "</div>" : "")
+        + (n.tips ? '<div class="callout tip" style="margin:10px 0 0"><span class="co-ico">💡</span><div>' + esc(n.tips) + "</div></div>" : "")
+        + "</div></div></details>"
+
+        + ((n.inputs && n.inputs.length) ? '<details class="np-sec"' + (i === 0 ? " open" : "") + ' data-sec="input"><summary>⬅ 输入 <span class="sec-count">' + n.inputs.length + '</span><span class="node-chevron">▶</span></summary><div class="np-sec-body">'
+          + n.inputs.map(function (inp, ii) {
+              var zh = window.WIDGET_HELP ? window.WIDGET_HELP.typeZh(inp.type) : "";
+              return '<details class="io-item" data-iosec="input" data-ioidx="' + ii + '"><summary>' + typeChip(inp.type)
+                + '<span class="io-name">' + esc(inp.name) + "</span>" + (zh ? '<span class="io-zh">' + esc(zh) + "</span>" : "") + "</summary>"
+                + '<div class="io-body">'
+                + (inp.from ? '<div><span class="io-cap">典型上游</span>' + esc(inp.from) + "</div>" : "")
+                + (inp.desc ? '<div style="margin-top:4px"><span class="io-cap">说明</span>' + esc(inp.desc) + "</div>" : "")
+                + "</div></details>";
+            }).join("")
+          + "</div></details>" : "")
+
+        + ((n.outputs && n.outputs.length) ? '<details class="np-sec" data-sec="output"><summary>➡ 输出 <span class="sec-count">' + n.outputs.length + '</span><span class="node-chevron">▶</span></summary><div class="np-sec-body">'
+          + n.outputs.map(function (o, oi) {
+              var zh = window.WIDGET_HELP ? window.WIDGET_HELP.typeZh(o.type || o.name) : "";
+              return '<details class="io-item" data-iosec="output" data-ioidx="' + oi + '"><summary>' + typeChip(o.type || o.name)
+                + (zh ? '<span class="io-zh">' + esc(zh) + "</span>" : "") + "</summary>"
+                + '<div class="io-body">'
+                + (o.to ? '<div><span class="io-cap">典型下游</span>' + esc(o.to) + "</div>" : "")
+                + (o.desc ? '<div style="margin-top:4px"><span class="io-cap">说明</span>' + esc(o.desc) + "</div>" : "")
+                + "</div></details>";
+            }).join("")
+          + "</div></details>" : "")
+
+        + (hasParams ? '<details class="np-sec" data-sec="param"><summary>🎛 参数详解 <span class="sec-count">' + Math.max((n.params || []).length, (n.widgets || []).length) + '</span><span class="node-chevron">▶</span></summary><div class="np-sec-body" data-parambody="' + i + '"></div></details>' : "")
+
+        + "</div></div></div></details>";
     });
     html += "</div>";
     html += pagerNav(pkgs(), p.id, "#/nodes/", "节点包");
@@ -162,9 +182,49 @@
     return html;
   }
 
+  /* 节点包页：渲染左侧真实结构 mock + 点击联动右侧详情 */
+  function mountPkgMocks(pkgId) {
+    var p = null;
+    pkgs().forEach(function (x) { if (x.id === pkgId) p = x; });
+    if (!p || !window.ComfyGraph) return;
+    $all("[data-mocknode]").forEach(function (holder) {
+      var i = parseInt(holder.getAttribute("data-mocknode"), 10);
+      var n = (p.nodes || [])[i];
+      if (!n) return;
+      var node = { title: n.name, cat: n.cat, inputs: n.inputs, outputs: n.outputs, widgets: n.widgets || [], params: n.params };
+      var G = window.ComfyGraph;
+      /* 预填参数区 */
+      var pb = holder.closest(".node-body").querySelector("[data-parambody]");
+      if (pb && !pb.innerHTML) pb.innerHTML = G.paramRowsHtml(G.deriveParams(node));
+      var wrap = document.createElement("div");
+      holder.appendChild(wrap);
+      G.renderNodeMock(wrap, node, {
+        onSelect: function (kind, idx) {
+          var card = holder.closest(".node-body");
+          if (!card) return;
+          var sec = card.querySelector('.np-sec[data-sec="' + kind + '"]');
+          if (!sec && kind === "widget") sec = card.querySelector('.np-sec[data-sec="param"]');
+          if (!sec) return;
+          sec.open = true;
+          var target = null;
+          if (kind === "input" || kind === "output") {
+            target = sec.querySelector('.io-item[data-ioidx="' + idx + '"]');
+          } else if (kind === "widget") {
+            target = sec.querySelectorAll(".param-row")[idx];
+          }
+          if (target) {
+            if (target.tagName === "DETAILS") target.open = true;
+            target.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          } else {
+            sec.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          }
+        }
+      });
+    });
+  }
+
   /* 上一条 / 下一条导航 */
-  function pagerNav(list, id, base, label) {
-    var idx = -1;
+  function pagerNav(list, id, base, label) {    var idx = -1;
     list.forEach(function (x, i) { if (x.id === id) idx = i; });
     if (idx < 0) return "";
     var prev = list[idx - 1], next = list[idx + 1];
@@ -402,7 +462,11 @@
 
     if (!parts.length) { app.innerHTML = renderHome(); return; }
     if (parts[0] === "arch") { app.innerHTML = window.PAGE_ARCH ? window.PAGE_ARCH.render() : "<div class=container>加载中…</div>"; if (window.PAGE_ARCH) window.PAGE_ARCH.mount(); return; }
-    if (parts[0] === "nodes" && parts[1]) { app.innerHTML = renderPkgDetail(parts[1]); return; }
+    if (parts[0] === "nodes" && parts[1]) {
+      app.innerHTML = renderPkgDetail(parts[1]);
+      mountPkgMocks(parts[1]);
+      return;
+    }
     if (parts[0] === "nodes") {
       app.innerHTML = renderNodes();
       paintPkgGrid();

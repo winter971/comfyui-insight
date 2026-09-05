@@ -249,28 +249,10 @@
     container.appendChild(detail);
 
     function showDetail(node) {
-      var color = CAT_COLORS[node.cat] || "#647088";
-      var html = '<span class="gd-close" title="关闭">✕</span>';
-      html += '<h4>' + esc(node.title) + '</h4>';
-      html += '<div class="gd-cat"><span class="cat-dot cat-' + esc(node.cat) + '" style="display:inline-block;vertical-align:middle;margin-right:6px"></span><span style="color:' + color + '">' + esc(CAT_LABELS[node.cat] || node.cat || "节点") + '</span></div>';
-      if (node.brief) html += '<div class="gd-brief">' + esc(node.brief) + '</div>';
-      if (node.desc) html += '<div class="gd-sec">详细说明</div><div class="gd-p">' + esc(node.desc) + '</div>';
-      if (node.widgets && node.widgets.length) html += '<div class="gd-sec">参数</div><div class="gd-p mono" style="font-size:11.5px">' + node.widgets.map(esc).join("<br>") + '</div>';
-      if (node.inputs && node.inputs.length) {
-        html += '<div class="gd-sec">输入</div>';
-        node.inputs.forEach(function (p) {
-          html += '<div class="gd-p io-line">⬅ <span class="mono" style="color:' + typeColor(p.type) + '">' + esc(p.type || "?") + '</span> <b style="color:#cdd6f4">' + esc(p.name) + '</b></div>';
-        });
-      }
-      if (node.outputs && node.outputs.length) {
-        html += '<div class="gd-sec">输出</div>';
-        node.outputs.forEach(function (p) {
-          html += '<div class="gd-p io-line">➡ <span class="mono" style="color:' + typeColor(p.type) + '">' + esc(p.type || "?") + '</span></div>';
-        });
-      }
-      detail.innerHTML = html;
-      detail.classList.add("open");
-      detail.querySelector(".gd-close").addEventListener("click", function () { detail.classList.remove("open"); });
+      showRichDetail(detail, node, function () {
+        svg.querySelectorAll(".g-node.selected").forEach(function (el) { el.classList.remove("selected"); });
+        setHighlight(null);
+      });
     }
 
     /* 平移缩放 */
@@ -345,4 +327,213 @@
     CAT_COLORS: CAT_COLORS,
     CAT_LABELS: CAT_LABELS
   };
+
+  /* ============================================================
+     节点真实结构 mock 渲染 + 富详情弹窗
+     ============================================================ */
+
+  function esc2(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  /* 单节点结构 mock：与画布节点同构，端口/控件行可点击 */
+  function renderNodeMock(container, node, opts) {
+    opts = opts || {};
+    container.classList.add("np-mock-wrap");
+    var lay = computeLayout(node);
+    var color = CAT_COLORS[node.cat] || "#647088";
+    var svgNS = "http://www.w3.org/2000/svg";
+    var svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("viewBox", "-2 -2 " + (lay.w + 4) + " " + (lay.h + 4));
+    svg.setAttribute("class", "np-mock");
+    var help = window.WIDGET_HELP;
+    var inner = "";
+
+    /* 输入端口行 */
+    var inputs = node.inputs || [], outputs = node.outputs || [];
+    var rowMax = Math.max(inputs.length, outputs.length);
+    for (var i = 0; i < rowMax; i++) {
+      var y = HEADER_H + i * PORT_H;
+      var inp = inputs[i], outp = outputs[i];
+      if (inp) {
+        var zh = help ? help.typeZh(inp.type) : "";
+        inner += '<g class="mock-row" data-kind="input" data-idx="' + i + '" title="' + esc2(inp.name + " · " + (zh || inp.type || "")) + '">'
+          + '<rect class="mock-row-hl" x="1" y="' + (y + 1.5) + '" width="' + (lay.w - 2) + '" height="' + (PORT_H - 3) + '" rx="4" fill="transparent" stroke="transparent"/>'
+          + '<circle cx="0" cy="' + (y + PORT_H / 2 + 1) + '" r="4.5" fill="' + typeColor(inp.type) + '" stroke="#101218" stroke-width="1.5"/>'
+          + '<text class="g-port-text" x="9" y="' + (y + PORT_H / 2 + 4.5) + '">' + esc2(inp.name) + "</text></g>";
+      }
+      if (outp) {
+        var y2 = HEADER_H + i * PORT_H;
+        var ot = outp.type || outp.name || "";
+        var ozh = help ? help.typeZh(ot) : "";
+        inner += '<g class="mock-row" data-kind="output" data-idx="' + i + '" title="' + esc2((outp.name || ot) + " · " + (ozh || ot)) + '">'
+          + '<rect class="mock-row-hl" x="1" y="' + (y2 + 1.5) + '" width="' + (lay.w - 2) + '" height="' + (PORT_H - 3) + '" rx="4" fill="transparent" stroke="transparent"/>'
+          + '<circle cx="' + lay.w + '" cy="' + (y2 + PORT_H / 2 + 1) + '" r="4.5" fill="' + typeColor(ot) + '" stroke="#101218" stroke-width="1.5"/>'
+          + '<text class="g-port-text" x="' + (lay.w - 9) + '" y="' + (y2 + PORT_H / 2 + 4.5) + '" text-anchor="end" fill="' + typeColor(ot) + '">' + esc2(ot) + "</text></g>";
+      }
+    }
+    /* 控件行 */
+    var wy = HEADER_H + rowMax * PORT_H + 4;
+    (node.widgets || []).forEach(function (wv, wi) {
+      var wyy = wy + wi * WIDGET_H;
+      inner += '<g class="mock-row" data-kind="widget" data-idx="' + wi + '" title="' + esc2(wv) + '">'
+        + '<rect class="mock-row-hl" x="1" y="' + (wyy - 1) + '" width="' + (lay.w - 2) + '" height="' + WIDGET_H + '" rx="4" fill="transparent" stroke="transparent"/>'
+        + '<rect x="8" y="' + wyy + '" width="' + (lay.w - 16) + '" height="' + (WIDGET_H - 4) + '" rx="4" fill="#141724" stroke="#2c3245"/>'
+        + '<text class="g-widget-text" x="' + (lay.w / 2) + '" y="' + (wyy + 12.5) + '" text-anchor="middle">' + esc2(wv) + "</text></g>";
+    });
+
+    /* 外壳（放在最上层线框之下） */
+    var shell = '<rect class="g-node-body" width="' + lay.w + '" height="' + lay.h + '" rx="9" fill="#1b1e2b" stroke="#3a4157" stroke-width="1"/>'
+      + '<path d="M 0 9 A 9 9 0 0 1 9 0 L ' + (lay.w - 9) + ' 0 A 9 9 0 0 1 ' + lay.w + ' 9 L ' + lay.w + ' ' + HEADER_H + ' L 0 ' + HEADER_H + ' Z" fill="' + color + '" opacity="0.92"/>'
+      + '<rect x="0" y="' + HEADER_H + '" width="' + lay.w + '" height="2.5" fill="' + color + '" opacity="0.5"/>'
+      + '<text class="g-node-title" x="' + (lay.w / 2) + '" y="17.5" text-anchor="middle">' + esc2(node.title) + "</text>";
+    svg.innerHTML = shell + inner;
+    container.appendChild(svg);
+
+    var hint = document.createElement("div");
+    hint.className = "mock-hint";
+    hint.textContent = "👆 点击节点上的端口或控件，右侧详情自动展开";
+    container.appendChild(hint);
+
+    svg.addEventListener("click", function (e) {
+      var row = e.target.closest(".mock-row");
+      if (!row) return;
+      svg.querySelectorAll(".mock-row.flash").forEach(function (r) { r.classList.remove("flash"); });
+      row.classList.add("flash");
+      if (opts.onSelect) opts.onSelect(row.getAttribute("data-kind"), parseInt(row.getAttribute("data-idx"), 10));
+    });
+    return { lay: lay };
+  }
+
+  /* 富详情弹窗（用于工作流图与节点包页共用） */
+  function typeChipHtml(t) {
+    var zh = window.WIDGET_HELP ? window.WIDGET_HELP.typeZh(t) : "";
+    return '<span class="type-chip t-' + esc2(String(t || "DEFAULT").toUpperCase()) + '">' + esc2(t) + "</span>" +
+      (zh ? '<span class="type-zh">' + esc2(zh) + "</span>" : "");
+  }
+
+  function paramRowsHtml(params) {
+    var html = "";
+    (params || []).forEach(function (p) {
+      html += '<div class="param-row"><div class="param-head">'
+        + '<span class="param-name">' + esc2(p.name) + "</span>"
+        + (p.kind ? '<span class="param-kind">' + esc2(p.kind) + "</span>" : "")
+        + (p.default !== undefined && p.default !== "" ? '<span class="param-default">默认 ' + esc2(p.default) + "</span>" : "")
+        + "</div>"
+        + (p.desc ? '<div class="param-desc">' + esc2(p.desc) + "</div>" : "");
+      if (p.options && p.options.length) {
+        html += '<div class="param-opts">';
+        p.options.forEach(function (o) {
+          var v = Array.isArray(o) ? o[0] : o.value;
+          var d = Array.isArray(o) ? o[1] : o.desc;
+          html += '<div class="param-opt"><span class="opt-v">' + esc2(v) + '</span><span class="opt-d">' + esc2(d) + "</span></div>";
+        });
+        html += "</div>";
+      }
+      html += "</div>";
+    });
+    return html;
+  }
+
+  /* 从 widgets 字符串 + 全局参数库推导参数解释 */
+  function deriveParams(node) {
+    var out = [];
+    var help = window.WIDGET_HELP;
+    if (node.params && node.params.length) {
+      node.params.forEach(function (p) { out.push(p); });
+      return out;
+    }
+    (node.widgets || []).forEach(function (wv) {
+      var val = String(wv);
+      var nameGuess = val;
+      /* widget 值形如 "euler" 或 "30" 或 "sd_xl_base_1.0.safetensors"，按值反查参数库 */
+      var hit = null;
+      if (help) {
+        ["sampler_name", "scheduler", "ckpt_name", "unet_name", "lora_name", "vae_name", "control_net_name", "upscale", "guidance", "denoise", "cfg", "steps", "seed", "width", "height", "fps", "length", "batch_size", "strength", "factor"].some(function (k) {
+          /* 采样器/调度器常直接以值出现 */
+          var kh = help.get(k);
+          if (!kh) return false;
+          if (kh.options && kh.options.some(function (o) { return String(Array.isArray(o) ? o[0] : o.value).toLowerCase() === val.toLowerCase(); })) { hit = { name: kh.zh, desc: "取值 " + val + "：" + (kh.desc || ""), kind: kh.options ? "下拉选择" : "参数" }; return true; }
+          return false;
+        });
+        if (!hit) {
+          if (/^\d+$/.test(val)) { hit = { name: "数值参数", desc: "该节点的一个数值设置（取值 " + val + "）。具体含义见下方节点作用说明。", kind: "整数" }; }
+          else if (/^(euler|ddim|uni_pc|dpm|lcm|res_)/i.test(val)) { hit = { name: "采样算法", desc: "取值 " + val + "：" + (help.get("sampler_name") || {}).desc, kind: "下拉选择" }; }
+          else if (/\.(safetensors|ckpt|pt|gguf|onnx|pth|bin)$/i.test(val)) { hit = { name: "模型文件", desc: "取值 " + val + "：models 对应子目录中的模型文件。", kind: "下拉选择" }; }
+          else if (/^\d+\s*[x×]\s*\d+$/i.test(val)) { hit = { name: "分辨率", desc: "图像或视频的宽高设置：" + val + "。注意需为 8 的倍数。", kind: "整数" }; }
+        }
+      }
+      if (!hit) hit = { name: nameGuess, desc: "", kind: "" };
+      out.push({ name: val, kind: hit.kind || "参数", desc: hit.desc || "", default: "", options: hit.options || [] });
+    });
+    return out;
+  }
+
+  /* 富详情面板 HTML（工作流图点击节点时用） */
+  function showRichDetail(panel, node, closeCb) {
+    var help = window.WIDGET_HELP;
+    var color = CAT_COLORS[node.cat] || "#647088";
+    var html = '<span class="gd-close" title="关闭">✕</span>';
+    html += '<div class="gd-head">' + catDot2(node.cat) + "<h4>" + esc2(node.title) + '</h4></div>';
+    html += '<div class="gd-cat" style="margin-bottom:8px"><span style="color:' + color + ';font-size:11.5px">' + esc2(CAT_LABELS[node.cat] || node.cat || "节点") + '</span></div>';
+
+    /* 作用（默认展开） */
+    html += '<div class="gd-role"><b style="color:#dfe4f2">作用：</b>' + esc2(node.brief || "") +
+      (node.desc ? "<br>" + esc2(node.desc) : "") + "</div>";
+
+    /* 输入 */
+    var inputs = node.inputs || [];
+    if (inputs.length) {
+      html += '<details class="gd-sec-block" open><summary>⬅ 输入 <span class="sec-count">' + inputs.length + "</span></summary><div class=\"sec-body\">";
+      inputs.forEach(function (p, i) {
+        var zh = help ? help.typeZh(p.type) : "";
+        html += '<details class="io-item"><summary>' + typeChipHtml(p.type) + '<span class="io-name">' + esc2(p.name) + "</span>" +
+          (zh ? '<span class="io-zh">' + esc2(zh) + "</span>" : "") + "</summary><div class=\"io-body\">";
+        if (p.from) html += '<div><span class="io-cap">典型上游</span>' + esc2(p.from) + "</div>";
+        if (p.desc) html += '<div style="margin-top:4px"><span class="io-cap">说明</span>' + esc2(p.desc) + "</div>";
+        if (!p.from && !p.desc) html += '<div style="color:var(--faint)">接收同类型数据的输入。</div>';
+        html += "</div></details>";
+      });
+      html += "</div></details>";
+    }
+
+    /* 输出 */
+    var outputs = node.outputs || [];
+    if (outputs.length) {
+      html += '<details class="gd-sec-block"><summary>➡ 输出 <span class="sec-count">' + outputs.length + "</span></summary><div class=\"sec-body\">";
+      outputs.forEach(function (o) {
+        var zh = help ? help.typeZh(o.type || o.name) : "";
+        html += '<details class="io-item"><summary>' + typeChipHtml(o.type || o.name) +
+          (zh ? '<span class="io-zh">' + esc2(zh) + "</span>" : "") + "</summary><div class=\"io-body\">";
+        if (o.to) html += '<div><span class="io-cap">典型下游</span>' + esc2(o.to) + "</div>";
+        if (o.desc) html += '<div style="margin-top:4px"><span class="io-cap">说明</span>' + esc2(o.desc) + "</div>";
+        if (!o.to && !o.desc) html += '<div style="color:var(--faint)">向下游传递该类型的数据。</div>';
+        html += "</div></details>";
+      });
+      html += "</div></details>";
+    }
+
+    /* 参数 */
+    var params = deriveParams(node);
+    if (params.length) {
+      html += '<details class="gd-sec-block" open><summary>🎛 参数 <span class="sec-count">' + params.length + "</span></summary><div class=\"sec-body\">";
+      html += paramRowsHtml(params);
+      html += "</div></details>";
+    }
+
+    panel.innerHTML = html;
+    panel.classList.add("open");
+    panel.querySelector(".gd-close").addEventListener("click", function () { panel.classList.remove("open"); if (closeCb) closeCb(); });
+  }
+
+  function catDot2(cat) { return '<span class="cat-dot cat-' + esc2(cat) + '"></span>'; }
+
+  window.ComfyGraph.renderNodeMock = renderNodeMock;
+  window.ComfyGraph.showRichDetail = showRichDetail;
+  window.ComfyGraph.deriveParams = deriveParams;
+  window.ComfyGraph.paramRowsHtml = paramRowsHtml;
+  window.ComfyGraph.typeChipHtml = typeChipHtml;
+  window.ComfyGraph.esc2 = esc2;
 })();
