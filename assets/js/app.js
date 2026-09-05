@@ -293,6 +293,23 @@
 
     if (w.notice) html += '<div class="callout danger"><span class="co-ico">⚠️</span><div><span class="co-title">使用前必读</span>' + esc(w.notice) + "</div></div>";
 
+    /* 依赖清单（模型 / LoRA / 控制网等，前置展示） */
+    var depBadge = { "Checkpoint": "#8b5cf6", "LoRA": "#4ade80", "ControlNet": "#a1887f", "VAE": "#d9534f", "UNET/Diffusion": "#7c5cff", "CLIP": "#c9b34a", "ClipVision": "#c9b34a", "Upscale": "#4cc9f0", "检测模型": "#c98a5c", "InstantID": "#f9a8d4", "人脸模型": "#f9a8d4", "超分": "#4cc9f0", "其他": "#647088" };
+    if (w.models && w.models.length) {
+      html += '<div class="section" style="margin-top:26px"><div class="sec-head"><h2 style="font-size:20px">依赖清单</h2><span class="sec-en">REQUIRED MODELS</span>'
+        + '<span style="font-size:12px;color:var(--faint)">共 ' + w.models.length + " 项，放到 models 对应子目录后刷新</span></div>"
+        + '<table class="data-table"><tr><th>类型</th><th>文件 / 要求</th><th>说明与获取指引</th></tr>';
+      w.models.forEach(function (m) {
+        var c = depBadge[m.type] || "#647088";
+        html += "<tr><td><span style=\"font-size:11px;font-weight:600;padding:2px 10px;border-radius:99px;border:1px solid " + c + "55;background:" + c + "14;color:" + c + "\">" + esc(m.type) + "</span></td>"
+          + '<td class="mono" style="color:#93c5fd">' + esc(m.name) + "</td>"
+          + '<td style="color:var(--muted)">' + esc(m.note) + "</td></tr>";
+      });
+      html += "</table>"
+        + '<div class="callout info" style="margin-top:12px"><span class="co-ico">📥</span><div><span class="co-title">获取指引</span>官方模型优先从 Comfy Org 的 Hugging Face 页面获取（comfyanonymous/ComfyUI_docs 或对应官方仓库）；社区微调模型与 LoRA 常见来源为 Civitai 与 Hugging Face。下载后放入对应目录：Checkpoint → models/checkpoints，LoRA → models/loras，ControlNet → models/controlnet，VAE → models/vae，放大模型 → models/upscale_models。</div></div>'
+        + "</div>";
+    }
+
     /* 交互式节点图 */
     html += '<div class="section"><div class="sec-head"><h2>工作流节点图</h2><span class="sec-en">INTERACTIVE GRAPH</span></div>'
       + '<p class="sec-desc">拖拽平移 · 滚轮缩放 · <b>点击节点</b>查看它在整条流程中的职责，并高亮它的上下游连线；双击空白处复位视图。连线颜色 = 数据类型。</p>';
@@ -322,6 +339,16 @@
       });
       html += "</div></div>";
     }
+
+    /* 工作流源文件（API 格式 JSON 展示与下载） */
+    html += '<div class="section"><div class="sec-head"><h2>工作流源文件</h2><span class="sec-en">WORKFLOW FILE</span></div>'
+      + '<div class="card"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:6px">'
+      + '<button class="bulk-btn" id="wfJsonToggle">📋 查看源 JSON</button>'
+      + '<button class="bulk-btn" id="wfJsonDownload">⬇ 下载 .json</button>'
+      + '<span style="font-size:12px;color:var(--faint)">ComfyUI API 格式 · 可直接拖入画布导入</span></div>'
+      + '<div id="wfJsonBox" style="display:none"><div class="code-head"><span>' + esc(w.id) + '.api.json</span><span>API 格式</span></div><pre id="wfJsonPre" style="max-height:440px;overflow:auto"></pre></div>'
+      + '<div class="callout info" style="margin:12px 0 0"><span class="co-ico">🧭</span><div><span class="co-title">如何导入</span>下载 JSON 后：方式一，把文件直接拖进 ComfyUI 画布；方式二，菜单 Workflow → Open 选择文件。导入后请把各加载节点里的模型文件名改成你本机已有的文件（见上方依赖清单）；若提示缺节点，先在 ComfyUI-Manager 里安装对应节点包。</div></div>'
+      + "</div></div>";
 
     /* 数据流步骤 */
     if (w.flow && w.flow.length) {
@@ -357,15 +384,6 @@
       html += "</table></div>";
     }
 
-    /* 模型清单 */
-    if (w.models && w.models.length) {
-      html += '<div class="section"><div class="sec-head"><h2>需要准备的模型</h2><span class="sec-en">MODELS</span></div><table class="data-table"><tr><th>类型</th><th>名称 / 要求</th><th>说明</th></tr>';
-      w.models.forEach(function (m) {
-        html += "<tr><td>" + esc(m.type) + "</td><td class=\"mono\" style=\"color:#93c5fd\">" + esc(m.name) + "</td><td style=\"color:var(--muted)\">" + esc(m.note) + "</td></tr>";
-      });
-      html += "</table></div>";
-    }
-
     if (w.tips && w.tips.length) {
       html += '<div class="section"><div class="sec-head"><h2>实用技巧与常见坑</h2><span class="sec-en">TIPS</span></div><div class="card">';
       w.tips.forEach(function (t) { html += '<p style="color:var(--muted);margin-bottom:8px">✦ ' + esc(t) + "</p>"; });
@@ -396,6 +414,57 @@
         var ids = (w.stages[si].nodes || []).slice();
         /* 补上阶段间衔接节点的直接连线两端，保证高亮链路完整 */
         api.highlight(ids);
+      });
+    }
+
+    /* 源 JSON 加载 / 展示 / 下载 */
+    var box = $("#wfJsonBox"), pre = $("#wfJsonPre");
+    var tBtn = $("#wfJsonToggle"), dBtn = $("#wfJsonDownload");
+    if (box && tBtn && dBtn) {
+      var raw = null;
+      function loadJson(cb) {
+        if (raw !== null) return cb(raw);
+        fetch("assets/js/data/exports/" + w.id + ".api.json")
+          .then(function (r) { if (!r.ok) throw new Error("404"); return r.text(); })
+          .then(function (t) { raw = t; cb(t); })
+          .catch(function () { raw = ""; cb(null); });
+      }
+      function pretty(t) {
+        try { return esc(JSON.stringify(JSON.parse(t), null, 2)); }
+        catch (e) { return esc(t); }
+      }
+      tBtn.addEventListener("click", function () {
+        var hidden = box.style.display !== "block";
+        if (hidden) {
+          loadJson(function (t) {
+            pre.innerHTML = t === null
+              ? '<span style="color:var(--warn)">⏳ 该工作流的源文件正在整理，将在下一个版本提供。</span>'
+              : pretty(t);
+            box.style.display = "block";
+            tBtn.textContent = "📋 收起源 JSON";
+          });
+        } else {
+          box.style.display = "none";
+          tBtn.textContent = "📋 查看源 JSON";
+        }
+      });
+      dBtn.addEventListener("click", function () {
+        loadJson(function (t) {
+          if (t === null) {
+            pre.innerHTML = '<span style="color:var(--warn)">⏳ 该工作流的源文件正在整理，将在下一个版本提供。</span>';
+            box.style.display = "block";
+            tBtn.textContent = "📋 收起源 JSON";
+            return;
+          }
+          var blob = new Blob([t], { type: "application/json" });
+          var a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = w.id + ".api.json";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(a.href);
+        });
       });
     }
   }
