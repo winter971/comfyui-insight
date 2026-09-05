@@ -14,6 +14,7 @@
   }
   function $(sel, root) { return (root || document).querySelector(sel); }
   function $all(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
+  function wfFile(id) { return ((D().workflowFiles) || {})[id] || null; }
 
   function typeChip(t) {
     var key = t && window.ComfyGraph.TYPE_COLORS[String(t).toUpperCase()] ? String(t).toUpperCase() : (t ? String(t).toUpperCase() : "DEFAULT");
@@ -267,6 +268,7 @@
         + "<h3><span class=\"wf-cat-pill\">" + esc(w.category) + "</span>" + esc(w.name) + "</h3>"
         + '<div class="wf-desc">' + esc(w.summary) + "</div>"
         + '<div class="wf-foot"><span class="diff">' + diffStars(w.difficulty) + '</span><span class="mini-tag">' + (w.graph.nodes || []).length + " 个节点</span>"
+        + (wfFile(w.id) ? '<span class="mini-tag" style="color:#7dd3fc">📄 真实文件</span>' : '<span class="mini-tag" style="color:var(--warn)">🧪 自制参考</span>')
         + (w.tags || []).slice(0, 3).map(function (t) { return '<span class="mini-tag">' + esc(t) + "</span>"; }).join("")
         + "</div></a>";
     });
@@ -287,7 +289,9 @@
       + '<a class="back-link" href="#/workflows">← 返回工作流列表</a>'
       + '<div class="pkg-hero"><h1>' + esc(w.name) + "</h1>"
       + '<div class="ph-meta"><span class="wf-cat-pill">' + esc(w.category) + '</span><span class="diff">' + diffStars(w.difficulty) + '</span><span class="mini-tag">' + (w.graph.nodes || []).length + " 个节点</span>"
-      + '<span class="mini-tag">来源：' + esc(w.source || "社区常见结构") + "</span>"
+      + (wfFile(w.id)
+          ? '<a class="mini-tag" href="' + esc(wfFile(w.id).sourceUrl) + '" target="_blank" rel="noopener" style="color:#7dd3fc;border-color:rgba(76,201,240,.4)">📄 真实文件：' + esc(wfFile(w.id).sourceName) + " ↗</a>"
+          : '<span class="mini-tag">🧪 来源：' + esc(w.source || "社区常见结构") + "（本站自制参考版）</span>")
       + (w.tags || []).map(function (t) { return '<span class="mini-tag">' + esc(t) + "</span>"; }).join("") + "</div>"
       + '<p class="ph-desc">' + esc(w.summary) + "</p></div>";
 
@@ -340,14 +344,21 @@
       html += "</div></div>";
     }
 
-    /* 工作流源文件（API 格式 JSON 展示与下载） */
+    /* 工作流源文件（展示与下载） */
+    var mf = wfFile(w.id);
     html += '<div class="section"><div class="sec-head"><h2>工作流源文件</h2><span class="sec-en">WORKFLOW FILE</span></div>'
       + '<div class="card"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:6px">'
       + '<button class="bulk-btn" id="wfJsonToggle">📋 查看源 JSON</button>'
       + '<button class="bulk-btn" id="wfJsonDownload">⬇ 下载 .json</button>'
-      + '<span style="font-size:12px;color:var(--faint)">ComfyUI API 格式 · 可直接拖入画布导入</span></div>'
-      + '<div id="wfJsonBox" style="display:none"><div class="code-head"><span>' + esc(w.id) + '.api.json</span><span>API 格式</span></div><pre id="wfJsonPre" style="max-height:440px;overflow:auto"></pre></div>'
-      + '<div class="callout info" style="margin:12px 0 0"><span class="co-ico">🧭</span><div><span class="co-title">如何导入</span>下载 JSON 后：方式一，把文件直接拖进 ComfyUI 画布；方式二，菜单 Workflow → Open 选择文件。导入后请把各加载节点里的模型文件名改成你本机已有的文件（见上方依赖清单）；若提示缺节点，先在 ComfyUI-Manager 里安装对应节点包。</div></div>'
+      + (mf
+          ? '<a class="mini-tag" href="' + esc(mf.sourceUrl) + '" target="_blank" rel="noopener" style="color:#7dd3fc;border-color:rgba(76,201,240,.4)">📄 溯源：' + esc(mf.sourceName) + " ↗</a>"
+            + '<span style="font-size:12px;color:#86efac">✓ 公开仓库原始文件 · 结构校验通过</span>'
+          : '<span style="font-size:12px;color:var(--warn)">🧪 本站自制参考版 · 非任何作者的原始文件</span>')
+      + "</div>"
+      + '<div id="wfJsonBox" style="display:none"><div class="code-head"><span>' + esc(w.id) + ".json</span><span>" + (mf ? "UI 格式（官方原始）" : "API 格式（自制参考）") + "</span></div><pre id=\"wfJsonPre\" style=\"max-height:440px;overflow:auto\"></pre></div>"
+      + (mf
+          ? '<div class="callout info" style="margin:12px 0 0"><span class="co-ico">🧭</span><div><span class="co-title">如何导入</span>下载 JSON 后：方式一，把文件直接拖进 ComfyUI 画布；方式二，菜单 Workflow → Open 选择文件。导入后请把各加载节点里的模型文件名改成你本机已有的文件（见上方依赖清单）；若提示缺节点，先在 ComfyUI-Manager 里安装对应节点包。本文件来自上方标注的公开仓库，可点击溯源。</div></div>'
+          : '<div class="callout warn" style="margin:12px 0 0"><span class="co-ico">🧭</span><div><span class="co-title">关于此文件</span>该工作流暂无对应的公开原始文件，此处为本站依据社区通用结构构造的参考实现（API 格式），已通过结构校验。导入方式同左：拖入画布或 Workflow → Open。第三方节点若提示缺失请先用 Manager 安装；参数如与最新版节点包有出入，请对照上方节点图与参数详解微调。</div></div>')
       + "</div></div>";
 
     /* 数据流步骤 */
@@ -422,9 +433,10 @@
     var tBtn = $("#wfJsonToggle"), dBtn = $("#wfJsonDownload");
     if (box && tBtn && dBtn) {
       var raw = null;
+      var fetchPath = mf ? mf.file : "assets/js/data/exports/" + w.id + ".api.json";
       function loadJson(cb) {
         if (raw !== null) return cb(raw);
-        fetch("assets/js/data/exports/" + w.id + ".api.json")
+        fetch(fetchPath)
           .then(function (r) { if (!r.ok) throw new Error("404"); return r.text(); })
           .then(function (t) { raw = t; cb(t); })
           .catch(function () { raw = ""; cb(null); });
@@ -459,7 +471,7 @@
           var blob = new Blob([t], { type: "application/json" });
           var a = document.createElement("a");
           a.href = URL.createObjectURL(blob);
-          a.download = w.id + ".api.json";
+          a.download = w.id + ".json";
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);

@@ -23,6 +23,7 @@
         inputs: [],
         outputs: [],
         why: "ComfyUI 核心节点只有几十个，修脸、控图、视频等能力几乎全靠社区节点包扩展，这个入口决定了你能多容易地接入整个生态。",
+        params: [],
         tips: "优先选安装量大、维护活跃的包；装完务必按提示重启 ComfyUI，否则新节点不会出现。"
       },
       {
@@ -33,6 +34,7 @@
         inputs: [],
         outputs: [],
         why: "模型文件动辄几 GB、类别多、存放路径要求严格，手动管理容易出错，这个功能把选模型、下模型、放模型三步合并成一步。",
+        params: [],
         tips: "下载前留意模型的许可证和用途限制；列表里没有的模型也可以手动下载后放入 models 对应子目录再刷新。"
       },
       {
@@ -43,6 +45,7 @@
         inputs: [],
         outputs: [],
         why: "社区节点更新频繁，修复缺陷和适配新模型都靠更新；定期检查更新能少踩很多别人已经修过的坑。",
+        params: [],
         tips: "更新 ComfyUI 本体之后建议先获取更新再更新各节点包，避免新旧接口不匹配；重要任务跑到一半时不要更新节点。"
       },
       {
@@ -53,6 +56,7 @@
         inputs: [],
         outputs: [],
         why: "很多新模型和新节点都要求较新的 ComfyUI 版本，长期不更新会逐渐出现装得上却跑不动的兼容问题。",
+        params: [],
         tips: "更新前记下当前可用版本号，出问题可以用 git 回退；建议在两批任务之间更新，不要在任务中途动环境。"
       },
       {
@@ -63,6 +67,7 @@
         inputs: [],
         outputs: [],
         why: "复用社区工作流几乎必然遇到缺节点，没有它你要对着一个个红色节点猜来源，有它就是一次点击的事。",
+        params: [],
         tips: "分享时尽量用自带工作流信息的 PNG 或 JSON；补装后如果仍有红色节点，试试修复依赖或手动重装对应包。"
       },
       {
@@ -73,6 +78,7 @@
         inputs: [],
         outputs: [],
         why: "依赖问题是新手装节点最常见的失败原因，报错又往往是英文技术细节，一键修复能救命。",
+        params: [],
         tips: "修复后务必重启 ComfyUI 再验证；反复失败时把控制台完整报错复制去搜索或提交 issue。"
       },
       {
@@ -83,6 +89,7 @@
         inputs: [],
         outputs: [],
         why: "环境一致性是稳定出图的前提，快照相当于给节点环境做系统还原点，是任何折腾之前的保险。",
+        params: [],
         tips: "每次大更新前先保存快照；恢复快照后同样需要重启 ComfyUI 才生效。"
       },
       {
@@ -93,6 +100,7 @@
         inputs: [],
         outputs: [],
         why: "节点库的收录有延迟，这个入口保证你总能装到最新发布的包，不受收录进度限制。",
+        params: [],
         tips: "只安装信任来源的代码；如果依赖安装失败，看控制台输出按提示处理。"
       }
     ]
@@ -123,6 +131,10 @@
           { type: "SEGM_DETECTOR", to: "典型下游：SegmDetectorSEGS", desc: "分割检测器，输出贴轮廓的精细区域" }
         ],
         why: "没有它，后面的 SEGS 检测节点就没有模型可用；选哪个模型决定了你检测的是脸、手还是整个人。",
+        params: [
+          { name: "model_name", kind: "下拉选择", default: "bbox/face_yolov8m.pt", desc: "选择 models/ultralytics 目录里的检测模型文件，文件名决定了检测什么目标（人脸、手部、全身等）。",
+            options: [["bbox/ 开头的文件", "边界框模型，速度快，只给方形框区域"], ["segm/ 开头的文件", "分割模型，输出贴合轮廓的区域，重绘边缘更准"]] }
+        ],
         tips: "只找位置选框版模型，要贴边轮廓选分割版；模型可从 Impact Pack 官方说明提供的地址下载。"
       },
       {
@@ -138,6 +150,11 @@
           { type: "SAM_MODEL", to: "典型下游：SAMDetectorCombined 或带 SAM 选项的检测节点", desc: "已加载的 SAM 分割模型" }
         ],
         why: "边界框检测快但粗糙，直接拿框当遮罩会把背景一起重绘；SAM 负责把区域边缘抠准，是修图不伤背景的关键。",
+        params: [
+          { name: "model_name", kind: "下拉选择", default: "sam_vit_b_01ec64.pth", desc: "SAM 模型文件，vit_b 轻量常用，vit_l 和 vit_h 分割更准但更占显存、更慢。首次使用会自动下载。" },
+          { name: "device_mode", kind: "下拉选择", default: "AUTO", desc: "SAM 在什么设备上运行，决定显存占用与速度。",
+            options: [["AUTO", "平时不占显存，检测时才临时载入 GPU，显存紧张首选"], ["Prefer GPU", "模型常驻显存，多次检测更快，显存充裕时用"], ["CPU", "只用内存不占显存，速度最慢"]] }
+        ],
         tips: "首次使用会自动下载模型；追求速度用最小型号，对边缘质量要求高再上大型号。"
       },
       {
@@ -153,6 +170,11 @@
           { type: "SEGS", to: "典型下游：FaceDetailer、DetailerForEach 或 SAMDetectorCombined", desc: "检测到的所有区域，每项含裁剪图和遮罩" }
         ],
         why: "自动找脸是整套自动修图的第一环；没有检测结果，后面的细化重绘无从谈起。",
+        params: [
+          { name: "threshold", kind: "浮点数", default: "0.5", desc: "检测置信度阈值，调低能找出更多目标但容易误报，0.3 到 0.5 是常用区间。" },
+          { name: "dilation", kind: "整数", default: "10", desc: "检测框向外扩张的像素数，调大能多盖住一点周围区域，负数则向内收缩。" },
+          { name: "crop_factor", kind: "浮点数", default: "3.0", desc: "裁剪区域相对检测框的放大倍数，越大重绘时看到的上下文越多也越慢，一般保持 3 左右。" }
+        ],
         tips: "检测阈值调低能找出更多目标但可能误报，0.3 到 0.5 是常用区间；输出可以直接接 FaceDetailer。"
       },
       {
@@ -168,6 +190,11 @@
           { type: "SEGS", to: "典型下游：DetailerForEach、FaceDetailer", desc: "分割出的一组精细区域" }
         ],
         why: "当重绘边缘贴不贴肉很关键时，例如换装、修手，分割检测比边界框加 SAM 更省事也更准。",
+        params: [
+          { name: "threshold", kind: "浮点数", default: "0.5", desc: "检测置信度阈值，调低找得更多但误报也多，0.3 到 0.5 常用。" },
+          { name: "dilation", kind: "整数", default: "10", desc: "分割区域向外扩张的像素数，想让重绘范围多盖一圈就调大。" },
+          { name: "crop_factor", kind: "浮点数", default: "3.0", desc: "裁剪区域相对检测框的放大倍数，影响重绘时的上下文量，一般保持默认。" }
+        ],
         tips: "有分割版检测模型就优先用它，可以省掉 SAMLoader；没有再用框检测加 SAM 的组合。"
       },
       {
@@ -184,6 +211,12 @@
           { type: "SEGS", to: "典型下游：DetailerForEach、FaceDetailer", desc: "遮罩已细化的 SEGS" }
         ],
         why: "修脸最怕遮罩盖到背景，重绘后脸周围出现糊边；这一步保证遮罩只盖住该盖的地方。",
+        params: [
+          { name: "detection_hint", kind: "下拉选择", default: "center-1", desc: "告诉 SAM 在区域内取哪里当提示点来生成分割遮罩，多数场景用默认即可，边缘不贴时可换其他方式。",
+            options: [["center-1", "取区域中心一个点，通用默认"], ["mask-points", "在遮罩范围内自动取多个点，边缘更贴合"], ["mask-area", "把整个遮罩都当提示，覆盖最完整"]] },
+          { name: "dilation", kind: "整数", default: "0", desc: "分割结果向外扩张的像素数，想让遮罩比目标多盖一圈就调大。" },
+          { name: "threshold", kind: "浮点数", default: "0.93", desc: "SAM 分割灵敏度，调低遮罩会盖住更大范围（例如连同衣服），调高只保留最核心的区域。" }
+        ],
         tips: "检测提示等参数多数场景用默认即可；已经用分割版检测模型时可以跳过这个节点。"
       },
       {
@@ -204,6 +237,17 @@
           { type: "DETAILER_PIPE", to: "典型下游：其他 Detailer 类节点", desc: "打包好的细化配置，便于传递复用" }
         ],
         why: "远景和合影里的脸经常只有几十个像素，噪点和崩坏在所难免；FaceDetailer 不需要你手动框脸就能批量修复，是人物出图质量的保底环节。",
+        params: [
+          { name: "guide_size", kind: "浮点数", default: "512", desc: "脸部裁剪后至少放大到的边长，太小修不动、太大太慢，256 到 512 常用。" },
+          { name: "steps", kind: "整数", default: "20", desc: "人脸重绘的采样步数，与主图采样类似，20 左右够用。" },
+          { name: "cfg", kind: "浮点数", default: "8.0", desc: "人脸重绘的提示词遵循度，过高会过饱和，一般与主图保持一致。" },
+          { name: "sampler_name", kind: "下拉选择", default: "euler", desc: "人脸重绘用的采样器，与主图用同一款最不容易风格脱节。",
+            options: [["euler", "最朴素稳定，与主图一致最稳妥"], ["dpmpp_2m", "收敛快细节好，常配 karras 调度"]] },
+          { name: "scheduler", kind: "下拉选择", default: "normal", desc: "采样时噪声步的排布方式。",
+            options: [["normal", "默认排布，通用"], ["karras", "步数少时噪点更少、细节更细腻，人脸重绘常用"]] },
+          { name: "denoise", kind: "浮点数", default: "0.5", desc: "重绘幅度，越低越贴近原脸、越高改动越大，0.3 到 0.5 常用，过高会有换脸感。" },
+          { name: "feather", kind: "整数", default: "5", desc: "修好的脸贴回原图时的边缘羽化宽度，调大过渡更柔和，太大会出现糊边。" }
+        ],
         tips: "guide_size 决定脸至少放大到多少像素再重绘，256 到 512 常用；给重绘单独配一组人脸向提示词（例如干净皮肤、精致眼睛）效果更好。"
       },
       {
@@ -220,6 +264,15 @@
           { type: "IMAGE", to: "典型下游：SaveImage 或下一个 Detailer 类节点", desc: "所有区域细化完成后的整图" }
         ],
         why: "想修手、修画面里的特定物体时，只要换检测器就能复用同一套细化逻辑，不必为每种目标重搭工作流。",
+        params: [
+          { name: "guide_size", kind: "浮点数", default: "512", desc: "每个区域裁剪后至少放大到的边长，修手等小目标建议 320 到 512。" },
+          { name: "seed", kind: "整数", default: "0", desc: "区域重绘的随机种子，固定可复现，配合通配符能让每个区域各有变化。" },
+          { name: "steps", kind: "整数", default: "20", desc: "每个区域重绘的采样步数，20 左右够用。" },
+          { name: "cfg", kind: "浮点数", default: "8.0", desc: "区域重绘的提示词遵循度，一般与主图一致。" },
+          { name: "sampler_name", kind: "下拉选择", default: "euler", desc: "区域重绘用的采样器。",
+            options: [["euler", "最朴素稳定，通用首选"], ["dpmpp_2m", "收敛快细节好，常配 karras 调度"]] },
+          { name: "denoise", kind: "浮点数", default: "0.5", desc: "重绘幅度，修手修物体建议 0.3 到 0.5，过高容易把内容改掉。" }
+        ],
         tips: "用 BasicPipe 传配置能让画面清爽很多；通配符和种子参数可以让每个区域的重绘各有变化。"
       },
       {
@@ -236,6 +289,15 @@
           { type: "IMAGE", to: "典型下游：SaveImage", desc: "细化后的整图" }
         ],
         why: "自动修图最大的问题是出错了你也不知道，调试版让检测误报、遮罩偏移、重绘过头这些藏起来的问题一眼可见。",
+        params: [
+          { name: "guide_size", kind: "浮点数", default: "512", desc: "每个区域裁剪后至少放大到的边长，与正式版含义一致。" },
+          { name: "seed", kind: "整数", default: "0", desc: "区域重绘的随机种子，调参时固定住方便对比修改效果。" },
+          { name: "steps", kind: "整数", default: "20", desc: "每个区域重绘的采样步数。" },
+          { name: "cfg", kind: "浮点数", default: "8.0", desc: "区域重绘的提示词遵循度。" },
+          { name: "sampler_name", kind: "下拉选择", default: "euler", desc: "区域重绘用的采样器。",
+            options: [["euler", "最朴素稳定，通用首选"], ["dpmpp_2m", "收敛快细节好，常配 karras 调度"]] },
+          { name: "denoise", kind: "浮点数", default: "0.5", desc: "重绘幅度，观察预览图判断检测和遮罩是否正确。" }
+        ],
         tips: "新工作流第一次跑建议先用调试版；预览图存在临时目录，不影响正式输出。"
       },
       {
@@ -251,6 +313,7 @@
           { type: "SEGS", to: "典型下游：DetailerForEach", desc: "合并后的区域列表" }
         ],
         why: "想用一套细化流程同时修脸和修手，就需要把两路检测结果合并，这个节点就是那个合流三通。",
+        params: [],
         tips: "合并前确认两路 SEGS 来自同一张原图，尺寸不一致会导致后续回贴错位。"
       },
       {
@@ -270,6 +333,7 @@
           { type: "DETAILER_PIPE", to: "典型下游：FaceDetailer、DetailerForEach", desc: "打包好的完整细化配置" }
         ],
         why: "Detailer 类节点的输入又多又长，复杂工作流里满屏连线难读，管道化是 Impact 官方给出的整理方案。",
+        params: [],
         tips: "暂时没有的项目（例如分割检测器）可以空着；同一根管道可以分发给多个 Detailer 类节点。"
       },
       {
@@ -285,6 +349,7 @@
           { type: "CONDITIONING", to: "典型下游：KSampler 的条件输入", desc: "打包时的正向与负向条件" }
         ],
         why: "没有拆包节点，管道里的配置就只能整体在 Impact 节点之间流转；有了它，管道和其他节点体系可以自由互通。",
+        params: [],
         tips: "拆包得到的各项与打包时完全相同；只是临时借用某一项时，从对应输出口接即可。"
       },
       {
@@ -300,6 +365,12 @@
           { type: "STRING", to: "典型下游：CLIPTextEncode 的正向文本输入", desc: "展开后的具体提示词" }
         ],
         why: "想批量生成多样内容时手改文本效率极低；通配符加种子让多样性自动化且可复现。",
+        params: [
+          { name: "wildcard_text", kind: "文本", default: "", desc: "通配符模板，用花括号包住候选词并用竖线分隔，例如 {红|蓝|白}色裙子，运行时随机展开成一条具体提示词。" },
+          { name: "mode", kind: "下拉选择", default: "populate", desc: "决定用哪种方式产出最终文本。",
+            options: [["populate", "每次按种子重新展开 wildcard_text，批量抽卡用它"], ["fixed", "锁定使用 populated_text 的内容，方便手动微调后固定"]] },
+          { name: "seed", kind: "整数", default: "0", desc: "控制随机展开的结果，固定种子可以复现同一句提示词。" }
+        ],
         tips: "先固定种子检查展开结果是否符合预期；注意区分处理器（出文本）和接收器（在 Detailer 节点里消费通配符）的分工。"
       }
     ]
@@ -331,6 +402,11 @@
           { type: "IMAGE", to: "典型下游：ControlNetApplyAdvanced 配合 canny 模型", desc: "黑底白线的边缘控制图" }
         ],
         why: "想让生成结果严格复刻参考图的构图和轮廓时，Canny 是首选；线稿转实景、建筑效果图都靠它。",
+        params: [
+          { name: "low_threshold", kind: "浮点数", default: "0.4", desc: "弱边缘门槛，亮度变化弱于它的部分被忽略，调高线条更少更干净，调低细节更多但也更杂。" },
+          { name: "high_threshold", kind: "浮点数", default: "0.8", desc: "强边缘门槛，变化强于它的部分画成实线，与低阈值之间决定线条的主次过渡。" },
+          { name: "resolution", kind: "整数", default: "512", desc: "预处理用的处理分辨率，越高边缘越精细也越慢，一般与出图分辨率接近。" }
+        ],
         tips: "线太杂就提高阈值，丢结构就降低；处理手绘线稿素材时可以试试 LineArt，通常更干净。"
       },
       {
@@ -345,6 +421,11 @@
           { type: "IMAGE", to: "典型下游：ControlNetApplyAdvanced 配合 lineart 模型", desc: "线稿风格控制图" }
         ],
         why: "做插画、漫画风控图时，Canny 的碎线会让画面毛糙，LineArt 给出的是画师会画的那种线。",
+        params: [
+          { name: "coarse", kind: "下拉选择", default: "disable", desc: "粗略模式开关，影响线条的概括程度。",
+            options: [["disable", "精细连贯的线稿，多数场景用它"], ["enable", "粗略模式，线条更少更概括"]] },
+          { name: "resolution", kind: "整数", default: "512", desc: "处理分辨率，越高线条越精细也越慢。" }
+        ],
         tips: "粗略与精细两种模式可以切换；实物照片转线稿再上色是它的经典用法。"
       },
       {
@@ -359,6 +440,9 @@
           { type: "IMAGE", to: "典型下游：ControlNetApplyAdvanced 配合 lineart anime 模型", desc: "动漫线稿控制图" }
         ],
         why: "用通用线稿器处理动漫图常有噪点和断线，特化版本让二次元素材的控图干净利落。",
+        params: [
+          { name: "resolution", kind: "整数", default: "512", desc: "处理分辨率，越高发丝和细线保留越完整也越慢。" }
+        ],
         tips: "处理真人照片不要用它，换回 LineArt 或 Canny 更合适。"
       },
       {
@@ -374,6 +458,11 @@
           { type: "IMAGE", to: "典型下游：ControlNetApplyAdvanced 配合 depth 模型", desc: "灰度深度控制图" }
         ],
         why: "想保留构图的空间骨架、又想自由更换画风和材质时，深度控制比边缘控制更灵活。",
+        params: [
+          { name: "ckpt_name", kind: "下拉选择", default: "depth_anything_v2_vitl.pth", desc: "模型规格，越大深度估计越准也越慢。",
+            options: [["depth_anything_v2_vitl.pth", "大型模型，边界和细节最稳，常用推荐"], ["depth_anything_v2_vitb.pth", "中型，速度与质量折中"], ["depth_anything_v2_vits.pth", "小型最快，适合快速预览"]] },
+          { name: "resolution", kind: "整数", default: "512", desc: "处理分辨率，越高深度细节越丰富也越慢。" }
+        ],
         tips: "首次使用会自动下载模型权重；与同名的 depth anything 相关 ControlNet 模型搭配效果最稳。"
       },
       {
@@ -388,6 +477,10 @@
           { type: "IMAGE", to: "典型下游：ControlNetApplyAdvanced 配合 depth 模型", desc: "深度控制图" }
         ],
         why: "它兼容大量既有工作流；某些场景下它的深度风格与早期 depth 模型搭配更协调。",
+        params: [
+          { name: "bg_threshold", kind: "浮点数", default: "0.1", desc: "背景判定阈值，把最远的背景统一压黑让主体更突出，一般保持默认。" },
+          { name: "resolution", kind: "整数", default: "512", desc: "处理分辨率，越高深度过渡越细腻也越慢。" }
+        ],
         tips: "新流程一般优先 Depth Anything V2；复刻旧工作流时保持 MiDaS 才能还原原始效果。"
       },
       {
@@ -403,6 +496,11 @@
           { type: "IMAGE", to: "典型下游：ControlNetApplyAdvanced 配合 softedge 或 hed 模型", desc: "带浓淡的软边缘控制图" }
         ],
         why: "既想保留构图、又不想被死线条锁死时，HED 与 SoftEdge 是很好的折中选择。",
+        params: [
+          { name: "safe", kind: "下拉选择", default: "enable", desc: "安全模式，决定是否抑制误检测出来的杂线。",
+            options: [["enable", "开启后线条更少更干净，推荐"], ["disable", "保留更多边缘细节，噪线也会变多"]] },
+          { name: "resolution", kind: "整数", default: "512", desc: "处理分辨率，越高边缘浓淡层次越丰富也越慢。" }
+        ],
         tips: "配合 softedge 模型时强度不要拉满，0.5 到 0.8 常能兼顾结构与自由度。"
       },
       {
@@ -417,6 +515,9 @@
           { type: "IMAGE", to: "典型下游：ControlNetApplyAdvanced 配合 softedge 模型", desc: "软边缘控制图" }
         ],
         why: "在 Canny 的死板与无控制的放飞之间，SoftEdge 提供了一个好用的中间档。",
+        params: [
+          { name: "resolution", kind: "整数", default: "512", desc: "处理分辨率，越高边缘越清晰也越慢。" }
+        ],
         tips: "常配 0.5 到 0.8 的控制强度；需要更硬的结构约束就退回 Canny。"
       },
       {
@@ -434,6 +535,12 @@
           { type: "IMAGE", to: "典型下游：ControlNetApplyAdvanced 配合 openpose 模型", desc: "黑底彩色骨架控制图" }
         ],
         why: "想让两个角色摆同一姿势、或按参考照片摆动作时，骨架控制是不二之选。",
+        params: [
+          { name: "detect_body", kind: "开关", default: "enable", desc: "是否检测身体骨架，做姿势控制必须开启。" },
+          { name: "detect_hand", kind: "开关", default: "enable", desc: "是否检测手部骨架，只控大致姿势时关掉可以提速。" },
+          { name: "detect_face", kind: "开关", default: "enable", desc: "是否检测面部关键点，不需要控表情时可以关掉。" },
+          { name: "resolution", kind: "整数", default: "512", desc: "处理分辨率，越高关键点定位越准也越慢。" }
+        ],
         tips: "只控姿势时关掉手部和面部检测可以提速；手指细节要求高时可改用 DWPreprocessor。"
       },
       {
@@ -451,6 +558,12 @@
           { type: "IMAGE", to: "典型下游：ControlNetApplyAdvanced 配合 openpose 或 dwpose 模型", desc: "骨架控制图" }
         ],
         why: "手指和面部姿态的还原度直接决定人物质量，DWPose 在这些难点上明显更稳。",
+        params: [
+          { name: "detect_body", kind: "开关", default: "enable", desc: "是否检测身体骨架，做姿势控制必须开启。" },
+          { name: "detect_hand", kind: "开关", default: "enable", desc: "是否检测手部骨架，复杂手势记得打开。" },
+          { name: "detect_face", kind: "开关", default: "enable", desc: "是否检测面部关键点，不需要控表情时可以关掉。" },
+          { name: "resolution", kind: "整数", default: "512", desc: "处理分辨率，越高手指等细节定位越准也越慢。" }
+        ],
         tips: "首次使用会自动下载权重；复杂手势场景记得打开手部检测。"
       },
       {
@@ -466,6 +579,10 @@
           { type: "IMAGE", to: "典型下游：ControlNetApplyAdvanced 配合 tile 模型", desc: "色块化控制图" }
         ],
         why: "直接放大一张大图，模型经常凭空加内容或糊成一片；tile 控制让每个分块只补细节、不乱改结构。",
+        params: [
+          { name: "pyrUp_iters", kind: "整数", default: "3", desc: "色块化迭代次数，越大图越模糊、对细节的约束越松，1 到 3 常用。" },
+          { name: "resolution", kind: "整数", default: "512", desc: "色块图的生成分辨率，一般保持默认即可。" }
+        ],
         tips: "经典配方是先把图放大 1.5 到 2 倍，再接 tile 控制，强度 0.4 到 0.7。"
       },
       {
@@ -480,6 +597,9 @@
           { type: "IMAGE", to: "典型下游：ControlNetApplyAdvanced 配合 scribble 模型", desc: "涂鸦风格控制图" }
         ],
         why: "涂鸦控制是给灵感起稿最快的路径，几根线就能定构图，把细节决定权留给模型。",
+        params: [
+          { name: "resolution", kind: "整数", default: "512", desc: "处理分辨率，越高涂鸦线条越连贯也越慢。" }
+        ],
         tips: "想要更自由的结果，可以降低 ControlNet 强度或把控制图先轻微模糊。"
       },
       {
@@ -495,6 +615,7 @@
           { type: "IMAGE", to: "典型下游：ControlNetApplyAdvanced 的控制图输入", desc: "遮罩外保留、遮罩内变黑的控制图" }
         ],
         why: "局部重绘时若控制图包含遮罩内的旧内容，模型会被带偏；这个节点让 ControlNet 只看该看的地方。",
+        params: [],
         tips: "遮罩边缘稍微羽化能让重绘过渡更自然；配合局部重绘采样流程使用效果最佳。"
       },
       {
@@ -509,6 +630,10 @@
           { type: "IMAGE", to: "典型下游：ControlNetApplyAdvanced 配合 shuffle 模型", desc: "内容打乱后的色彩控制图" }
         ],
         why: "想借一张图的色调气质而不是它的内容时，Shuffle 是轻量直接的办法。",
+        params: [
+          { name: "resolution", kind: "整数", default: "512", desc: "处理分辨率，色彩分布的采样精度，一般保持默认。" },
+          { name: "seed", kind: "整数", default: "0", desc: "打乱方式的随机种子，固定后色斑分布可以复现。" }
+        ],
         tips: "控制强度不用太高；先看洗牌结果再决定是否接入 ControlNet。"
       }
     ]
@@ -542,6 +667,17 @@
           { type: "INT", to: "典型下游：EmptyLatentImage 等尺寸输入", desc: "实际输出宽度" }
         ],
         why: "核心缩放节点功能太朴素，出图尺寸没对齐 8 的倍数就会报错或画质下降；这个节点是很多工作流的标准尺寸入口。",
+        params: [
+          { name: "width", kind: "整数", default: "512", desc: "目标宽度，设 0 表示跟随原图或按比例自动计算。" },
+          { name: "height", kind: "整数", default: "512", desc: "目标高度，设 0 表示跟随原图或按比例自动计算。" },
+          { name: "method", kind: "下拉选择", default: "stretch", desc: "缩放策略，决定原图比例与目标不一致时怎么处理。",
+            options: [["stretch", "强行拉伸到目标宽高，画面会变形"], ["keep proportion", "保比例缩放，结果可能不精确等于目标尺寸"], ["fill / crop", "保比例铺满后裁掉多余部分，统一一批尺寸最省心"], ["pad", "保比例缩放后补边，内容完整不裁切"]] },
+          { name: "interpolation", kind: "下拉选择", default: "nearest", desc: "插值算法，影响缩放后的清晰度。",
+            options: [["lanczos", "缩小图片时观感最锐利，最常用"], ["bicubic", "平滑适中"], ["nearest", "最近邻，最快但有锯齿，像素风可用"]] },
+          { name: "condition", kind: "下拉选择", default: "always", desc: "什么情况下才执行缩放，可以只在图比目标大或小时才动。",
+            options: [["always", "每次都缩放"], ["downscale if bigger", "图比目标大时才缩小，小图保持原样"], ["upscale if smaller", "图比目标小时才放大，大图保持原样"]] },
+          { name: "multiple_of", kind: "整数", default: "0", desc: "把结果尺寸对齐到该数的倍数，8 是扩散模型的安全值，SDXL 常用 64，0 表示不处理。" }
+        ],
         tips: "统一一批不同比例的图时，用 fill / crop 加固定宽高最省心；缩小图片用 lanczos 插值通常最锐利。"
       },
       {
@@ -557,6 +693,10 @@
           { type: "IMAGE", to: "典型下游：SaveImage 或合成节点", desc: "翻转后的图像" }
         ],
         why: "一句话搞定镜像、还支持整批处理，是画布上出现频率很高的小工具。",
+        params: [
+          { name: "axis", kind: "下拉选择", default: "x", desc: "翻转方向。",
+            options: [["x", "水平镜像，左右对调"], ["y", "垂直翻转，上下对调"], ["xy", "双向翻转，相当于旋转 180 度"]] }
+        ],
         tips: "画面里有文字或标志时镜像会反字，注意使用场景。"
       },
       {
@@ -575,6 +715,14 @@
           { type: "INT", to: "典型下游：合成或回贴节点", desc: "裁剪起点的横坐标" }
         ],
         why: "二次构图的常规操作；自动返回坐标的设计让裁剪再回贴的闭环工作流好写很多。",
+        params: [
+          { name: "width", kind: "整数", default: "256", desc: "裁剪宽度，超出源图会被自动截到边界。" },
+          { name: "height", kind: "整数", default: "256", desc: "裁剪高度，超出源图会被自动截到边界。" },
+          { name: "position", kind: "下拉选择", default: "top-left", desc: "裁剪锚点在图的哪个方位。",
+            options: [["center", "居中裁剪，二次构图最常用"], ["top-left", "从左上角开始裁"], ["bottom-right", "从右下角开始裁"]] },
+          { name: "x_offset", kind: "整数", default: "0", desc: "起点横坐标微调，正数向右移、负数向左移。" },
+          { name: "y_offset", kind: "整数", default: "0", desc: "起点纵坐标微调，正数向下移、负数向上移。" }
+        ],
         tips: "宽高超出源图时会被自动截到图片边界，不会报错。"
       },
       {
@@ -590,6 +738,9 @@
           { type: "IMAGE", to: "典型下游：采样、放大或批量保存节点", desc: "合并后的图像批次" }
         ],
         why: "核心节点合并批次不自动对齐尺寸、入口也少；多图合并成批是批量处理的第一步。",
+        params: [
+          { name: "method", kind: "下拉选择", default: "lanczos", desc: "尺寸不一致时对齐用的插值算法，lanczos 效果较好。" }
+        ],
         tips: "尺寸对齐方式默认 lanczos 效果较好；除第一张外的输入都可选，空着即不参与。"
       },
       {
@@ -606,6 +757,11 @@
           { type: "IMAGE", to: "典型下游：视频合成或 SaveImage", desc: "固定数量的图像批次" }
         ],
         why: "后续视频节点常要求固定帧数，手动凑数很痛苦；这个节点是图像批次和视频流程之间的适配器。",
+        params: [
+          { name: "size", kind: "整数", default: "16", desc: "目标帧数，输出正好这个数量。" },
+          { name: "method", kind: "下拉选择", default: "expand", desc: "凑数策略，决定多出的帧怎么生成、缺的帧怎么补。",
+            options: [["expand", "在批次内均匀取样，数量变多时相邻帧自动过渡，适合补间"], ["repeat all", "整批循环复制凑满"], ["repeat first", "在开头复制首帧补齐"], ["repeat last", "在末尾复制末帧补齐，只为凑数时最不伤画质"]] }
+        ],
         tips: "expand 的插值过渡适合做补间动画；只为补齐数量时用 repeat last 最不伤画质。"
       },
       {
@@ -622,6 +778,10 @@
           { type: "IMAGE", to: "典型下游：任何接受图像的节点", desc: "取出的子批次" }
         ],
         why: "分而治之是复杂工作流的常用手法，批次切分是它的基础操作。",
+        params: [
+          { name: "start", kind: "整数", default: "0", desc: "起始序号，从 0 开始数，超出范围会自动夹到最后一帧。" },
+          { name: "length", kind: "整数", default: "-1", desc: "取多少张，-1 表示从起点一直取到末尾。" }
+        ],
         tips: "起始序号超出范围会被自动夹到最后一帧，不会报错。"
       },
       {
@@ -636,6 +796,7 @@
           { type: "IMAGE", to: "典型下游：支持逐张处理列表的节点", desc: "逐张流动的图像列表" }
         ],
         why: "很多循环、逐张保存类玩法依赖列表语义；分不清批次和列表时，记住拆开用这个节点就行。",
+        params: [],
         tips: "下游节点会按列表逐张运行，总耗时随张数线性增加。"
       },
       {
@@ -650,6 +811,7 @@
           { type: "IMAGE", to: "典型下游：批次类节点", desc: "合并后的批次" }
         ],
         why: "批次与列表两种语义互转是搭建灵活工作流的必备工具，essentials 这一对节点把转换做得很干净。",
+        params: [],
         tips: "尺寸不一致的列表项会自动缩放到第一张的尺寸再合并。"
       },
       {
@@ -668,6 +830,12 @@
           { type: "IMAGE", to: "典型下游：SaveImage 或 VAEEncode", desc: "合成结果" }
         ],
         why: "图像级合成不用回修图软件，在工作流里直接完成，方便自动化批量出图。",
+        params: [
+          { name: "x", kind: "整数", default: "0", desc: "源图粘贴到 底图 上的横坐标，支持负数表示部分移出画面。" },
+          { name: "y", kind: "整数", default: "0", desc: "粘贴的纵坐标，负数表示向上移出画面。" },
+          { name: "offset_x", kind: "整数", default: "0", desc: "在 x 基础上再整体偏移的量，方便接外部坐标数据。" },
+          { name: "offset_y", kind: "整数", default: "0", desc: "在 y 基础上再整体偏移的量。" }
+        ],
         tips: "源图超出底图边界会被裁掉而不是报错；配合裁剪节点返回的坐标可以做裁剪后原位回贴。"
       },
       {
@@ -684,6 +852,11 @@
           { type: "IMAGE", to: "典型下游：SaveImage 或继续合成", desc: "色调对齐后的图" }
         ],
         why: "自动修图和拼接最容易出现色温不一致的补丁感，色彩匹配是消除违和的收尾工序。",
+        params: [
+          { name: "color_space", kind: "下拉选择", default: "LAB", desc: "统计色彩分布用的色彩空间。",
+            options: [["LAB", "按亮度与色彩分离统计，最常用最稳"], ["RGB", "直接按三通道统计，简单直接"], ["YCbCr", "按亮度与色度统计，肤色场景可用"]] },
+          { name: "factor", kind: "浮点数", default: "1.0", desc: "匹配力度，0 不变，1 完全对齐参考图；想保留原图氛围可以从 0.5 左右试起。" }
+        ],
         tips: "力度先从 0.5 试起，完全匹配有时会丢原图氛围；LAB 是默认且通常最好的色彩空间。"
       },
       {
@@ -700,6 +873,12 @@
           { type: "IMAGE", to: "典型下游：SaveImage", desc: "锐化后的图" }
         ],
         why: "出图最后一步的锐化决定观感，但普通锐化会把噪点一并放大，智能锐化专治这个问题。",
+        params: [
+          { name: "sharpen", kind: "浮点数", default: "5.0", desc: "锐化强度，越大细节越脆也越容易出现白边，从低数值试起。" },
+          { name: "noise_radius", kind: "整数", default: "7", desc: "保边滤波的半径，越大抹噪越多，过大可能糊掉细节。" },
+          { name: "preserve_edges", kind: "浮点数", default: "0.75", desc: "边缘保护程度，越高越不容易把噪点一起锐化，0.5 到 0.9 常用。" },
+          { name: "ratio", kind: "浮点数", default: "0.5", desc: "锐化结果与保边模糊结果的混合比例，1 为全锐化、0 为全模糊。" }
+        ],
         tips: "锐化过头会出现白边和噪点，从低数值试起；混合比例参数控制锐化与滤波的平衡。"
       },
       {
@@ -715,6 +894,7 @@
           { type: "INT", to: "典型下游：数学或逻辑节点", desc: "图像高度" }
         ],
         why: "动态工作流要靠数据流而不是人眼确定尺寸，这个节点把图像尺寸变成可传递的数值。",
+        params: [],
         tips: "数量输出可以用来做与批次相关的条件判断。"
       },
       {
@@ -728,6 +908,9 @@
         ],
         outputs: [],
         why: "画布上的数据流对用户多是黑盒，控制台打印是成本最低的黑盒透视工具。",
+        params: [
+          { name: "prefix", kind: "文本", default: "Value:", desc: "打印前缀，用来区分控制台里多条日志分别来自哪个节点。" }
+        ],
         tips: "去启动 ComfyUI 的那个终端窗口看输出；一条线看不透就沿线多放几个分别打印。"
       }
     ]

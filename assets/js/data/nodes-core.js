@@ -28,6 +28,10 @@
           { type: "VAE", to: "VAE Encode / VAE Decode 的 vae 输入", desc: "编解码器，负责图像与潜空间互转" }
         ],
         why: "没有它就没有 MODEL/CLIP/VAE 三路供给，整条管线无从谈起。它是缓存判断的锚点：只要不换模型，它的结果一直复用，后续所有迭代都不重复加载模型。",
+        params: [
+          { name: "ckpt_name", kind: "下拉选择", default: "最近使用的模型文件", desc: "从 models/checkpoints 目录里选一个底模文件。切换这里等于切换整套画风与能力，是工作流里影响最大的单一选项。" }
+        ],
+        why: "没有它就没有 MODEL/CLIP/VAE 三路供给，整条管线无从谈起。它是缓存判断的锚点：只要不换模型，它的结果一直复用，后续所有迭代都不重复加载模型。",
         tips: "换底模 = 换画风最有效的一步。模型放在 models/checkpoints 目录（桌面版可在设置里改模型路径）。加载 6GB 以上大模型时第一次执行会明显卡顿，那是模型读入显存的过程。"
       },
       {
@@ -42,6 +46,11 @@
           { type: "MODEL", to: "下游 LoRA 链或 KSampler", desc: "注入后的模型" },
           { type: "CLIP", to: "CLIP Text Encode", desc: "注入后的编码器" }
         ],
+        params: [
+          { name: "lora_name", kind: "下拉选择", default: "无", desc: "从 models/loras 目录选择 LoRA 文件。文件名通常就是画风或人物名，需配合训练时的触发词使用。" },
+          { name: "strength_model", kind: "浮点数", default: "1.0", desc: "对绘画主体（UNet）的注入强度。1.0 完全生效，0.6-0.8 常用于与其他 LoRA 混搭，超过 1.5 容易画面崩坏或颜色溢出。" },
+          { name: "strength_clip", kind: "浮点数", default: "1.0", desc: "对文本编码器的注入强度，影响触发词的权重。一般与 strength_model 保持一致；只想改画面不改文字理解时可单独调低。" }
+        ],
         why: "它是扩展模型能力的最轻量方式——不必为每种画风下载整个 7GB 底模，一个 LoRA 即可切换。几乎所有风格化、人物一致性、NSFW 调整类工作流都依赖它。",
         tips: "多个 LoRA 叠加时总强度别拉满，互相稀释或冲突很常见；出问题先逐个把强度归零排查。LoRA 名称要和训练时触发词配合使用才生效。"
       },
@@ -54,6 +63,9 @@
         ],
         outputs: [
           { type: "CONDITIONING", to: "KSampler 的 positive/negative，或 ControlNet/区域控制节点", desc: "条件向量" }
+        ],
+        params: [
+          { name: "text", kind: "文本", default: "空", desc: "提示词内容。正向节点写想要的内容，负向节点写要避开的词；支持 (word:1.2) 权重语法，越具体越可控，过长会稀释每个词的权重。" }
         ],
         why: "它是人类意图与模型之间的唯一翻译官。提示词怎么写决定模型怎么理解，而这个节点决定了翻译质量（配合什么 CLIP、截不截尾层都有影响）。",
         tips: "正向写具体主体+风格+质量词，负向一般用通用负面列表即可。权重语法（如 (word:1.2)）由前端解析后传入。Flux 等模型对负向提示词不敏感，负向常留空。"
@@ -69,6 +81,11 @@
         ],
         outputs: [
           { type: "LATENT", to: "KSampler 的 latent_image 输入", desc: "初始噪声" }
+        ],
+        params: [
+          { name: "width", kind: "整数", default: "512", desc: "画布宽度（像素）。需为 8 的倍数；SD1.5 以 512 为基准，SDXL 以 1024 为基准，偏离基准太多会出现人物重复或构图崩坏。" },
+          { name: "height", kind: "整数", default: "512", desc: "画布高度（像素）。与 width 一起决定最终输出分辨率，竖版图直接把高度调大即可。" },
+          { name: "batch_size", kind: "整数", default: "1", desc: "一次生成几张。调大可以一次出多张候选，但显存与耗时按张数成倍增长。" }
         ],
         why: "文生图必须有一个初始噪声；图生图用 VAEEncode 的结果替代它。它决定了最终输出的分辨率。",
         tips: "SD1.5 用 512~768，SDXL 用 1024~1536，Flux 在 1024 附近最稳。想要竖版海报就直接改宽高比例，不必生成长图再裁。"
@@ -86,6 +103,31 @@
         outputs: [
           { type: "LATENT", to: "VAE Decode（或第二遍采样/放大）", desc: "去噪完成的潜空间结果" }
         ],
+        params: [
+          { name: "seed", kind: "整数", default: "0", desc: "随机种子，相同种子加相同参数可以得到几乎相同的结果。锁定它方便微调提示词，改成 randomize 则每次出新构图。" },
+          { name: "steps", kind: "整数", default: "20", desc: "去噪迭代次数，20-35 常用。越多细节越充分但耗时线性增加，超过 40 通常收益很小。" },
+          { name: "cfg", kind: "浮点数", default: "8.0", desc: "对提示词的服从度。调高更听话但画面容易过饱和僵硬，调低更自由有创意。SD1.5 常用 6-8，SDXL 常用 4-7，Flux 不用这个参数。" },
+          { name: "sampler_name", kind: "下拉选择", default: "euler", desc: "去噪算法。新手记住两个组合就够用：euler/normal 最朴素稳定，dpmpp_2m/karras 细节与效率兼得。",
+            options: [
+              ["euler", "最朴素稳定，通用首选，出图风格偏柔和"],
+              ["euler_ancestral", "每步都注入随机性，细节多但构图不稳定，同种子复现性差"],
+              ["dpmpp_2m", "二阶多步采样，速度快细节好，配 karras 是社区公认的高质量组合"],
+              ["dpmpp_2m_sde", "在 2m 基础上加入随机微分方程噪声，质感更细腻丰富，略慢"],
+              ["dpmpp_3m_sde", "三阶版本，高步数下细节更佳，低步数优势不明显"],
+              ["ddim", "老牌确定性采样，步数少时结构稳定，常用于老模型与图生图"],
+              ["uni_pc", "新一代预测校正采样，低步数下性价比高"]
+            ] },
+          { name: "scheduler", kind: "下拉选择", default: "normal", desc: "控制每一步噪声减多少的日程表，和采样算法搭配使用。换调度器对画面质感的影响常常比换采样器还大。",
+            options: [
+              ["normal", "默认线性日程，与 euler 搭配的中规中矩"],
+              ["karras", "步长前大后小，收尾更精细，细节和质感普遍更好，dpmpp_2m 的黄金搭档"],
+              ["exponential", "指数衰减，前期去噪快，适合低步数出图"],
+              ["sgm_uniform", "均匀步长，视频模型与 SGM 系模型常用"],
+              ["simple", "简单缩短的日程，行为接近 karras 的通用替代"],
+              ["beta", "按 Beta 分布分配步长，某些模型官方推荐，整体更均匀"]
+            ] },
+          { name: "denoise", kind: "浮点数", default: "1.0", desc: "去噪强度：1.0 表示从纯噪声重画（文生图），0.5 左右表示保留一半原图信息做图生图。输入是纯噪声时保持 1.0，图生图常用 0.4-0.7。" }
+        ],
         why: "它是唯一真正『生成』的节点——其他节点都在为它做准备或处理它的产物。工作流的调参九成发生在它的四个参数上：steps、cfg、sampler、seed。",
         tips: "通用起步：steps 25-35、cfg 5-7（SDXL）。sampler 选 euler/normal 或 dpmpp_2m/karras 最稳。锁定 seed 可以固定构图只微调提示词。denoise 参数仅在图生图（输入不是纯噪声）时才有意义。"
       },
@@ -98,6 +140,16 @@
         ],
         outputs: [
           { type: "LATENT", to: "VAE Decode 或下一段 KSampler (Advanced)", desc: "分段采样的结果" }
+        ],
+        params: [
+          { name: "add_noise", kind: "开关", default: "enable", desc: "是否在起点潜空间上添加新噪声。两段式采样时第二段通常保持默认；做某些无噪续算玩法时才关掉。" },
+          { name: "noise_seed", kind: "整数", default: "0", desc: "噪声随机种子，与普通 KSampler 的 seed 作用相同，仅当 add_noise 开启时生效。" },
+          { name: "steps", kind: "整数", default: "20", desc: "整段采样的总步数。两段接力时两遍必须填同一个数，分界点才有意义。" },
+          { name: "cfg", kind: "浮点数", default: "8.0", desc: "提示词服从度，含义与普通 KSampler 相同。SD1.5 用 6-8，SDXL 用 4-7。" },
+          { name: "sampler_name", kind: "下拉选择", default: "euler", desc: "去噪算法，选项与普通 KSampler 完全一致；euler/normal 与 dpmpp_2m/karras 是稳妥起步。" },
+          { name: "start_at_step", kind: "整数", default: "0", desc: "本段从第几步开始。第一遍填 0，第二遍填上一遍的结束步（如 15），实现中途接力。" },
+          { name: "end_at_step", kind: "整数", default: "10000", desc: "本段跑到第几步为止。高清修复第一遍常填 15 左右，剩余步数留给放大后的第二遍。" },
+          { name: "return_with_leftover_noise", kind: "开关", default: "disable", desc: "到达结束步时是否带着剩余噪声直接输出。两段式采样必须开启，否则第一遍会一步到底；单段使用保持关闭。" }
         ],
         why: "任何『分两遍采样』的玩法（两段式放大、先低步数预览再精修）都必须用它，普通 KSampler 做不到中途暂停。",
         tips: "两段式示例：第一遍 end_at_step=15、第二遍 start_at_step=15，两遍 steps 保持一致；第二遍 denoise 无效，控制力度靠 step 分界点。"
@@ -113,6 +165,7 @@
         outputs: [
           { type: "IMAGE", to: "SaveImage / 预览 / 后处理节点", desc: "成品图像" }
         ],
+        params: [],
         why: "没有它就看不到图。工作流里凡是『KSampler 之后接什么』的问题，九成答案就是它。",
         tips: "画面发灰、发指纹状噪点常常是 VAE 不匹配——SDXL 模型建议显式加载官方 SDXL VAE。 tiled 版本（VAE Decode Tiled）可在低显存下解码大图。"
       },
@@ -127,6 +180,7 @@
         outputs: [
           { type: "LATENT", to: "KSampler / SetLatentNoiseMask", desc: "原图的潜空间表示" }
         ],
+        params: [],
         why: "它是『从图像出发的所有玩法』（图生图、重绘、ControlNet 后采样、换脸管线）的第一站。",
         tips: "denoise 0.4-0.7 是图生图常用区间：0.4 微调、0.7 大改。输入图长宽比尽量贴合目标，采样前先 ImageScale 统一尺寸。"
       },
@@ -140,6 +194,9 @@
         outputs: [
           { type: "IMAGE", to: "VAEEncode / ControlNet 预处理 / ReActor 等", desc: "图像张量" },
           { type: "MASK", to: "遮罩类节点", desc: "透明通道提取的蒙版" }
+        ],
+        params: [
+          { name: "image", kind: "下拉选择", default: "最近上传的图片", desc: "从 input 目录选择图片，也可以直接点上传按钮（桌面版支持把图拖进画布）。换机器后需要把原图片重新放进 input 目录。" }
         ],
         why: "所有以图为输入的玩法都需要它。工作流文件里内嵌了缩略图与文件名，但换机器后文件必须重新存在于 input 目录。",
         tips: "大图先经过 ImageScale 缩到目标分辨率再编码，可显著提速并稳定构图。PNG 透明背景会自动变成 MASK 输出。"
@@ -155,6 +212,16 @@
         outputs: [
           { type: "MASK", to: "GrowMask / SetLatentNoiseMask / 遮罩处理节点", desc: "提取出的蒙版" }
         ],
+        params: [
+          { name: "image", kind: "下拉选择", default: "最近上传的蒙版图", desc: "选择 input 目录里的蒙版图片，白（亮）色区域表示允许重绘的部分。" },
+          { name: "channel", kind: "下拉选择", default: "red", desc: "用图片的哪个颜色通道生成蒙版，适合用修图软件按颜色分别保存多块蒙版。",
+            options: [
+              ["red", "取红色通道，最常用的默认画法：红色涂出重绘范围"],
+              ["green", "取绿色通道，可用于在同一张图里放第二块蒙版"],
+              ["blue", "取蓝色通道，同上，用于第三块蒙版"],
+              ["alpha", "取透明通道，PNG 里透明处即蒙版，适合保留透明的素材图"]
+            ] }
+        ],
         why: "手动重绘（inpaint）工作流的『范围控制器』。没有蒙版，KSampler 会重画整张图。",
         tips: "桌面版更常用的方式是直接在 Load Image 上右键 Open in MaskEditor 涂抹蒙版，省去单独画蒙版图。"
       },
@@ -169,6 +236,7 @@
         outputs: [
           { type: "LATENT", to: "KSampler 的 latent_image", desc: "带蒙版约束的潜空间" }
         ],
+        params: [],
         why: "重绘工作流的『围栏』。没有它，所谓 inpaint 与普通图生图没有区别。",
         tips: "重绘边缘生硬时，把蒙版经 GrowMask 扩几个像素并加羽化，衔接会自然得多。"
       },
@@ -184,6 +252,12 @@
         outputs: [
           { type: "CONDITIONING", to: "KSampler 的 positive（可再叠下一个 ControlNet）", desc: "注入结构约束后的条件" }
         ],
+        params: [
+          { name: "control_net_name", kind: "下拉选择", default: "首个可用的 ControlNet 模型", desc: "选择 models/controlnet 目录里的 ControlNet 模型。模型类型决定它吃什么图：线稿模型配线稿、深度模型配深度图。" },
+          { name: "strength", kind: "浮点数", default: "1.0", desc: "结构约束强度。1.0 严格跟随参考图，0.6-0.8 给模型留发挥空间，2.0 起可能喧宾夺主压过提示词。" },
+          { name: "start_percent", kind: "浮点数", default: "0.0", desc: "从采样的百分之几开始施加约束，0 表示从第一步就锁结构。一般不动，除非想前半程自由打底。" },
+          { name: "end_percent", kind: "浮点数", default: "1.0", desc: "在采样的百分之几松开约束。0.5-0.8 常用：前半程锁定构图，后半程放开让模型补细节，画面更自然。" }
+        ],
         why: "构图可控是 AI 绘图工程化的分水岭：姿态、线条、深度、法线、二维码……一切『按参考图生成』的需求都由此实现。",
         tips: "Advanced 版可以分别设置正/负向强度与起止步数（end_percent 0.5 常用于后半程松手让细节自由）。预处理必须与 ControlNet 类型匹配：线稿模型吃线稿图，深度模型吃深度图。"
       },
@@ -196,6 +270,13 @@
         ],
         outputs: [
           { type: "CONDITIONING", to: "KSampler 或下一级条件节点", desc: "合并/区域化后的条件" }
+        ],
+        params: [
+          { name: "strength", kind: "浮点数", default: "1.0", desc: "该路条件（或该区域）的影响力。多路条件叠加时各路权重之和控制在 1.0 上下，过高会互相撕扯导致画面混乱。" },
+          { name: "x", kind: "整数", default: "0", desc: "区域条件生效范围的左上角横坐标（像素）。与 width 搭配决定『条件管住画面的哪一条竖带』。" },
+          { name: "y", kind: "整数", default: "0", desc: "区域条件生效范围的左上角纵坐标（像素）。把角色条件锁在上半、背景条件锁在下半就是这么用的。" },
+          { name: "width", kind: "整数", default: "64", desc: "区域条件的生效宽度。x 加 width 不要超出画面总宽，否则多出的部分无效。" },
+          { name: "height", kind: "整数", default: "64", desc: "区域条件的生效高度。区域至少要能框住主体的轮廓，太小会导致该条件几乎不起作用。" }
         ],
         why: "单个提示词无法表达『左边是男孩右边是女孩』这类空间需求，条件区域化是双角色构图、艺术二维码等玩法的地基。",
         tips: "分区控制建议配合区域蒙版类第三方节点（如 Latent Couple）使用；两路条件权重之和以 1.0 上下为宜，过高会互相撕扯。"
@@ -210,6 +291,9 @@
         outputs: [
           { type: "CONDITIONING", to: "KSampler 的 positive", desc: "带引导值的事件条件" }
         ],
+        params: [
+          { name: "guidance", kind: "浮点数", default: "3.5", desc: "Flux 的蒸馏引导值，相当于传统 cfg 的替代品。越高越严格贴合提示词、构图越死板，越低越自由有氛围。3.5 是社区默认；人像 2.5-3.5，需要严格对齐构图时提到 4-5。" }
+        ],
         why: "Flux 不吃普通 cfg——没有这个节点（或固定 guidance 值）就无法控制 Flux 的提示词服从度。",
         tips: "guidance 3.5 是社区默认值；人像 2.5-3.5、需要严格服从构图时提到 4-5。负向提示词对 Flux 基本无效，负向用 ZeroOut 即可。"
       },
@@ -222,6 +306,17 @@
         ],
         outputs: [
           { type: "LATENT", to: "第二遍 KSampler", desc: "放大后的潜空间画布" }
+        ],
+        params: [
+          { name: "upscale_method", kind: "下拉选择", default: "bilinear", desc: "潜空间插值算法。这只决定『画布放大后平滑与否』，不产生新细节，细节要靠第二遍采样补。",
+            options: [
+              ["bilinear", "双线性插值，平滑通用，最常用的默认选择"],
+              ["bicubic", "双三次插值，过渡更柔顺，放大后再采样时过渡更自然"],
+              ["area", "区域平均，整体偏柔和，适合避免锯齿"],
+              ["nearest-exact", "最近邻直接复制像素，硬边明显，一般只在特殊风格下用"],
+              ["bislerp", "球面插值，潜空间语义混合更连贯，放大后崩坏率更低，稍慢"]
+            ] },
+          { name: "upscale_by", kind: "浮点数", default: "1.5", desc: "放大倍率。1.25-1.5 最稳，直接超过 2 倍容易构图崩坏，大倍率建议分多级放大逐级采样。" }
         ],
         why: "低成本放大工作流的关键中转站：在潜空间放大比在像素空间放大省显存得多，且能与增量采样无缝配合。",
         tips: "upscale_method 选 bicubic/area 更平滑；放大倍率 1.25-1.5 倍最稳，超过 2 倍建议分多级进行。"
@@ -237,6 +332,9 @@
         outputs: [
           { type: "IMAGE", to: "SaveImage / Ultimate SD Upscale", desc: "放大后的图像" }
         ],
+        params: [
+          { name: "model_name", kind: "下拉选择", default: "models/upscale_models 里的第一个模型", desc: "选择超分模型文件。名字里的 4x 表示放大倍率；UltraSharp 偏锐利、RealESRGAN 偏通用平滑，按画风喜好选。" }
+        ],
         why: "它是『出大图』最省心的路径：不占采样预算、不挑模型架构，4 倍放大一键完成。",
         tips: "4x 模型名字里的 4x 指放大倍率。超分后再过一遍低 denoise 的 Ultimate SD Upscale 可消除过度锐化的伪影。"
       },
@@ -250,6 +348,33 @@
         outputs: [
           { type: "IMAGE", to: "SaveImage 或后处理链", desc: "处理结果" }
         ],
+        params: [
+          { name: "upscale_method", kind: "下拉选择", default: "nearest-exact", desc: "Image Scale 的像素插值算法。放大照片级内容建议 bicubic 或 lanczos。",
+            options: [
+              ["lanczos", "锐利清晰，放大后文字与线条边缘保持最好，稍慢"],
+              ["bicubic", "平滑中带细节，放大照片类图像的通用选择"],
+              ["nearest-exact", "像素风硬边效果，放大像素画专用，常规图会有锯齿"],
+              ["area", "缩小图片时质量最好，能避免摩尔纹"]
+            ] },
+          { name: "width", kind: "整数", default: "512", desc: "Image Scale 的目标宽度。只改宽会拉伸变形，配合 crop 或保持比例的缩放节点使用。" },
+          { name: "height", kind: "整数", default: "512", desc: "Image Scale 的目标高度。送入潜空间前记得保持 8 的倍数。" },
+          { name: "crop", kind: "下拉选择", default: "disabled", desc: "Image Scale 尺寸不一致时是否居中裁掉超出部分。center 可避免拉伸变形，代价是损失边缘内容。",
+            options: [
+              ["disabled", "不裁剪，直接缩放到目标尺寸，比例不同会被拉伸"],
+              ["center", "居中裁剪，保持比例但裁掉画面边缘"]
+            ] },
+          { name: "blend_mode", kind: "下拉选择", default: "normal", desc: "Image Blend 的图层混合模式，与 Photoshop 同名模式概念一致。",
+            options: [
+              ["normal", "普通叠加，仅按不透明度混合，效果最可预期"],
+              ["multiply", "正片叠底，白色变透明、整体变暗，适合叠线稿和阴影"],
+              ["screen", "滤色，黑色变透明、整体变亮，适合叠光效、光斑"],
+              ["overlay", "叠加，暗部更暗亮部更亮，增强对比与质感"],
+              ["soft_light", "柔光，比 overlay 温和，适合轻度统一色调"],
+              ["difference", "差值，两图差异处变亮，常用于对齐检查与故障风"]
+            ] },
+          { name: "blend_factor", kind: "浮点数", default: "1.0", desc: "Image Blend 的混合比例：0 只见底图，1 上层图完全生效，0.5 左右是自然的双重曝光。" },
+          { name: "resize_source", kind: "开关", default: "disable", desc: "Image Composite Masked 的选项：开启后自动把贴入的小图缩放到目标位置尺寸，省一步手工 Scale。" }
+        ],
         why: "采样管线结束后的一切『排版级』操作都靠它们：尺寸统一、图层合成、局部回贴是几乎所有成品工作流的收尾步骤。",
         tips: "Composite 前务必保证两图尺寸一致（先 Scale）；按蒙版贴回时蒙版羽化 2-5px 可以消除接缝。"
       },
@@ -261,6 +386,9 @@
           { name: "images", type: "IMAGE", from: "VAEDecode 或后处理输出", desc: "待输出图像" }
         ],
         outputs: [],
+        params: [
+          { name: "filename_prefix", kind: "文本", default: "ComfyUI", desc: "输出文件名前缀，支持 %date:yyyy-MM-dd% 这类日期模板与 %seed% 等变量，批量出图时建议带上日期或模型关键词方便归档。" }
+        ],
         why: "OUTPUT_NODE 类型节点：引擎以它们为『终点』判断哪些分支需要执行——一张图里没有输出节点的话，整个工作流会被判定无事可做。",
         tips: "文件名模板用 ComfyUI_%date:yyyy-MM-dd%_# 前缀自动编号；中间节点多用 Preview 少落盘，能省大量磁盘。"
       },
@@ -273,6 +401,18 @@
         ],
         outputs: [
           { type: "MODEL / CLIP / VAE", to: "与 Load Checkpoint 完全相同的下游", desc: "三路标准输出" }
+        ],
+        params: [
+          { name: "unet_name", kind: "下拉选择", default: "models/unet 或 diffusion_models 里的文件", desc: "选择扩散主体文件（Flux、Wan 等）。同名 fp8 版本体积与显存减半，是低显存跑新模型的第一选择。" },
+          { name: "weight_dtype", kind: "下拉选择", default: "default", desc: "UNET Loader 的加载精度。default 按文件原样加载；显存吃紧时选 fp8 相关项可大幅省显存。",
+            options: [
+              ["fp8_e4m3fn", "8bit 浮点格式，显存约省一半，画质损失轻微，低显存首选"],
+              ["fp8_e4m3fn_fast", "在 e4m3fn 基础上用更快的计算核心，速度更快，个别显卡可能报错"],
+              ["fp8_e5m2", "另一种 8bit 格式，动态范围大但精度略低，较少用"]
+            ] },
+          { name: "clip_name1", kind: "下拉选择", default: "models/clip 里的编码器文件", desc: "DualCLIPLoader 的第一个文本编码器，Flux 通常是 CLIP-L（如 clip_l.safetensors）。" },
+          { name: "clip_name2", kind: "下拉选择", default: "models/clip 里的编码器文件", desc: "第二个文本编码器，Flux 通常选 T5-XXL（显存翻倍，可选 fp8 版节省）。" },
+          { name: "vae_name", kind: "下拉选择", default: "models/vae 里的文件", desc: "VAE Loader 选择的解码器文件，需与所用模型架构匹配，如 Flux 用 ae.safetensors。" }
         ],
         why: "新世代大模型都是分离式发布（且常有 fp8 量化版），不会用这三件套就跑不了 Flux/Wan 工作流。",
         tips: "显存不足优先换 fp8 量化的 UNET 文件；CLIP 编码器可用 CLIPSetLastLayer 或 skip 影响输出风格。加载 T5 时显存翻倍，可考虑 FP8 版 T5。"
@@ -288,6 +428,9 @@
         outputs: [
           { type: "CLIP", to: "CLIP Text Encode", desc: "截断后的编码器" }
         ],
+        params: [
+          { name: "stop_at_clip_layer", kind: "整数", default: "-1", desc: "负数表示从 CLIP 尾部截掉几层。-1 截一层，-2 截两层。某些二次元底模在 -2 时色彩与构图明显更好；现代 SDXL/Flux 模型一般保持默认。" }
+        ],
         why: "特定二次元底模（如 Anything 系列）在 -1/-2 层有明显画质增益，是老玩家口口相传的『玄学优化』的真实出处。",
         tips: "现代 SDXL/Flux 模型一般不需要动它；只有当特定底模出图发灰、构图呆板时值得试 -2。"
       },
@@ -299,6 +442,7 @@
         outputs: [
           { type: "*（Primitive 视内容而定）", to: "任意同类型输入", desc: "转发的参数值" }
         ],
+        params: [],
         why: "工作流传播（社区分享）离不开它们：没有注释的工作流两周后连作者自己都看不懂；没有 Primitive，改一个公共种子要点开每个节点。",
         tips: "分享工作流前放一张 Note 写清模型清单与参数范围是社区礼仪；rgthree 等第三方包有增强版（如 Power Prompt、Any Reroute）。"
       },
@@ -311,6 +455,10 @@
         ],
         outputs: [
           { type: "IMAGE", to: "VAEEncode / Composite / Save", desc: "调整后的图像" }
+        ],
+        params: [
+          { name: "upscale_method", kind: "下拉选择", default: "bicubic", desc: "像素插值算法，与 Image Scale 相同；放大照片选 lanczos 或 bicubic 更清晰。" },
+          { name: "scale_by", kind: "浮点数", default: "1.5", desc: "缩放倍率。以倍率缩放时自动保持长宽比，比手填宽高更不容易变形；外扩画布外的操作则配合裁剪与填充节点完成。" }
         ],
         why: "所有涉及『输入图与目标分辨率不一致』的场景都需要它：图生图、ControlNet 参考、外扩、拼图合成。",
         tips: "等比缩放后常出现非 8 倍数尺寸——潜空间要求尺寸是 8 的倍数，记得用选项里的 divisible-by 对齐。"
@@ -325,6 +473,13 @@
         outputs: [
           { type: "LATENT / output", to: "VAEDecode", desc: "采样结果" }
         ],
+        params: [
+          { name: "noise_seed", kind: "整数", default: "0", desc: "RandomNoise 组件的噪声种子，作用等同于 KSampler 的 seed，控制整次生成的随机性。" },
+          { name: "sampler_name", kind: "下拉选择", default: "euler", desc: "KSamplerSelect 选择的去噪算法，选项与普通 KSampler 相同；dpmpp_2m 配 karras 调度器依旧是稳妥的高质量组合。" },
+          { name: "scheduler", kind: "下拉选择", default: "normal", desc: "BasicScheduler 生成的噪声日程表类型，karras 细节更精致，sgm_uniform 常用于视频模型。" },
+          { name: "steps", kind: "整数", default: "20", desc: "BasicScheduler 的总步数，决定噪声日程被切成多少步，20-35 为常用区间。" },
+          { name: "denoise", kind: "浮点数", default: "1.0", desc: "BasicScheduler 的去噪强度：1.0 完整生成，0.5 相当于只用日程表的前半段做图生图。" }
+        ],
         why: "想精细控制采样（自定义噪声日程、中途换引导、多阶段采样）只能用它；新模型官方示例也用它，看不懂它就看不懂 Flux 工作流。",
         tips: "入门先理解 sigmas：它本质是每一步的噪声强度时间表，denoise 0.5 在老 KSampler 里等价于 sigmas 取前半段。"
       },
@@ -337,6 +492,11 @@
         ],
         outputs: [
           { type: "LATENT", to: "视频模型 KSampler", desc: "视频初始噪声" }
+        ],
+        params: [
+          { name: "width", kind: "整数", default: "832", desc: "视频画布宽度。Wan 系模型常用 832x480 横版或 480x832 竖版，需为 16 的倍数。" },
+          { name: "height", kind: "整数", default: "480", desc: "视频画布高度。分辨率与帧数共同决定显存占用，先降帧再降分辨率是排障顺序。" },
+          { name: "length", kind: "整数", default: "81", desc: "总帧数，即视频长度（Wan 按 16 帧每秒计，81 帧约 5 秒）。多数视频模型要求帧数为 4 的倍数加 1（如 49、81），显存随帧数近似线性增长。" }
         ],
         why: "视频工作流的信息量是图像的几百倍，理解『帧数即 batch、显存随帧数线性涨』是入门视频生成的第一课。",
         tips: "512x512x81 帧的 5B 级模型在 12G 显存可跑；帧数每翻一倍显存近似翻倍，出问题先降帧再降分辨率。"

@@ -29,6 +29,10 @@
           { type: "CLIP_VISION", to: "各类 IPAdapter 节点的 clip_vision 输入", desc: "配套的视觉编码器" }
         ],
         why: "IPAdapter 模型文件众多且命名复杂，选错版本会直接报错或效果异常；Unified Loader 自动完成架构识别与文件匹配，大幅降低出错率。",
+        params: [
+          { name: "preset", kind: "下拉选择", default: "PLUS (high strength)", desc: "预设档位决定加载哪套 IPAdapter 与 CLIP Vision 权重，加载器会根据底模自动匹配 SD1.5 或 SDXL 版本。",
+            options: [["PLUS (high strength)", "通用风格与概念迁移，最常用的档位"], ["PLUS FACE (portraits)", "带人脸增强，适合人像参考"], ["FULL FACE - SD1.5 only (portraits stronger)", "整脸保持更强，仅 SD1.5 可用"], ["LIGHT - SD1.5 only (low strength)", "低强度轻度参考，不容易锁死画面"]] }
+        ],
         tips: "若提示缺少模型文件，按控制台日志给出的文件名下载，放进 models/ipadapter 与 models/clip_vision 目录后重启即可。"
       },
       {
@@ -45,6 +49,11 @@
           { type: "MODEL", to: "典型下游：KSampler 的 model 输入", desc: "注入参考图特征后的模型" }
         ],
         why: "无需训练即可把任意图片的风格或内容特征迁移到生成结果中，是风格化与概念一致性的最低门槛入口。",
+        params: [
+          { name: "weight", kind: "浮点数", default: "1.0", desc: "注入强度，0 为不生效，1 为完全生效；从 0.6 到 0.8 试起，过高画面容易僵化、色彩溢出。" },
+          { name: "weight_type", kind: "下拉选择", default: "standard", desc: "参考图话语权与提示词的相对强弱。",
+            options: [["standard", "常规注入，图文并重"], ["style transfer", "只学画风，不学构图内容"], ["prompt is more important", "削弱参考图，给提示词更大发挥空间"]] }
+        ],
         tips: "weight 从 0.6 到 0.8 试起；过高容易出现画面僵化、色彩溢出或构图被参考图锁死。"
       },
       {
@@ -63,6 +72,15 @@
           { type: "MODEL", to: "典型下游：KSampler 的 model 输入", desc: "注入后的模型" }
         ],
         why: "复杂工作流需要对注入的时机、区域和强度做精确控制，Advanced 是用途最广、社区工作流出镜率最高的版本。",
+        params: [
+          { name: "weight", kind: "浮点数", default: "1.0", desc: "注入强度，配合权重曲线使用，过高会构图被参考图锁死。" },
+          { name: "weight_type", kind: "下拉选择", default: "linear", desc: "注入强度随采样步数变化的曲线，决定参考图在何时起作用。",
+            options: [["linear", "全程恒定，通用默认"], ["ease in-out", "先弱后强再弱，常用来先定结构、后放细节"], ["style transfer", "专注迁移画风而弱化内容"], ["composition", "只参考构图与布局，弱化画风"]] },
+          { name: "start_at", kind: "浮点数", default: "0.0", desc: "从采样进度的哪个比例开始注入，0 表示从头生效。" },
+          { name: "end_at", kind: "浮点数", default: "1.0", desc: "到采样进度的哪个比例停止注入，0.7 表示最后三成步不再干预，让画面自由收尾。" },
+          { name: "embeds_scaling", kind: "下拉选择", default: "V only", desc: "特征注入的数学方式，影响参考图实际影响力的大小。",
+            options: [["V only", "只调节值通道，最通用最稳"], ["K+V", "同时调键与值通道，参考图的约束力更强"]] }
+        ],
         tips: "想让构图先定型、细节再自由发挥，选 ease in out 类权重曲线并配合较高的 weight；局部注入时用 attn_mask 划定区域。"
       },
       {
@@ -79,6 +97,10 @@
           { type: "MODEL", to: "典型下游：KSampler 的 model 输入", desc: "注入后的模型" }
         ],
         why: "大量社区工作流和教程基于 Plus 版搭建，认识它有助于看懂和改造存量工作流。",
+        params: [
+          { name: "weight", kind: "浮点数", default: "1.0", desc: "注入强度，多张参考图取平均时总强度过高更容易色彩溢出。" },
+          { name: "weight_type", kind: "下拉选择", default: "linear", desc: "强度随采样步数变化的曲线，含义与 IPAdapter Advanced 相同。" }
+        ],
         tips: "新工作流请优先用 Advanced，两者参数几乎一一对应，迁移成本很低。"
       },
       {
@@ -96,6 +118,11 @@
           { type: "MODEL", to: "典型下游：KSampler 的 model 输入", desc: "注入人脸身份后的模型" }
         ],
         why: "普通风格迁移对「人脸像不像」控制很弱，FaceID 专门解决人物身份一致这个高频需求。",
+        params: [
+          { name: "weight", kind: "浮点数", default: "1.0", desc: "身份注入强度，不宜超过 1，否则脸部容易塑料感。" },
+          { name: "insightface", kind: "下拉选择", default: "CPU", desc: "人脸分析模型的运行设备。",
+            options: [["CPU", "稳定不占显存，分析稍慢"], ["CUDA", "用显卡分析更快，显存紧张时慎用"]] }
+        ],
         tips: "配合项目提供的 FaceID 专用 LoRA 一起使用，相似度会明显提升；weight 不宜超过 1，否则脸部容易塑料感。"
       },
       {
@@ -114,6 +141,12 @@
           { type: "MODEL", to: "典型下游：KSampler 的 model 输入", desc: "注入后的模型" }
         ],
         why: "它是社区公认人脸相似度与画质平衡最好的 IPAdapter 人脸方案之一，常用于虚拟角色与写真类工作流。",
+        params: [
+          { name: "weight", kind: "浮点数", default: "1.0", desc: "身份嵌入强度，控制像不像参考图里的本人。" },
+          { name: "weight_v2", kind: "浮点数", default: "1.0", desc: "图像嵌入强度，控制光影、质感等外观细节的还原程度。" },
+          { name: "insightface", kind: "下拉选择", default: "CPU", desc: "人脸分析模型的运行设备。",
+            options: [["CPU", "稳定不占显存，分析稍慢"], ["CUDA", "用显卡分析更快，显存紧张时慎用"]] }
+        ],
         tips: "脸部崩坏时优先降低总 weight 并检查 FaceID 配套 LoRA 是否加载，而不是反复换参考图。"
       },
       {
@@ -130,6 +163,9 @@
           { type: "EMBEDS", to: "典型下游：IPAdapter Advanced 或 IPAdapter Combine Embeds", desc: "编码后的特征向量" }
         ],
         why: "把编码与注入两步拆开后，复杂工作流结构更清晰，同一组参考特征也能复用到多个分支。",
+        params: [
+          { name: "weight", kind: "浮点数", default: "1.0", desc: "该组特征的权重，影响这组参考图在后续注入时的话语权。" }
+        ],
         tips: "多张同类风格图放进同一组输入即可自动取平均，不必先在外部合成。"
       },
       {
@@ -145,6 +181,10 @@
           { type: "EMBEDS", to: "典型下游：IPAdapter Advanced 的嵌入输入", desc: "合并后的特征" }
         ],
         why: "想同时参考多张图时，逐层叠加模型节点容易互相干扰；在嵌入层面做数学运算更干净、更可控。",
+        params: [
+          { name: "method", kind: "下拉选择", default: "concat", desc: "多路特征之间的合并运算方式。",
+            options: [["concat", "拼接保留全部信息，信息最完整"], ["average", "平均融合，风格与人物混合时常用"], ["subtract", "相减剔除特征，用来减去混入的污染风格"], ["norm average", "归一化平均，各路强度更均衡"]] }
+        ],
         tips: "subtract 模式可以用来「减去」某张图的特征，常用于剔除混入的污染风格。"
       },
       {
@@ -161,6 +201,12 @@
           { type: "IMAGE", to: "典型下游：CLIP Vision Encode 或 IPAdapter 节点的图像输入", desc: "预处理后的参考图" }
         ],
         why: "风格迁移对参考图的纹理细节非常敏感，规范的预处理往往能把相似度提升一个明显档次。",
+        params: [
+          { name: "interpolation", kind: "下拉选择", default: "LANCZOS", desc: "缩放插值算法，LANCZOS 对纹理细节的保留最好。" },
+          { name: "crop_position", kind: "下拉选择", default: "top", desc: "裁切位置，决定缩放时保留画面的哪一部分。",
+            options: [["center", "居中裁切，主体在画面中间时用"], ["top", "保留上方，人脸常在画面偏上位置时更稳"], ["pad", "不裁切，补边保留完整画面"]] },
+          { name: "sharpening", kind: "浮点数", default: "0.0", desc: "锐化强度，0 为关闭；参考图分辨率低时加一点锐化，布纹笔触更容易被学到。" }
+        ],
         tips: "参考图分辨率偏低时适当增加锐化，布纹、笔触等细节更容易被学到。"
       }
     ]
@@ -191,6 +237,9 @@
           { type: "IMAGE", to: "典型下游：Save Image 或 VHS Video Combine", desc: "换脸完成的图像" }
         ],
         why: "视频换脸动辄上千帧，完整版参数在批处理中既慢又不稳定，快速版正是为此而生。",
+        params: [
+          { name: "swap_model", kind: "下拉选择", default: "inswapper_128.onnx", desc: "换脸模型文件，inswapper_128 是社区默认标配。" }
+        ],
         tips: "源图请用光照均匀、无遮挡的正面清晰脸。提醒：换脸属于对肖像的深度合成，务必取得当事人授权并遵守当地法律。"
       },
       {
@@ -209,6 +258,14 @@
           { type: "IMAGE", to: "典型下游：Save Image 或后续修复、放大链", desc: "换脸完成的图像" }
         ],
         why: "精细控制换脸范围与修复强度是商用出图的基本要求，这个节点把整条换脸链收进了一个节点。",
+        params: [
+          { name: "swap_model", kind: "下拉选择", default: "inswapper_128.onnx", desc: "换脸模型文件，默认 inswapper_128 即可满足大多数场景。" },
+          { name: "faces_index", kind: "文本", default: "0", desc: "替换目标图中第几张脸，从 0 开始编号，写 0,1 表示同时换两张。" },
+          { name: "face_restore_model", kind: "下拉选择", default: "none", desc: "换完脸之后对面部做修复的模型。",
+            options: [["none", "不修复，速度最快"], ["GFPGANv1.4", "通用修复，快而稳"], ["CodeFormer", "细节更好，可调保真权重，稍慢"]] },
+          { name: "face_restore_visibility", kind: "浮点数", default: "1.0", desc: "修复结果与原脸的混合比例，1 为全用修复脸，调低保留更多原脸特征。" },
+          { name: "codeformer_weight", kind: "浮点数", default: "0.5", desc: "仅 CodeFormer 生效，越高画面越清晰整齐但越容易失真，0.5 左右比较平衡。" }
+        ],
         tips: "faces_index 填 0 表示只换图中第一个人脸。合规提醒：处理真实人物面孔前必须取得肖像权授权，不得用于伪造、冒充、诽谤或欺诈内容。"
       },
       {
@@ -223,6 +280,12 @@
           { type: "FACE_MODEL", to: "典型下游：ReActorFaceSwap 的 face_model 输入", desc: "融合后的人脸模型" }
         ],
         why: "多人脸融合模型的稳定性远高于反复挑选单张源图，是视频换脸前的标准准备步骤。",
+        params: [
+          { name: "face_model_name", kind: "文本", default: "default", desc: "保存模式启用时使用的模型文件名，多个角色可以用不同名字分别管理。" },
+          { name: "save_mode", kind: "开关", default: "true", desc: "开启后把融合结果保存进 models 目录长期复用，关闭则只在本次输出。" },
+          { name: "compute_method", kind: "下拉选择", default: "Mean", desc: "多张脸特征的融合算法。",
+            options: [["Mean", "取平均，最常用最稳"], ["Median", "取中值，能抗个别异常照片"], ["Mode", "取众数，贴近出现最多的特征"]] }
+        ],
         tips: "建议用同一人 5 到 20 张不同角度的清晰照片；启用保存模式会把模型存进 models 目录长期复用。合规提醒：采集他人人脸照片需获得授权。"
       },
       {
@@ -237,6 +300,12 @@
           { type: "MASK", to: "典型下游：遮罩混合或局部处理节点", desc: "围绕人脸的羽化遮罩" }
         ],
         why: "裸换脸常在发际线、下颌边缘出现色差与接缝，用遮罩收窄作用域是最有效的补救手段。",
+        params: [
+          { name: "bbox_crop_factor", kind: "浮点数", default: "3.0", desc: "人脸检测框向外扩的倍数，决定遮罩覆盖脸周多大范围，调大更容易盖住发际线。" },
+          { name: "morphology_distance", kind: "整数", default: "0", desc: "遮罩形态学膨胀收缩的像素数，正数扩大、负数缩小，用来微调作用范围。" },
+          { name: "blur_radius", kind: "整数", default: "9", desc: "遮罩边缘的模糊半径，换脸边缘出现生硬接缝时调大。" },
+          { name: "sigma_factor", kind: "浮点数", default: "1.0", desc: "模糊强度系数，与模糊半径配合控制过渡的柔和程度。" }
+        ],
         tips: "边缘生硬时加大模糊量。提醒：对真实人物换脸请确认已取得肖像权授权，遵守肖像权与深度合成相关法规。"
       },
       {
@@ -252,6 +321,12 @@
           { type: "IMAGE", to: "典型下游：Save Image 或放大链", desc: "修复后的图像" }
         ],
         why: "换脸结果的脸部常常发糊，独立的修复节点让「先换脸、后修复」的流程可以灵活拆分与调参。",
+        params: [
+          { name: "face_restore_model", kind: "下拉选择", default: "GFPGANv1.4", desc: "面部修复模型。",
+            options: [["GFPGANv1.4", "通用修复，快而稳"], ["CodeFormer", "细节更好，可调保真权重，稍慢"], ["none", "不修复"]] },
+          { name: "face_restore_visibility", kind: "浮点数", default: "1.0", desc: "修复结果与原图的混合比例，1 为全用修复结果，调低保留更多原画面。" },
+          { name: "codeformer_weight", kind: "浮点数", default: "0.5", desc: "仅 CodeFormer 生效，越高画面越「整齐」但越容易失真。" }
+        ],
         tips: "提醒：人脸属于敏感个人信息，处理他人照片前请确认已获得授权，并遵守肖像权与个人信息保护法规。修复权重越高画面越「整齐」但越容易失真。"
       }
     ]
@@ -280,6 +355,9 @@
           { type: "INSTANTID", to: "典型下游：Apply InstantID 的 instantid 输入", desc: "InstantID 主模型" }
         ],
         why: "IdentityNet 与普通 IPAdapter 权重结构不同，必须用专用加载器，复用普通 IPAdapter 节点会直接报错。",
+        params: [
+          { name: "instantid_file", kind: "下拉选择", default: "ip-adapter.bin", desc: "InstantID 主模型文件，放入 models/instantid 目录后出现在下拉列表，官方只有 ip-adapter.bin 一个。" }
+        ],
         tips: "bin 文件放入 models/instantid 目录；加载失败多半是路径或文件名问题。提醒：使用他人面部数据请遵守肖像权与个人信息保护法规。"
       },
       {
@@ -293,6 +371,10 @@
           { type: "FACEANALYSIS", to: "典型下游：Apply InstantID 的 insightface 输入", desc: "人脸分析器" }
         ],
         why: "InstantID 对人脸特征提取的依赖比普通 IPAdapter 深得多，没有这一环整条链无法工作。",
+        params: [
+          { name: "provider", kind: "下拉选择", default: "CPU", desc: "人脸分析模型运行在什么设备上。",
+            options: [["CPU", "不占显存，检测稍慢，显存紧张首选"], ["CUDA", "用显卡跑检测更快，占显存"], ["ROCM", "AMD 显卡用这个选项"], ["CoreML", "苹果芯片设备用这个选项"]] }
+        ],
         tips: "首次运行报缺模型时，把 antelopev2 模型包解压到 models/insightface 目录。提醒：采集与分析他人人脸前请取得授权。"
       },
       {
@@ -314,6 +396,13 @@
           { type: "CONDITIONING", to: "典型下游：KSampler 的 negative 输入", desc: "更新后的负向条件" }
         ],
         why: "一个节点同时完成模型注入与条件改写，免去手动连接多个节点的复杂度，也让身份强度可以统一调节。",
+        params: [
+          { name: "weight", kind: "浮点数", default: "0.8", desc: "身份注入强度，0.8 到 1.0 起步，太高容易脸部僵硬、过度贴合参考图。" },
+          { name: "start_at", kind: "浮点数", default: "0.0", desc: "从采样进度的哪个比例开始生效，0 表示从头干预。" },
+          { name: "end_at", kind: "浮点数", default: "1.0", desc: "到采样进度的哪个比例停止干预，调低可以让画面后段自由收尾。" },
+          { name: "weight_type", kind: "下拉选择", default: "linear", desc: "身份强度随采样步数的衰减曲线。",
+            options: [["linear", "全程恒定，最常用"], ["ease in-out", "中段最强、开头结尾减弱，效果更自然"]] }
+        ],
         tips: "合规提醒：人脸是敏感生物特征，使用他人照片前必须获得明确授权，遵守肖像权法规，严禁制作冒充他人的内容。weight 建议 0.8 到 1.0 配合线性权重曲线起步。"
       },
       {
@@ -334,6 +423,12 @@
           { type: "CONDITIONING", to: "典型下游：KSampler 的 positive / negative 输入", desc: "更新后的正负条件" }
         ],
         why: "想让人物大改姿势或角度时，基础版容易连构图一起锁死；Advanced 的分离控制正是解法。",
+        params: [
+          { name: "ip_weight", kind: "浮点数", default: "0.8", desc: "IP-Adapter 身份注入强度，控制像不像参考脸。" },
+          { name: "cn_strength", kind: "浮点数", default: "0.8", desc: "内置人脸结构约束的强度，想大改姿势或角度时降到 0.5 以下甚至为 0。" },
+          { name: "start_at", kind: "浮点数", default: "0.0", desc: "从采样进度的哪个比例开始生效。" },
+          { name: "end_at", kind: "浮点数", default: "1.0", desc: "到采样进度的哪个比例停止干预。" }
+        ],
         tips: "想大改姿势时把内置约束强度降到 0.5 以下甚至为零，只靠身份权重锁脸。提醒：生成真人形象务必注意肖像权合规。"
       },
       {
@@ -349,6 +444,7 @@
           { type: "FACE_BBOX", to: "典型下游：需要人脸框的节点", desc: "人脸边界框" }
         ],
         why: "InstantID 对检测质量非常敏感，侧脸、遮挡、多人脸都会导致效果崩坏；先可视化再排查能省下大量试错时间。",
+        params: [],
         tips: "预览图上关键点错乱时先换正脸图或裁剪放大；多人脸图先框定目标脸。提醒：调试真实人脸素材时注意肖像权授权。"
       }
     ]
@@ -380,6 +476,11 @@
           { type: "MODEL", to: "典型下游：ADE_UseEvolved Sampling 或 KSampler 的 model 输入", desc: "具备运动能力的模型" }
         ],
         why: "运动模块是 AnimateDiff 的一切来源，选对与基础模型匹配的版本是成片质量的第一道关卡。",
+        params: [
+          { name: "model_name", kind: "下拉选择", default: "—", desc: "运动模型文件，放在 models/animatediff_models 目录，必须与底模架构匹配。",
+            options: [["v3_sd15_mm.ckpt", "SD1.5 首选，运动自然流畅"], ["mm_sd_v15_v2.ckpt", "SD1.5 经典版，稳定通用"]] },
+          { name: "beta_schedule", kind: "下拉选择", default: "autoselect", desc: "噪声调度方式，autoselect 会自动匹配运动模型训练时用的调度，建议不要手动改。" }
+        ],
         tips: "SD1.5 首选 v3_sd15_mm 或 mm_sd_v15_v2；SDXL 需要用专用动画模型，混用会严重劣化。"
       },
       {
@@ -396,6 +497,11 @@
           { type: "MODEL", to: "典型下游：ADE_UseEvolved Sampling 或 KSampler", desc: "具备运动能力的模型" }
         ],
         why: "显存与时长受限时，分段生成是跑长动画的实用手段，Advanced 提供了官方入口。",
+        params: [
+          { name: "model_name", kind: "下拉选择", default: "—", desc: "运动模型文件，需与底模架构匹配，选择原则与 Gen1 相同。" },
+          { name: "beta_schedule", kind: "下拉选择", default: "autoselect", desc: "噪声调度方式，保持 autoselect 即可。" },
+          { name: "frame_offset", kind: "整数", default: "0", desc: "起始帧偏移，分段生成长视频时第二段填上一段的帧数，让运动相位自然衔接。" }
+        ],
         tips: "分段续写时保持工作流其他参数不变，只递增 frame_offset，衔接才顺滑。"
       },
       {
@@ -411,6 +517,9 @@
           { type: "MODEL", to: "典型下游：KSampler 的 model 输入", desc: "挂载视频采样策略后的模型" }
         ],
         why: "无限长度、窗口滑移、自由帧率等功能都建立在进化采样之上，它是视频工作流推荐的标配环节。",
+        params: [
+          { name: "beta_schedule", kind: "下拉选择", default: "autoselect", desc: "噪声调度方式，autoselect 自动匹配运动模型，一般不动。" }
+        ],
         tips: "养成固定链路习惯：运动模型加载器接 Use Evolved Sampling，再接上下文选项或直接进 KSampler。"
       },
       {
@@ -427,6 +536,12 @@
           { type: "CONTEXT_OPTIONS", to: "典型下游：ADE_UseEvolved Sampling", desc: "上下文窗口方案" }
         ],
         why: "想生成 32 帧以上的长动画，上下文机制几乎是唯一正解，它直接决定长视频的连贯性。",
+        params: [
+          { name: "context_length", kind: "整数", default: "16", desc: "每个窗口的帧数，运动模型按 16 帧训练，一般固定 16。" },
+          { name: "context_overlap", kind: "整数", default: "4", desc: "相邻窗口的重叠帧数，重叠部分用来缝合过渡，4 到 8 常用，太小容易跳变。" },
+          { name: "context_stride", kind: "整数", default: "1", desc: "窗口滑动的跨步，1 表示逐帧滑动，连贯性最好。" },
+          { name: "closed_loop", kind: "开关", default: "false", desc: "首尾闭环，做循环动画时打开，让最后一帧接回第一帧。" }
+        ],
         tips: "窗口重叠建议 4 到 8 帧；做循环动画时打开 closed_loop 让首尾相接。"
       },
       {
@@ -442,6 +557,11 @@
           { type: "MOTION_LORA", to: "典型下游：运动模型加载器的 motion_lora 输入", desc: "运动 LoRA" }
         ],
         why: "运动模块本身只保证「会动」，镜头感与稳定性要靠运动 LoRA 补足，官方提供的平移类 LoRA 是最常用的起点。",
+        params: [
+          { name: "lora_name", kind: "下拉选择", default: "—", desc: "运动 LoRA 文件，放在 models/animatediff_motion_lora 目录，每种只教一个镜头动作。",
+            options: [["v2_lora_ZoomIn.ckpt", "镜头推近变焦"], ["v2_lora_PanLeft.ckpt", "镜头向左平移"], ["v2_lora_TiltUp.ckpt", "镜头向上摇"]] },
+          { name: "strength", kind: "浮点数", default: "1.0", desc: "运动效果强度，0.6 到 1.0 之间调节，叠加多个 LoRA 时适当降低。" }
+        ],
         tips: "强度在 0.6 到 1.0 之间调节；一次叠加两个以上运动 LoRA 容易相互抵消。"
       },
       {
@@ -457,6 +577,11 @@
           { type: "LATENT", to: "典型下游：KSampler 的 latent_image 输入", desc: "视频初始噪声批次" }
         ],
         why: "视频工作流里帧数是核心参数，专用节点避免了 batch_size 与帧数两个概念的混淆。",
+        params: [
+          { name: "width", kind: "整数", default: "512", desc: "帧宽度，建议用运动模型训练分辨率附近起手，SD1.5 常用 512。" },
+          { name: "height", kind: "整数", default: "512", desc: "帧高度，SD1.5 视频 512 到 768 之间更稳。" },
+          { name: "length", kind: "整数", default: "16", desc: "帧数，即一次生成的画面数量，先用 16 帧小尺寸测试再放大。" }
+        ],
         tips: "先用 16 帧小尺寸测试构图与运动，确认后再放大 length 与分辨率。"
       }
     ]
@@ -491,6 +616,13 @@
           { type: "VHS_VIDEOINFO", to: "典型下游：需要视频元信息的节点", desc: "宽高、帧率等元数据" }
         ],
         why: "视频工作流的第一步是可控地把视频变成帧，帧率、裁剪与抽帧参数直接决定后续计算量。",
+        params: [
+          { name: "video", kind: "下拉选择", default: "—", desc: "前端上传的视频文件，上传后自动出现在列表里。" },
+          { name: "force_rate", kind: "整数", default: "0", desc: "强制重采样到的目标帧率，0 保持原帧率；常用 12 到 24 控制后续计算量。" },
+          { name: "frame_load_cap", kind: "整数", default: "0", desc: "最多加载的帧数，0 为不限；调试时设 8 到 16 帧快速试跑。" },
+          { name: "skip_first_frames", kind: "整数", default: "0", desc: "跳过开头的帧数，用来掐掉片头或废帧。" },
+          { name: "select_every_nth", kind: "整数", default: "1", desc: "隔帧抽取，设 2 表示每 2 帧取 1 帧，帧数减半、动作更快。" }
+        ],
         tips: "调试阶段把 frame_load_cap 设为 8 到 16 帧快速试跑，定稿后再放开全量帧。"
       },
       {
@@ -509,6 +641,13 @@
           { type: "VHS_VIDEOINFO", to: "典型下游：需要视频元信息的节点", desc: "视频元数据" }
         ],
         why: "做批处理或无人值守跑图时，路径输入比手动上传可靠得多，这是自动化工作流的标准选择。",
+        params: [
+          { name: "video", kind: "文本", default: "", desc: "服务器上的视频文件路径，用正斜杠书写最稳妥，可由外部脚本批量注入。" },
+          { name: "force_rate", kind: "整数", default: "0", desc: "强制重采样到的目标帧率，0 保持原帧率。" },
+          { name: "frame_load_cap", kind: "整数", default: "0", desc: "最多加载的帧数，0 为不限。" },
+          { name: "skip_first_frames", kind: "整数", default: "0", desc: "跳过开头的帧数。" },
+          { name: "select_every_nth", kind: "整数", default: "1", desc: "隔帧抽取，设 2 表示每 2 帧取 1 帧。" }
+        ],
         tips: "路径使用正斜杠书写最稳妥；配合队列脚本可以批量处理整个目录的视频。"
       },
       {
@@ -524,6 +663,9 @@
           { type: "AUDIO", to: "典型下游：VHS Video Combine", desc: "可用音轨，可能为空" }
         ],
         why: "图片序列是视频制作中最通用的中间格式，这个节点让 ComfyUI 与外部工具能无缝交换帧数据。",
+        params: [
+          { name: "directory", kind: "文本", default: "", desc: "序列帧所在文件夹的路径，按文件名排序决定帧顺序，建议用 0001.png 这样的零填充编号。" }
+        ],
         tips: "文件夹混入非序列文件会导致帧数异常，先给序列帧单独建目录。"
       },
       {
@@ -538,6 +680,9 @@
           { type: "INT", to: "典型下游：需要帧数的节点", desc: "帧数" }
         ],
         why: "不方便访问服务器文件系统的用户也能使用序列帧，降低了视频工作流的上手门槛。",
+        params: [
+          { name: "images", kind: "下拉选择", default: "—", desc: "前端上传的多张图片或 zip 压缩包，按文件名顺序组成帧序列。" }
+        ],
         tips: "打包 zip 时把图片放在压缩包根目录，避免多层文件夹打乱帧顺序。"
       },
       {
@@ -552,6 +697,10 @@
           { type: "AUDIO", to: "典型下游：VHS Video Combine 的 audio 输入", desc: "音频流" }
         ],
         why: "无声成片往往要回到剪辑软件再配乐，直接在节点内挂音轨能一步导出完整视频。",
+        params: [
+          { name: "audio", kind: "下拉选择", default: "—", desc: "前端上传或从服务器路径选择的音频文件。" },
+          { name: "seek_frames", kind: "整数", default: "0", desc: "起始读取位置，从第几帧开始取音频。" }
+        ],
         tips: "输出帧数与音频长度不必一致，合成时以图像帧数为准拼接音频。"
       },
       {
@@ -566,6 +715,14 @@
         ],
         outputs: [],
         why: "帧序列只有被合成为视频文件才方便传播与审阅，该节点还承担帧率对齐与循环处理的职责。",
+        params: [
+          { name: "frame_rate", kind: "浮点数", default: "8", desc: "输出帧率，要与画面运动速度匹配，常用 12 到 30。" },
+          { name: "loop_count", kind: "整数", default: "0", desc: "循环播放次数，0 表示播放一次，导出 gif 循环素材时常调大。" },
+          { name: "pingpong", kind: "开关", default: "false", desc: "正放倒放交替，帧数少时能让动作显得更流畅。" },
+          { name: "format", kind: "下拉选择", default: "image/gif", desc: "容器与编码格式，不同格式会带出各自的码率设置项。",
+            options: [["image/gif", "免安装编码，快速预览运动首选"], ["video/h264-mp4", "常用成品格式，体积小画质好"], ["image/webp", "较高质量的有损动图，体积比 gif 小"]] },
+          { name: "filename_prefix", kind: "文本", default: "AnimateDiff", desc: "输出文件名前缀，成品保存在 output 目录。" }
+        ],
         tips: "出片前先用 gif 或高 crf 快速预览运动效果，确认后再导出高质量 mp4。"
       }
     ]
@@ -597,6 +754,12 @@
           { type: "IMAGE", to: "典型下游：VHS Video Combine 的 images 输入", desc: "插帧后的高帧率序列" }
         ],
         why: "生成模型的帧率受显存与时间限制，用 RIFE 把 16 帧补到 48 帧是性价比最高的流畅度方案。",
+        params: [
+          { name: "ckpt_name", kind: "下拉选择", default: "rife49.pth", desc: "插帧模型版本，编号越大版本越新。",
+            options: [["rife49.pth", "较新版本，快速运动重影更少，推荐"], ["rife_v4.6.pth", "经典版本，大量旧工作流在用"]] },
+          { name: "multiplier", kind: "整数", default: "2", desc: "插帧倍率，2 表示帧数翻倍、4 表示变四倍，建议一次 2 到 3 倍。" },
+          { name: "ensemble", kind: "开关", default: "true", desc: "集成推理，多次推理取平均，快速运动的重影更少但更耗时。" }
+        ],
         tips: "倍率建议一次 2 到 3 倍；快速运动画面出现重影时换更高版本的模型或开启 ensemble。"
       },
       {
@@ -613,6 +776,11 @@
           { type: "IMAGE", to: "典型下游：VHS Video Combine", desc: "插帧后的序列" }
         ],
         why: "高分辨率视频最容易在补帧这最后一步爆显存，分块版本让同一张显卡跑得动更大的画布。",
+        params: [
+          { name: "ckpt_name", kind: "下拉选择", default: "rife49.pth", desc: "插帧模型版本，含义与 RIFE VFI 相同。" },
+          { name: "multiplier", kind: "整数", default: "2", desc: "插帧倍率，2 表示帧数翻倍。" },
+          { name: "tile_size", kind: "整数", default: "128", desc: "分块尺寸，显存不足时从 256 降到 128，对插帧质量几乎没有影响。" }
+        ],
         tips: "显存不足时把 tile_size 从 256 降到 128；分块对插帧质量几乎无影响。"
       },
       {
@@ -628,6 +796,11 @@
           { type: "IMAGE", to: "典型下游：VHS Video Combine", desc: "插帧后的序列" }
         ],
         why: "RIFE 在剧烈运动或镜头切换处容易撕扯，FILM 作为互补方案可以救回这些镜头。",
+        params: [
+          { name: "ckpt_name", kind: "下拉选择", default: "film_net_fp32.pt", desc: "FILM 插帧模型文件，一般只有一个可用版本。" },
+          { name: "multiplier", kind: "整数", default: "2", desc: "插帧倍率，最小为 2，帧数成倍增长，注意别一次翻太多。" },
+          { name: "clear_cache_after_n_frames", kind: "整数", default: "10", desc: "每处理多少帧清理一次缓存，用来控制显存占用，一般保持默认。" }
+        ],
         tips: "与 RIFE 各跑同一段对比后再定稿；FILM 速度略慢，适合关键镜头精修。"
       },
       {
@@ -642,6 +815,11 @@
           { type: "IMAGE", to: "典型下游：VHS Video Combine", desc: "插帧后的序列" }
         ],
         why: "二次元内容的插帧一直是 RIFE 的弱项，GMFSS Fortuna 填补了动画向的空缺。",
+        params: [
+          { name: "ckpt_name", kind: "下拉选择", default: "GMFSS_fortuna_union", desc: "模型版本，union 是整合增强版。",
+            options: [["GMFSS_fortuna_union", "整合版，二次元线条更稳，推荐"], ["GMFSS_fortuna", "基础版，速度稍快"]] },
+          { name: "multiplier", kind: "整数", default: "2", desc: "插帧倍率，2 表示帧数翻倍。" }
+        ],
         tips: "实拍素材仍优先 RIFE 或 FILM；动画素材可以把几个模型并排对比选效果。"
       }
     ]
@@ -678,6 +856,18 @@
           { type: "IMAGE", to: "典型下游：Save Image", desc: "放大并补足细节的成图" }
         ],
         why: "一张图同时要倍率、细节与稳定性时，它是被社区验证了无数遍的方案；分块、去噪、接缝三个层面都能精细控制。",
+        params: [
+          { name: "upscale_by", kind: "浮点数", default: "2.0", desc: "放大倍率，2 倍是稳妥起点，最高 4 倍，倍率越高越依赖分块重绘兜底。" },
+          { name: "steps", kind: "整数", default: "20", desc: "每个分块重绘的采样步数，与主图采样类似，20 左右够用。" },
+          { name: "denoise", kind: "浮点数", default: "0.2", desc: "分块重绘幅度，0.1 到 0.3 只添质感、画面几乎不变，0.35 到 0.5 长真实细节，0.55 以上开始改变内容且容易块间风格漂移。" },
+          { name: "tile_width", kind: "整数", default: "512", desc: "分块宽度，块更大（如 1024）接缝更少但更占显存。" },
+          { name: "tile_padding", kind: "整数", default: "32", desc: "每块向外多带的上下文余量，帮助块与块之间纹理衔接，常用 32。" },
+          { name: "mask_blur", kind: "整数", default: "8", desc: "块边缘的羽化宽度，用于淡化块间接缝。" },
+          { name: "mode_type", kind: "下拉选择", default: "Linear", desc: "分块重绘的排布方式。",
+            options: [["Linear", "线性排布逐块处理，最通用"], ["Chess", "棋盘式隔块重绘，先一半再一半，更省时"], ["None", "只放大不重绘，等于纯放大模型输出"]] },
+          { name: "seam_fix_mode", kind: "下拉选择", default: "None", desc: "接缝修复方式，决定如何抹平块与块的缝合线。",
+            options: [["Half Tile", "在接缝处再跑一次半块去噪，效果最好最常用"], ["Band Pass", "在接缝处画一条修复带，速度与效果折中"], ["None", "不修复，最快，接缝可能可见"]] }
+        ],
         tips: "2 倍放大起步参数：denoise 0.25 到 0.35、块尺寸 1024、tile_padding 32、接缝修复选 Half Tile。放大模型与正向提示词共同决定细节走向，补一些皮肤、材质类描述词效果更好。"
       },
       {
@@ -696,6 +886,17 @@
           { type: "IMAGE", to: "典型下游：Save Image 或下一轮放大", desc: "原尺寸精修后的图像" }
         ],
         why: "把放大与重绘拆开后，可以自由组合放大模型与重绘强度；排查问题时也更容易定位是放大糊了还是重绘崩了。",
+        params: [
+          { name: "steps", kind: "整数", default: "20", desc: "每个分块重绘的采样步数。" },
+          { name: "denoise", kind: "浮点数", default: "0.2", desc: "分块重绘幅度，当作全图精修用 0.15 到 0.3，不会改变构图。" },
+          { name: "tile_width", kind: "整数", default: "512", desc: "分块宽度，显存够用时 1024 接缝更少。" },
+          { name: "tile_padding", kind: "整数", default: "32", desc: "每块向外多带的上下文余量，帮助块间纹理衔接。" },
+          { name: "mask_blur", kind: "整数", default: "8", desc: "块边缘的羽化宽度，用于淡化块间接缝。" },
+          { name: "mode_type", kind: "下拉选择", default: "Linear", desc: "分块重绘的排布方式。",
+            options: [["Linear", "线性排布逐块处理，最通用"], ["Chess", "棋盘式隔块重绘，更省时"], ["None", "不重绘，仅原样输出"]] },
+          { name: "seam_fix_mode", kind: "下拉选择", default: "None", desc: "接缝修复方式。",
+            options: [["Half Tile", "在接缝处再跑一次半块去噪，效果最好"], ["Band Pass", "在接缝处画一条修复带"], ["None", "不修复，最快"]] }
+        ],
         tips: "当作全图精修用：denoise 0.15 到 0.3、块尺寸 1024，正负提示词沿用出图时那一套，画面不会变构图。"
       }
     ]
@@ -725,6 +926,11 @@
           { type: "MODEL", to: "典型下游：LoRA 链或 KSampler 的 model 输入", desc: "量化加载的扩散模型" }
         ],
         why: "没有它，低显存设备连大模型的第一步都迈不出去；它把「能不能跑」变成了「跑哪个档位」的选择题。",
+        params: [
+          { name: "unet_name", kind: "下拉选择", default: "—", desc: "models/unet 里的量化模型文件，文件名中的 Q4_K_M、Q8_0 等是量化档位。",
+            options: [["Q8_0", "最接近原版画质，约 12GB 级显存占用"], ["Q5_K_M", "画质与体积的折中"], ["Q4_K_M", "8GB 显存的经典选择，画质损失很小"]] },
+          { name: "dequant_dtype", kind: "下拉选择", default: "default", desc: "反量化时的计算精度，default 自动选择即可。" }
+        ],
         tips: "8GB 显存选 Q4_K_M，12GB 可上 Q6_K 或 Q8_0；档位越高质量越接近原版，但显存几乎线性上升。Q4_K_M 是画质与体积的经典平衡点。"
       },
       {
@@ -739,6 +945,12 @@
           { type: "CLIP", to: "典型下游：CLIP Text Encode 的 clip 输入", desc: "量化加载的文本编码器" }
         ],
         why: "T5 这类大编码器常驻显存是低配设备的最大负担之一，量化后可再省下数 GB。",
+        params: [
+          { name: "clip_name", kind: "下拉选择", default: "—", desc: "models/clip 目录里的量化编码器文件，文件名中的档位含义与主模型相同。",
+            options: [["t5xxl 系文件", "Flux 的语义理解主力，体积最大，优先量化它"], ["clip_l 系文件", "辅助编码器，保持较高精度整体损失最小"]] },
+          { name: "type", kind: "下拉选择", default: "stable_diffusion", desc: "编码器对应的模型架构，要与主模型匹配。",
+            options: [["flux", "Flux 系模型"], ["sd3", "Stable Diffusion 3 系"], ["stable_diffusion", "SD1.5 与 SDXL 传统架构"]] }
+        ],
         tips: "优先把 T5 降到低档位量化，clip_l 保持较高精度，整体画质损失最小。"
       },
       {
@@ -754,6 +966,12 @@
           { type: "CLIP", to: "典型下游：CLIP Text Encode 的 clip 输入", desc: "合并后的双编码器" }
         ],
         why: "双编码器架构是新一代模型的标配，量化版加载器让低显存用户也能完整走通 Flux 工作流。",
+        params: [
+          { name: "clip_name1", kind: "下拉选择", default: "—", desc: "第一个编码器文件，Flux 标配选 clip_l 的量化版。" },
+          { name: "clip_name2", kind: "下拉选择", default: "—", desc: "第二个编码器文件，Flux 标配选 t5xxl 的量化版。" },
+          { name: "type", kind: "下拉选择", default: "stable_diffusion", desc: "两个编码器的组合架构。",
+            options: [["flux", "Flux 用 clip_l 加 t5xxl"], ["sd3", "SD3 用 clip_g 加 clip_l 等组合"], ["stable_diffusion", "传统双编码器架构"]] }
+        ],
         tips: "Flux 标配组合是 clip_l 与 t5xxl 两个 gguf 文件；t5 选低档量化、clip_l 选高档，画质损失最小。"
       },
       {
@@ -770,6 +988,12 @@
           { type: "CLIP", to: "典型下游：CLIP Text Encode 的 clip 输入", desc: "合并后的三编码器" }
         ],
         why: "SD3 系三路编码器总体积可观，全部量化才能显著压低整条链路的显存峰值。",
+        params: [
+          { name: "clip_name1", kind: "下拉选择", default: "—", desc: "第一个编码器文件，SD3 系用 clip_l。" },
+          { name: "clip_name2", kind: "下拉选择", default: "—", desc: "第二个编码器文件，SD3 系用 clip_g。" },
+          { name: "clip_name3", kind: "下拉选择", default: "—", desc: "第三个编码器文件，SD3 系用 t5xxl，占体积大头。" },
+          { name: "type", kind: "下拉选择", default: "stable_diffusion", desc: "三编码器的组合架构，SD3 与 SD3.5 选 sd3。" }
+        ],
         tips: "SD3.5 中 t5xxl 占体积大头，显存吃紧时优先对它使用低档量化。"
       },
       {
@@ -787,6 +1011,13 @@
           { type: "CLIP", to: "典型下游：CLIP Text Encode 的 clip 输入", desc: "合并后的四编码器" }
         ],
         why: "多编码器是新一代大模型的趋势，四路加载器保证社区在量化形态下也能第一时间跑通新模型。",
+        params: [
+          { name: "clip_name1", kind: "下拉选择", default: "—", desc: "第一个编码器文件，按目标模型官方说明的清单对应。" },
+          { name: "clip_name2", kind: "下拉选择", default: "—", desc: "第二个编码器文件。" },
+          { name: "clip_name3", kind: "下拉选择", default: "—", desc: "第三个编码器文件。" },
+          { name: "clip_name4", kind: "下拉选择", default: "—", desc: "第四个编码器文件。" },
+          { name: "type", kind: "下拉选择", default: "stable_diffusion", desc: "四编码器的组合架构，按所用模型选择对应档位。" }
+        ],
         tips: "四个编码器总体积可观，逐个查看体积并按需选档，优先压缩体积最大的那一路。"
       }
     ]
@@ -813,6 +1044,9 @@
           { type: "*", to: "典型下游：任何需要该数据的节点", desc: "读取的变量值，类型与 SetNode 存入时一致" }
         ],
         why: "大工作流的可读性直接决定改图效率，变量路由是社区公认最有效的整理手段。",
+        params: [
+          { name: "constant", kind: "下拉选择", default: "—", desc: "要读取的变量名，下拉列出画布上所有 SetNode 存入的变量，输出类型自动与存入类型一致。" }
+        ],
         tips: "变量名建议带类型前缀，如 vae_main、model_base，检索与排错都更快。GetNode 无需连线，选对变量名即可。"
       },
       {
@@ -826,6 +1060,9 @@
           { type: "*", to: "典型下游：原链路的下一个节点", desc: "原样透传的数据" }
         ],
         why: "没有它，全局共享数据只能靠长连线硬拉，改一次布局就要重排整张图。",
+        params: [
+          { name: "constant", kind: "文本", default: "", desc: "给存入数据起的变量名，同名变量只能有一个来源，GetNode 靠这个名字取数据。" }
+        ],
         tips: "同名变量只能有一个来源，出现重名冲突时节点会提示，注意改名区分。"
       },
       {
@@ -845,6 +1082,16 @@
           { type: "INT", to: "典型下游：需要实际尺寸的节点", desc: "最终高度" }
         ],
         why: "原生缩放节点不支持遮罩同步与实际尺寸输出，而多图混合前必须保证尺寸一致，这个节点一站解决。",
+        params: [
+          { name: "width", kind: "整数", default: "512", desc: "目标宽度，设 0 表示按原图或比例自动计算。" },
+          { name: "height", kind: "整数", default: "512", desc: "目标高度，设 0 表示按原图或比例自动计算。" },
+          { name: "upscale_method", kind: "下拉选择", default: "nearest-exact", desc: "插值算法，缩小图片用 lanczos 通常最锐利。",
+            options: [["lanczos", "缩小时观感最锐利，常用"], ["bicubic", "平滑适中"], ["nearest-exact", "最近邻，最快但有锯齿"]] },
+          { name: "keep_proportion", kind: "下拉选择", default: "stretch", desc: "比例处理方式，决定目标宽高与原图比例不一致时怎么办。",
+            options: [["stretch", "强行拉伸到目标宽高，会变形"], ["resize", "保比例缩放，结果可能不精确等于目标尺寸"], ["pad", "保比例缩放后补边，内容完整不裁切"], ["crop", "保比例铺满后居中裁切"]] },
+          { name: "crop_position", kind: "下拉选择", default: "center", desc: "裁切锚点在图的哪个方位，居中是多数场景的选择。" },
+          { name: "divisible_by", kind: "整数", default: "2", desc: "把结果尺寸对齐到该数的倍数，进 VAE 前常用 8 或 64，避免潜空间尺寸不整导致黑图。" }
+        ],
         tips: "先用保持比例模式对齐到 64 的倍数再进 VAE，避免潜空间尺寸不整导致的黑图。"
       },
       {
@@ -862,6 +1109,11 @@
           { type: "INT", to: "典型下游：需要高度的节点", desc: "当前高度" }
         ],
         why: "文生图第一环就是定分辨率，预设加尺寸输出的设计让分辨率在整个工作流中可追踪、可联动。",
+        params: [
+          { name: "dimensions", kind: "下拉选择", default: "512 x 512 (1:1)", desc: "常用分辨率预设，覆盖 SD1.5 到 SDXL 的常用档位，选完还会带出宽高输出供下游联动。" },
+          { name: "invert", kind: "开关", default: "false", desc: "交换宽高，横版竖版一键互转。" },
+          { name: "batch_size", kind: "整数", default: "1", desc: "一次生成几张，即批次大小。" }
+        ],
         tips: "把它输出的宽高接到放大或裁剪节点，改一处分辨率全图自动跟随。"
       },
       {
@@ -880,6 +1132,9 @@
           { type: "INT", to: "典型下游：裁剪或尺寸联动节点", desc: "有效区域高度" }
         ],
         why: "遮罩往往只被当作黑白色块使用；能读出它的几何信息后，局部处理流程才能真正自动化。",
+        params: [
+          { name: "threshold", kind: "浮点数", default: "0.01", desc: "判定有效遮罩像素的阈值，透明度低于它的像素不算在范围内，一般保持默认即可。" }
+        ],
         tips: "配合内置的 Image Crop 节点按输出坐标裁剪，可自动框定重绘区域。"
       },
       {
@@ -894,6 +1149,13 @@
           { type: "MASK", to: "典型下游：遮罩处理或局部重绘链", desc: "目标颜色区域遮罩" }
         ],
         why: "纯色背景素材经常需要转成遮罩来控制重绘区域，这个节点省去了去外部软件抠图的步骤。",
+        params: [
+          { name: "red", kind: "整数", default: "0", desc: "目标颜色的红色分量，0 到 255。" },
+          { name: "green", kind: "整数", default: "0", desc: "目标颜色的绿色分量，绿幕抠像常用 255。" },
+          { name: "blue", kind: "整数", default: "0", desc: "目标颜色的蓝色分量，纯绿幕组合为 0、255、0。" },
+          { name: "threshold", kind: "整数", default: "10", desc: "颜色容差，背景有噪点就调小、盖不全就调大，范围 0 到 255。" },
+          { name: "invert", kind: "开关", default: "false", desc: "反相遮罩，把选中和未选中的区域对调。" }
+        ],
         tips: "背景色有噪点时先收紧颜色范围，或对输出遮罩做轻微膨胀。"
       },
       {
@@ -905,6 +1167,9 @@
           { type: "INT", to: "典型下游：任何接受整数的输入", desc: "设定的整数值" }
         ],
         why: "调试和批量跑图时，集中管理常量比逐个点开节点修改快得多，也更不容易漏改。",
+        params: [
+          { name: "value", kind: "整数", default: "0", desc: "输出的固定整数值，可以充当 seed、帧数、尺寸等任何整数参数的来源。" }
+        ],
         tips: "搭配 SetNode 命名为 seed、frames 之类，全图共享同一套参数。"
       },
       {
@@ -917,6 +1182,9 @@
         ],
         outputs: [],
         why: "透明素材是合成流程的通用货币，这一步丢了 alpha，下游合成全要返工。",
+        params: [
+          { name: "filename_prefix", kind: "文本", default: "ComfyUI", desc: "输出文件名前缀，生成的 PNG 保存在 output 目录并带透明通道。" }
+        ],
         tips: "遮罩先做一次轻微羽化再当透明通道用，边缘合成时更自然。"
       }
     ]

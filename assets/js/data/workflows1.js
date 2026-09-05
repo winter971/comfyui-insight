@@ -958,15 +958,15 @@
     ]
   });
 
-  // ---------- 8. Ultimate SD Upscale 高清放大 ----------
+  // ---------- 8. 模型高清放大 ----------
   window.COMFY_DATA.workflows.push({
     id: "ultimate-upscale",
-    name: "Ultimate SD Upscale 高清放大",
+    name: "模型高清放大",
     category: "修复与放大",
     tags: ["放大", "超分", "瓦片重绘"],
     difficulty: 2,
-    source: "ssitu Ultimate SD Upscale 自定义节点",
-    summary: "Ultimate SD Upscale 先用超分模型把小图无损放大 4 倍，再把大图切成瓦片，用 KSampler 逻辑逐块低强度去噪，既补出细节又控制显存。必须这样连的原因是 Image Upscale With Model 只负责放大不会画细节，细节要靠 USDU 的分块重绘补齐，两者是接力关系。适合把低分辨率旧图、AI 小图放大到 4K 级别的出图定稿环节。",
+    source: "cubiq/ComfyUI_Workflows（真实文件）· Ultimate SD Upscale 为常用第三方变体",
+    summary: "先用超分模型（ESRGAN 系）把小图无损放大 4 倍，再对大图做低强度重绘补细节。本页源文件为 cubiq 整理的真实工作流（核心节点实现：Image Upscale With Model + 分块重绘思路）；社区更常用的 Ultimate SD Upscale 节点是同一思路的封装版，把分块、去噪、接缝修复做成了一个节点，两者可互相印证。适合把低分辨率旧图、AI 小图放大到 4K 级别的出图定稿环节。",
     useCases: [
       "1024 出图放大到 4096 定稿",
       "老照片与低清素材的高清化",
