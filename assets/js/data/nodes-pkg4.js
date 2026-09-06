@@ -208,6 +208,185 @@
           { name: "sharpening", kind: "浮点数", default: "0.0", desc: "锐化强度，0 为关闭；参考图分辨率低时加一点锐化，布纹笔触更容易被学到。" }
         ],
         tips: "参考图分辨率偏低时适当增加锐化，布纹、笔触等细节更容易被学到。"
+      },
+      {
+        name: "IPAdapter Model Loader", cat: "load",
+        brief: "从模型目录手动加载指定文件，输出独立的 IPAdapter 权重。",
+        desc: "不依赖预设的极简加载器：从 models/ipadapter 目录选择一个权重文件，反序列化后输出 IPADAPTER 类型。与 Unified Loader 的区别是它不做任何自动推断，用哪个文件完全由你决定，常用于加载社区训练的非官方 IPAdapter 权重或精确复现旧工作流。输出可接到任意应用节点的 ipadapter 输入。",
+        inputs: [
+          { name: "ipadapter_file", type: "COMBO", from: "models/ipadapter 目录中的文件列表", desc: "选择权重文件" }
+        ],
+        outputs: [
+          { type: "IPADAPTER", to: "典型下游：各类 IPAdapter 应用节点的 ipadapter 输入", desc: "手动加载的 IPAdapter 权重" }
+        ],
+        why: "需要加载自定义或非预设 IPAdapter 权重时，只有这个手动加载器能指名道姓地读文件。",
+        params: [
+          { name: "ipadapter_file", kind: "下拉选择", default: "—", desc: "models/ipadapter 目录里的权重文件，文件名通常带 PLUS、FACEID 等字样标明用途。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "IPAdapter InsightFace Loader", cat: "load",
+        brief: "加载 InsightFace 人脸分析模型，供 FaceID 系列节点使用。",
+        desc: "在 buffalo_l 与 antelopev2 两个模型包中选一个，用指定计算设备加载 InsightFace 人脸分析器，输出 INSIGHTFACE 类型。它服务的对象是 IPAdapter FaceID 系列应用节点：FaceID 靠它从参考图中提取人脸身份向量。显存充裕可选 CUDA 提速，求稳或显存紧张选 CPU。",
+        inputs: [
+          { name: "provider", type: "COMBO", from: "节点面板选择", desc: "CPU、CUDA 等运行设备" },
+          { name: "model_name", type: "COMBO", from: "节点面板选择", desc: "人脸分析模型包" }
+        ],
+        outputs: [
+          { type: "INSIGHTFACE", to: "典型下游：IPAdapter FaceID 系列节点的 insightface 输入", desc: "加载好的人脸分析器" }
+        ],
+        why: "FaceID 应用节点自身不带人脸分析能力，这个加载器是 FaceID 工作流的必备前置。",
+        params: [
+          { name: "provider", kind: "下拉选择", default: "CPU", desc: "人脸分析运行设备，CPU 稳定不占显存，CUDA 更快。" },
+          { name: "model_name", kind: "下拉选择", default: "buffalo_l", desc: "人脸检测识别模型包，两个官方包效果接近，按仓库说明下载其一。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "IPAdapter Unified Loader FaceID", cat: "load",
+        brief: "FaceID 专用统一加载器，自动备齐权重、LoRA 与人脸分析器。",
+        desc: "Unified Loader 的 FaceID 分支：选中 FACEID 系预设后，自动加载对应的 FaceID 权重、配套 LoRA（强度由 lora_strength 控制）与 InsightFace 人脸分析器，输出挂好 LoRA 的底模与打包好的 FaceID 管线。相比普通 Unified Loader，它额外处理了 FaceID 必需的 LoRA 挂载，免去手动补线。",
+        inputs: [
+          { name: "model", type: "MODEL", from: "典型上游：Load Checkpoint / LoRA 链", desc: "底模" },
+          { name: "preset", type: "COMBO", from: "节点面板选择", desc: "FaceID 系预设档位" },
+          { name: "lora_strength", type: "FLOAT", from: "节点面板调节", desc: "配套 LoRA 的挂载强度" }
+        ],
+        outputs: [
+          { type: "MODEL", to: "典型下游：LoRA 链或采样器", desc: "挂载配套 LoRA 后的底模" },
+          { type: "IPADAPTER", to: "典型下游：IPAdapter FaceID 系列节点的 ipadapter 输入", desc: "含权重与人脸分析器的管线包" }
+        ],
+        why: "FaceID 方案必须同时就位权重、LoRA、人脸分析三样东西，这个节点一次配齐。",
+        params: [
+          { name: "preset", kind: "下拉选择", default: "FACEID PLUS V2", desc: "FaceID 预设档位，决定加载哪套权重与 LoRA。",
+            options: [["FACEID", "基础人脸身份版"], ["FACEID PLUS V2", "叠加图像嵌入，人脸保真度更高，社区首选"], ["FACEID PORTRAIT (style transfer)", "人像风格化方向"]] },
+          { name: "lora_strength", kind: "浮点数", default: "0.6", desc: "FaceID 配套 LoRA 的强度，默认 0.6，脸不像时先调它。" },
+          { name: "provider", kind: "下拉选择", default: "CPU", desc: "InsightFace 的运行设备，显存紧张保持 CPU。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "IPAdapter Embeds", cat: "model",
+        brief: "直接用嵌入向量注入模型，跳过图像编码步骤。",
+        desc: "与普通 IPAdapter 节点的区别在输入端：它不接受图片，而是接受编码好的 EMBEDS，正向必填、负向可选。适合先把参考图编码成嵌入再反复注入，或对嵌入做组合运算的场景，省去重复编码的开销。权重、权重曲线与生效区间的控制与 Advanced 版一致。",
+        inputs: [
+          { name: "model", type: "MODEL", from: "典型上游：Load Checkpoint / LoRA 链", desc: "待注入的大模型" },
+          { name: "ipadapter", type: "IPADAPTER", from: "典型上游：Unified Loader 或 Model Loader", desc: "IPAdapter 权重" },
+          { name: "pos_embed", type: "EMBEDS", from: "典型上游：IPAdapter Encoder", desc: "正向参考特征" },
+          { name: "neg_embed", type: "EMBEDS", from: "可选，IPAdapter Encoder", desc: "负向参考特征，用于剔除某些特征" }
+        ],
+        outputs: [
+          { type: "MODEL", to: "典型下游：KSampler 的 model 输入", desc: "注入后的模型" }
+        ],
+        why: "嵌入解耦后可以保存、复用、运算再注入，是复杂 IPAdapter 工作流的中间枢纽。",
+        params: [
+          { name: "weight", kind: "浮点数", default: "1.0", desc: "注入强度，控制嵌入对画面的影响。" },
+          { name: "weight_type", kind: "下拉选择", default: "linear", desc: "强度随采样步数变化的曲线，含义与 Advanced 版相同。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "IPAdapter Tiled", cat: "model",
+        brief: "把参考图切块编码再注入，高分辨率参考图的专用解法。",
+        desc: "CLIP Vision 编码超高分辨率参考图会丢失细节或强拉伸变形。该节点把参考图切成小块分别编码，再把块特征拼回注入，顺带输出切好的图块与遮罩便于检查切块效果，内置 sharpening 还能给参考图做锐化预处理。除 MODEL 外多出 tiles 与 masks 两路输出。",
+        inputs: [
+          { name: "model", type: "MODEL", from: "典型上游：Load Checkpoint / LoRA 链", desc: "待注入的大模型" },
+          { name: "ipadapter", type: "IPADAPTER", from: "典型上游：Unified Loader", desc: "IPAdapter 权重" },
+          { name: "image", type: "IMAGE", from: "典型上游：Load Image", desc: "高分辨率参考图" }
+        ],
+        outputs: [
+          { type: "MODEL", to: "典型下游：KSampler 的 model 输入", desc: "注入后的模型" },
+          { type: "IMAGE", to: "典型下游：Save Image 预览", desc: "切块结果 tiles，用于检查" },
+          { type: "MASK", to: "典型下游：Save Image 预览", desc: "切块遮罩 masks，用于检查" }
+        ],
+        why: "参考图很大或细节极多时普通编码会糊成一团，分块编码是官方给出的正解。",
+        params: [
+          { name: "weight", kind: "浮点数", default: "1.0", desc: "注入强度。" },
+          { name: "sharpening", kind: "浮点数", default: "0.0", desc: "对参考图的锐化强度，0 为关闭，低清参考图可小幅开启。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "IPAdapter Batch", cat: "model",
+        brief: "一批参考图逐张注入对应帧，图批对帧批的专用节点。",
+        desc: "普通节点把整批参考图取平均，Batch 版把第 n 张参考图的特征注入第 n 帧的潜空间，适合给逐帧生成的序列施加逐帧变化的引导，例如让动画跟随一段参考视频的节奏。encode_batch_size 控制编码时一次送几张，显存紧张时调小。",
+        inputs: [
+          { name: "model", type: "MODEL", from: "典型上游：Load Checkpoint / LoRA 链", desc: "待注入的大模型" },
+          { name: "ipadapter", type: "IPADAPTER", from: "典型上游：Unified Loader", desc: "IPAdapter 权重" },
+          { name: "image", type: "IMAGE", from: "典型上游：视频加载或图片序列", desc: "批次参考图，数量与帧数对应" }
+        ],
+        outputs: [
+          { type: "MODEL", to: "典型下游：KSampler 的 model 输入", desc: "注入后的模型" }
+        ],
+        why: "做逐帧控制或参考视频驱动的动画时，逐张对应注入是平均注入做不到的能力。",
+        params: [
+          { name: "weight", kind: "浮点数", default: "1.0", desc: "注入强度。" },
+          { name: "encode_batch_size", kind: "整数", default: "0", desc: "编码参考图时的子批大小，0 为整批一次算完，爆显存就调成 4 或 8。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "IPAdapter Precise Style Transfer", cat: "model",
+        brief: "社区精选风格迁移节点，用 style_boost 精调画风力度。",
+        desc: "来自 Unified Loader Community 体系的风格迁移特化节点：在 Advanced 的基础上把风格与内容拆成独立旋钮，style_boost 专门抬升画风还原度而不干扰构图。需要配合 Unified Loader 的 Community 预设或手动加载对应权重使用。",
+        inputs: [
+          { name: "model", type: "MODEL", from: "典型上游：Load Checkpoint / LoRA 链", desc: "待注入的大模型" },
+          { name: "ipadapter", type: "IPADAPTER", from: "典型上游：Unified Loader 选 Community 预设", desc: "IPAdapter 权重" },
+          { name: "image", type: "IMAGE", from: "典型上游：Load Image", desc: "画风参考图" }
+        ],
+        outputs: [
+          { type: "MODEL", to: "典型下游：KSampler 的 model 输入", desc: "注入后的模型" }
+        ],
+        why: "纯画风迁移时它比通用节点更精准，style_boost 让「像几分」变成可量化的调节。",
+        params: [
+          { name: "weight", kind: "浮点数", default: "1.0", desc: "总体注入强度。" },
+          { name: "style_boost", kind: "浮点数", default: "1.0", desc: "画风加强项，正数强化画风还原，负数弱化，可超 1 大胆调。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "IPAdapter Regional Conditioning", cat: "cond",
+        brief: "给不同区域挂不同参考图，实现分区参考的分区注入。",
+        desc: "把参考图限定在遮罩区域内生效：输入参考图与可选遮罩，输出 IPADAPTER_PARAMS 区域参数包与更新后的正负条件，交给支持参数包的注入链路。典型用法是画面左边参考一张图、右边参考另一张图，各自用遮罩划定势力范围互不打架。",
+        inputs: [
+          { name: "image", type: "IMAGE", from: "典型上游：Load Image", desc: "该区域的参考图" },
+          { name: "mask", type: "MASK", from: "可选，遮罩生成节点", desc: "划定参考图生效的区域" },
+          { name: "positive", type: "CONDITIONING", from: "可选，正向 CLIP Text Encode", desc: "待更新的正向条件" },
+          { name: "negative", type: "CONDITIONING", from: "可选，负向 CLIP Text Encode", desc: "待更新的负向条件" }
+        ],
+        outputs: [
+          { type: "IPADAPTER_PARAMS", to: "典型下游：支持区域参数的应用链路", desc: "区域注入参数包" },
+          { type: "CONDITIONING", to: "典型下游：KSampler 的 positive 输入", desc: "更新后的正向条件" },
+          { type: "CONDITIONING", to: "典型下游：KSampler 的 negative 输入", desc: "更新后的负向条件" }
+        ],
+        why: "一张图想同时借两三个参考的不同部位时，区域参数是唯一不打架的做法。",
+        params: [
+          { name: "image_weight", kind: "浮点数", default: "1.0", desc: "该区域参考图的注入强度。" },
+          { name: "prompt_weight", kind: "浮点数", default: "1.0", desc: "遮罩区内提示词与参考图的相对权重。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "IPAdapter Weights", cat: "util",
+        brief: "把逗号分隔的权重序列展开成随帧变化的权重策略。",
+        desc: "输入一串形如 1.0, 0.5, 0.0 的数值，配合 timing 曲线与帧区间设置，把它展开成完整的 WEIGHTS_STRATEGY 策略包，同时输出权重序列与其反相序列，供逐帧注入使用。常用于让 IPAdapter 的作用强度随动画帧数有节奏地起伏。",
+        inputs: [
+          { name: "weights", type: "STRING", from: "节点面板填写", desc: "逗号分隔的权重数值序列" },
+          { name: "image", type: "IMAGE", from: "可选，视频加载节点", desc: "配套的帧序列，用于对齐帧数" }
+        ],
+        outputs: [
+          { type: "FLOAT", to: "典型下游：需要权重序列的节点", desc: "权重序列" },
+          { type: "FLOAT", to: "典型下游：需要反相权重的节点", desc: "反相权重序列" },
+          { type: "INT", to: "典型下游：需要帧数的节点", desc: "总帧数" },
+          { type: "WEIGHTS_STRATEGY", to: "典型下游：支持权重策略的注入节点", desc: "权重策略包" }
+        ],
+        why: "想让参考图影响力随时间波动，靠一条权重序列比手调无数关键帧直接得多。",
+        params: [
+          { name: "weights", kind: "文本", default: "1.0, 0.0", desc: "逗号分隔的权重值，按帧依次取用，可以只写几个值由策略循环展开。" },
+          { name: "timing", kind: "下拉选择", default: "linear", desc: "权重序列的时间展开方式，custom 按原样、linear 线性过渡、random 随机抖动。" },
+          { name: "frames", kind: "整数", default: "0", desc: "目标帧数，0 表示按输入图像的帧数对齐。" }
+        ],
+        tips: ""
       }
     ]
   });
@@ -328,6 +507,57 @@
           { name: "codeformer_weight", kind: "浮点数", default: "0.5", desc: "仅 CodeFormer 生效，越高画面越「整齐」但越容易失真。" }
         ],
         tips: "提醒：人脸属于敏感个人信息，处理他人照片前请确认已获得授权，并遵守肖像权与个人信息保护法规。修复权重越高画面越「整齐」但越容易失真。"
+      },
+      {
+        name: "ReActorLoadFaceModel", cat: "load",
+        brief: "从人脸模型目录加载已保存的自定义人脸模型。",
+        desc: "读取 models/reactor/faces 目录下的 safetensors 人脸模型文件，输出 FACE_MODEL 供换脸节点的 face_model 输入使用，同时输出模型名文本。与 BuildFaceModel 现场融合不同，它加载的是之前存好的结果，适合把做好的脸部模型跨工作流、跨项目复用。",
+        inputs: [
+          { name: "face_model", type: "COMBO", from: "models/reactor/faces 目录中的文件列表", desc: "选择人脸模型文件" }
+        ],
+        outputs: [
+          { type: "FACE_MODEL", to: "典型下游：ReActorFaceSwap 的 face_model 输入", desc: "加载好的人脸模型" },
+          { type: "STRING", to: "典型下游：需要模型名的节点", desc: "模型文件名" }
+        ],
+        why: "做好一次人脸模型后反复使用时，加载器比每次重新融合快得多也更稳定。",
+        params: [
+          { name: "face_model", kind: "下拉选择", default: "default", desc: "models/reactor/faces 里的人脸模型文件，选 none 则输出空值。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "ReActorSaveFaceModel", cat: "image",
+        brief: "把输入图片中的人脸提取保存为人脸模型文件。",
+        desc: "从一张含人脸的图片中检测并选定人脸（select_face_index 指定取第几张），打包成 safetensors 存入人脸模型目录，文件名由 face_model_name 决定。也可以不接图片，直接输入已构建的 FACE_MODEL 转存。保存后即可用 LoadFaceModel 或换脸节点复用。",
+        inputs: [
+          { name: "image", type: "IMAGE", from: "可选，Load Image", desc: "含人脸的源图" },
+          { name: "face_model", type: "FACE_MODEL", from: "可选，ReActorBuildFaceModel", desc: "直接转存的人脸模型" }
+        ],
+        outputs: [],
+        why: "把融合好的脸落盘归档，是团队共享与长期复用最省心的一步。",
+        params: [
+          { name: "face_model_name", kind: "文本", default: "default", desc: "保存用的模型文件名，同一目录下同名文件会被覆盖。" },
+          { name: "select_face_index", kind: "整数", default: "0", desc: "图中有多张脸时取第几张，从 0 开始编号。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "ReActorFaceBoost", cat: "image",
+        brief: "生成 FACE_BOOST 配置包，让换脸节点顺手做面部增强。",
+        desc: "它本身不处理图像，而是把面部增强设置（启停、修复模型、插值算法、可见度、CodeFormer 权重以及是否在主流程后整体再修复一次）打包输出 FACE_BOOST，接到换脸节点的 face_boost 输入，让换脸与增强一次完成。",
+        inputs: [],
+        outputs: [
+          { type: "FACE_BOOST", to: "典型下游：ReActorFaceSwap 的 face_boost 输入", desc: "面部增强配置包" }
+        ],
+        why: "换脸加修复一气呵成，省去单独串修复节点的麻烦，配置还能独立保存复用。",
+        params: [
+          { name: "enabled", kind: "开关", default: "true", desc: "是否启用面部增强。" },
+          { name: "boost_model", kind: "下拉选择", default: "GFPGANv1.4", desc: "修复模型，GFPGAN 系快而稳，CodeFormer 细节更好。" },
+          { name: "visibility", kind: "浮点数", default: "1.0", desc: "增强结果与原脸的混合比例。" },
+          { name: "codeformer_weight", kind: "浮点数", default: "0.5", desc: "仅 CodeFormer 生效的保真权重，越高越清晰也越容易失真。" },
+          { name: "restore_with_main_after", kind: "开关", default: "false", desc: "换脸主流程完成后再对全图面部整体修复一次，速度更慢但更干净。" }
+        ],
+        tips: ""
       }
     ]
   });
@@ -446,6 +676,54 @@
         why: "InstantID 对检测质量非常敏感，侧脸、遮挡、多人脸都会导致效果崩坏；先可视化再排查能省下大量试错时间。",
         params: [],
         tips: "预览图上关键点错乱时先换正脸图或裁剪放大；多人脸图先框定目标脸。提醒：调试真实人脸素材时注意肖像权授权。"
+      },
+      {
+        name: "InstantID Patch Attention", cat: "model",
+        brief: "只把 InstantID 的注意力注入部分挂到模型，输出人脸嵌入。",
+        desc: "分体式用法的第一步：提取人脸特征并把 IP-Adapter 注意力部分打进模型，输出打了补丁的 MODEL 与 FACE_EMBEDS 人脸嵌入。嵌入随后交给 InstantID Apply ControlNet 做结构约束，两个节点合起来等价于一次完整的 Apply InstantID，但身份与结构两步可以分别接线、分别调参。noise 参数可在负向嵌入里混入随机量，用来给身份留一点自由度。",
+        inputs: [
+          { name: "instantid", type: "INSTANTID", from: "典型上游：InstantIDModelLoader", desc: "InstantID 主模型" },
+          { name: "insightface", type: "FACEANALYSIS", from: "典型上游：InstantIDFaceAnalysis", desc: "人脸分析器" },
+          { name: "image", type: "IMAGE", from: "典型上游：Load Image", desc: "人脸参考图" },
+          { name: "model", type: "MODEL", from: "典型上游：Load Checkpoint / LoRA 链", desc: "底模" },
+          { name: "mask", type: "MASK", from: "可选，遮罩生成节点", desc: "把注入限制在局部区域" }
+        ],
+        outputs: [
+          { type: "MODEL", to: "典型下游：KSampler 的 model 输入", desc: "完成注意力注入的模型" },
+          { type: "FACE_EMBEDS", to: "典型下游：InstantID Apply ControlNet 的 face_embeds 输入", desc: "人脸嵌入" }
+        ],
+        why: "想让身份注入与结构约束分开调参、各自生效区间独立控制时，官方分体节点是正解。",
+        params: [
+          { name: "weight", kind: "浮点数", default: "1.0", desc: "身份注入强度。" },
+          { name: "noise", kind: "浮点数", default: "0.0", desc: "负向嵌入的随机扰动比例，大于 0 时身份约束稍松、表情更活。" },
+          { name: "start_at", kind: "浮点数", default: "0.0", desc: "从采样进度的哪个比例开始生效。" },
+          { name: "end_at", kind: "浮点数", default: "1.0", desc: "到采样进度的哪个比例停止生效。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "InstantID Apply ControlNet", cat: "cond",
+        brief: "接收人脸嵌入，用 InstantID 的 ControlNet 把脸型写入条件。",
+        desc: "分体式用法的第二步：输入 Patch Attention 输出的 FACE_EMBEDS 与一张人脸关键点图（image_kps，可用 Face Keypoints Preprocessor 生成），把 InstantID 内置 ControlNet 的结构约束写进正负条件后输出。strength 控制约束强弱，配合遮罩还能只约束局部。",
+        inputs: [
+          { name: "face_embeds", type: "FACE_EMBEDS", from: "典型上游：InstantID Patch Attention", desc: "人脸嵌入" },
+          { name: "control_net", type: "CONTROL_NET", from: "典型上游：ControlNet Loader", desc: "InstantID 的 ControlNet 权重" },
+          { name: "image_kps", type: "IMAGE", from: "典型上游：Face Keypoints Preprocessor", desc: "人脸关键点参考图" },
+          { name: "positive", type: "CONDITIONING", from: "典型上游：正向 CLIP Text Encode", desc: "正向条件" },
+          { name: "negative", type: "CONDITIONING", from: "典型上游：负向 CLIP Text Encode", desc: "负向条件" },
+          { name: "mask", type: "MASK", from: "可选，遮罩生成节点", desc: "把结构约束限制在局部" }
+        ],
+        outputs: [
+          { type: "CONDITIONING", to: "典型下游：KSampler 的 positive 输入", desc: "更新后的正向条件" },
+          { type: "CONDITIONING", to: "典型下游：KSampler 的 negative 输入", desc: "更新后的负向条件" }
+        ],
+        why: "与 Patch Attention 搭配后，身份强度与脸部结构强度彻底解耦，微调空间大得多。",
+        params: [
+          { name: "strength", kind: "浮点数", default: "1.0", desc: "结构约束强度，想大改姿势角度时调低，为 0 时完全关闭。" },
+          { name: "start_at", kind: "浮点数", default: "0.0", desc: "从采样进度的哪个比例开始生效。" },
+          { name: "end_at", kind: "浮点数", default: "1.0", desc: "到采样进度的哪个比例停止生效。" }
+        ],
+        tips: ""
       }
     ]
   });
@@ -583,6 +861,198 @@
           { name: "length", kind: "整数", default: "16", desc: "帧数，即一次生成的画面数量，先用 16 帧小尺寸测试再放大。" }
         ],
         tips: "先用 16 帧小尺寸测试构图与运动，确认后再放大 length 与分辨率。"
+      },
+      {
+        name: "ADE_LoadAnimateDiffModel", cat: "model",
+        brief: "第二代流程的运动模型加载器，输出可复用的运动模型。",
+        desc: "Gen2 解耦架构的第一环：只负责把运动模型文件加载成 MOTION_MODEL_ADE 输出，不直接接触底模。输出接到 Apply AnimateDiff Model 系列节点做注入，ad_settings 输入口可接运动模型设置微调内部行为。同一份运动模型可以复制多路给不同分支复用。",
+        inputs: [
+          { name: "model_name", type: "COMBO", from: "models/animatediff_models 目录", desc: "运动模型文件" },
+          { name: "ad_settings", type: "AD_SETTINGS", from: "可选，运动模型设置类节点", desc: "运动模型内部调整" }
+        ],
+        outputs: [
+          { type: "MOTION_MODEL_ADE", to: "典型下游：ADE_ApplyAnimateDiffModel 系列的 motion_model 输入", desc: "加载好的运动模型" }
+        ],
+        why: "Gen2 流程把加载与应用拆开后更灵活，这个加载器是新版官方工作流的起点。",
+        params: [
+          { name: "model_name", kind: "下拉选择", default: "—", desc: "运动模型文件，必须与底模架构匹配，选择原则与第一代加载器相同。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "ADE_ApplyAnimateDiffModelSimple", cat: "model",
+        brief: "把运动模型挂上缩放与生效选项，输出运动模型组。",
+        desc: "Gen2 核心应用节点：输入 Load AnimateDiff Model 给出的运动模型，挂上缩放 scale_multival 与生效范围 effect_multival 等选项后输出 M_MODELS 运动模型组，再由 Use Evolved Sampling 把整组收进底模。支持串联多个应用节点叠加多个运动模块，也可接运动 LoRA 与关键帧。",
+        inputs: [
+          { name: "motion_model", type: "MOTION_MODEL_ADE", from: "典型上游：ADE_LoadAnimateDiffModel", desc: "运动模型" },
+          { name: "motion_lora", type: "MOTION_LORA", from: "可选，ADE_AnimateDiffLoRALoader", desc: "运动 LoRA" },
+          { name: "scale_multival", type: "MULTIVAL", from: "可选，多值调节节点", desc: "运动强度缩放" },
+          { name: "effect_multival", type: "MULTIVAL", from: "可选，多值调节节点", desc: "运动影响范围" },
+          { name: "ad_keyframes", type: "AD_KEYFRAMES", from: "可选，关键帧节点", desc: "随采样变化的关键帧" }
+        ],
+        outputs: [
+          { type: "M_MODELS", to: "典型下游：ADE_UseEvolved Sampling 的 m_models 输入", desc: "运动模型组" }
+        ],
+        why: "新版工作流用加载、应用、收拢三步取代老式一键加载，这个节点是中间的注入环节。",
+        params: [
+          { name: "scale_multival", kind: "可选输入", default: "—", desc: "运动强度，可为常数、数值列表或遮罩，配合多值节点做逐帧变化。" },
+          { name: "effect_multival", kind: "可选输入", default: "—", desc: "运动效果的作用范围，0 为关闭，1 为完全生效。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "ADE_ApplyAnimateDiffModel", cat: "model",
+        brief: "高级版运动模型应用节点，增加按采样百分比生效的区间。",
+        desc: "在 Simple 版全部能力之上增加 start_percent 与 end_percent：可以规定运动模块只在采样的某一段介入，例如前半段锁运动、后半段自由细化，或反过来后半段才补运动。其余参数与 Simple 一致，输出同样是 M_MODELS。",
+        inputs: [
+          { name: "motion_model", type: "MOTION_MODEL_ADE", from: "典型上游：ADE_LoadAnimateDiffModel", desc: "运动模型" },
+          { name: "start_percent", type: "FLOAT", from: "节点面板调节", desc: "开始介入的采样进度" },
+          { name: "end_percent", type: "FLOAT", from: "节点面板调节", desc: "停止介入的采样进度" },
+          { name: "motion_lora", type: "MOTION_LORA", from: "可选，ADE_AnimateDiffLoRALoader", desc: "运动 LoRA" }
+        ],
+        outputs: [
+          { type: "M_MODELS", to: "典型下游：ADE_UseEvolved Sampling 的 m_models 输入", desc: "运动模型组" }
+        ],
+        why: "需要精确控制运动模块何时介入何时退场时，就得用它而不是 Simple 版。",
+        params: [
+          { name: "start_percent", kind: "浮点数", default: "0.0", desc: "从采样进度的哪个比例开始生效。" },
+          { name: "end_percent", kind: "浮点数", default: "1.0", desc: "到采样进度的哪个比例停止生效，0.5 表示后一半采样不再有运动干预。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "ADE_StandardUniformContextOptions", cat: "sampler",
+        brief: "标准均匀滑窗上下文方案，长视频连贯性的默认选择。",
+        desc: "定义一组沿时间轴均匀滑动的上下文窗口：context_length 窗口长、context_stride 跨步、context_overlap 重叠，融合方式 fuse_method 默认 pyramid 金字塔加权，缝合最顺滑。与 Looped 版的区别是不支持首尾闭环，适合普通连续长镜头。输出 CONTEXT_OPTS 接 Use Evolved Sampling。",
+        inputs: [
+          { name: "prev_context", type: "CONTEXT_OPTIONS", from: "可选，另一个上下文节点", desc: "串联叠加的上一个方案" }
+        ],
+        outputs: [
+          { type: "CONTEXT_OPTS", to: "典型下游：ADE_UseEvolved Sampling 的 context_options 输入", desc: "上下文窗口方案" }
+        ],
+        why: "它是旧版 Uniform Context Options 的现代替代品，社区新工作流的长视频连贯性主要靠它。",
+        params: [
+          { name: "context_length", kind: "整数", default: "16", desc: "窗口帧数，运动模型按 16 帧训练，一般固定 16。" },
+          { name: "context_stride", kind: "整数", default: "1", desc: "窗口滑动的跨步，1 表示逐帧滑动，连贯性最好。" },
+          { name: "context_overlap", kind: "整数", default: "4", desc: "相邻窗口重叠帧数，太小容易跳变，4 到 8 常用。" },
+          { name: "fuse_method", kind: "下拉选择", default: "pyramid", desc: "窗口重叠部分的融合方式，pyramid 按距离金字塔加权，接缝最不明显。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "ADE_StandardStaticContextOptions", cat: "sampler",
+        brief: "静态固定窗口方案，按固定窗口分批处理整段帧。",
+        desc: "与滑窗版本不同，静态方案没有跨步：整段视频按 context_length 切成固定窗口，窗口之间以 context_overlap 重叠融合。帧数不超过窗口长度时几乎零开销，适合 16 帧以内的短片或想省算力的场景，也是多段分批跑长片时的常用基准。",
+        inputs: [
+          { name: "prev_context", type: "CONTEXT_OPTIONS", from: "可选，另一个上下文节点", desc: "串联叠加的上一个方案" }
+        ],
+        outputs: [
+          { type: "CONTEXT_OPTS", to: "典型下游：ADE_UseEvolved Sampling 的 context_options 输入", desc: "上下文窗口方案" }
+        ],
+        why: "短动画用它最省事，长动画切多段跑时也常以它为分批基准。",
+        params: [
+          { name: "context_length", kind: "整数", default: "16", desc: "每个窗口的帧数。" },
+          { name: "context_overlap", kind: "整数", default: "4", desc: "相邻窗口的重叠帧数，用来缝合窗口间的过渡。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "ADE_LoopedUniformContextOptions", cat: "sampler",
+        brief: "循环式滑窗方案，支持 closed_loop 首尾闭环。",
+        desc: "在 Standard Uniform 的滑窗能力之上增加 closed_loop 闭环开关与更自由的融合方式列表：做循环动画时打开 closed_loop，最后一个窗口会与第一个窗口相互融合，首尾自然衔接。新版用它取代旧的 ADE_AnimateDiffUniformContextOptions 节点。",
+        inputs: [
+          { name: "prev_context", type: "CONTEXT_OPTIONS", from: "可选，另一个上下文节点", desc: "串联叠加的上一个方案" }
+        ],
+        outputs: [
+          { type: "CONTEXT_OPTS", to: "典型下游：ADE_UseEvolved Sampling 的 context_options 输入", desc: "上下文窗口方案" }
+        ],
+        why: "循环类动态素材如呼吸、摇摆、飘动，几乎都要靠它把首尾缝起来。",
+        params: [
+          { name: "context_length", kind: "整数", default: "16", desc: "窗口帧数，一般固定 16。" },
+          { name: "context_stride", kind: "整数", default: "1", desc: "窗口滑动的跨步。" },
+          { name: "context_overlap", kind: "整数", default: "4", desc: "相邻窗口重叠帧数。" },
+          { name: "closed_loop", kind: "开关", default: "false", desc: "首尾闭环，做无缝循环动画时打开。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "ADE_AnimateDiffSamplingSettings", cat: "sampler",
+        brief: "采样设置中枢，统一管理噪声类型、种子生成与迭代方式。",
+        desc: "把视频采样相关的杂项集中到一个节点：batch_offset 批偏移、noise_type 噪声类型、seed_gen 种子生成策略、seed_offset 种子偏移，还能外接噪声层、迭代选项、自定义 CFG、sigma 调度与图像注入等子模块。输出 SAMPLE_SETTINGS 接 Use Evolved Sampling 或老式加载器。长视频分段续写时它能保证各段噪声既独立又可复现。",
+        inputs: [
+          { name: "noise_layers", type: "NOISE_LAYERS", from: "可选，噪声层节点", desc: "分层噪声配置" },
+          { name: "iteration_opts", type: "ITERATION_OPTS", from: "可选，迭代选项节点", desc: "多次迭代策略" },
+          { name: "seed_override", type: "INT", from: "可选，INT 常量等", desc: "覆盖采样器种子的固定值" },
+          { name: "custom_cfg", type: "CUSTOM_CFG", from: "可选，自定义 CFG 节点", desc: "自定义引导配置" },
+          { name: "sigma_schedule", type: "SIGMA_SCHEDULE", from: "可选，sigma 调度节点", desc: "自定义噪声调度" }
+        ],
+        outputs: [
+          { type: "SAMPLE_SETTINGS", to: "典型下游：ADE_UseEvolved Sampling 的 sample_settings 输入", desc: "采样设置包" }
+        ],
+        why: "分段续写、种子可复现、FreeNoise 降噪这些进阶需求，全靠采样设置层兜底。",
+        params: [
+          { name: "batch_offset", kind: "整数", default: "0", desc: "批次偏移量，多段生成时递增它可以让每段噪声错开而不重样。" },
+          { name: "noise_type", kind: "下拉选择", default: "default", desc: "噪声类型，default 跟随全局，constant 每批恒定，FreeNoise 为长视频降噪方案。" },
+          { name: "seed_gen", kind: "下拉选择", default: "comfy", desc: "种子生成策略，comfy 与 auto1111 两套风格各可选 CPU 或 GPU 计算。" },
+          { name: "seed_offset", kind: "整数", default: "0", desc: "在种子基础上加的偏移，微调噪声用。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "ADE_AnimateDiffLoaderWithContext", cat: "model",
+        brief: "老式一体化加载器，可直接接收上下文选项，现已标记弃用。",
+        desc: "Gen1 时代的一站式节点：一次完成运动模型加载、LoRA 接入、上下文选项与采样设置挂载，输出可动 MODEL。大量旧工作流仍在使用它，但官方已在代码中标记弃用，新工作流建议改走 Gen2 的加载、应用、收拢三步。它的价值在于链路少两个节点，小工作流依然好用。",
+        inputs: [
+          { name: "model", type: "MODEL", from: "典型上游：Load Checkpoint / LoRA 链", desc: "底模" },
+          { name: "model_name", type: "COMBO", from: "models/animatediff_models 目录", desc: "运动模型文件" },
+          { name: "beta_schedule", type: "COMBO", from: "节点面板选择", desc: "噪声调度，保持 autoselect" },
+          { name: "context_options", type: "CONTEXT_OPTIONS", from: "可选，各类 Context Options 节点", desc: "上下文窗口方案" },
+          { name: "motion_lora", type: "MOTION_LORA", from: "可选，ADE_AnimateDiffLoRALoader", desc: "运动 LoRA" },
+          { name: "sample_settings", type: "SAMPLE_SETTINGS", from: "可选，ADE_AnimateDiffSamplingSettings", desc: "采样设置" }
+        ],
+        outputs: [
+          { type: "MODEL", to: "典型下游：KSampler 的 model 输入", desc: "具备运动能力的模型" }
+        ],
+        why: "看懂存量工作流绕不开它；参数齐全，临时小工作流也确实省事。",
+        params: [
+          { name: "model_name", kind: "下拉选择", default: "—", desc: "运动模型文件，必须与底模架构匹配。" },
+          { name: "beta_schedule", kind: "下拉选择", default: "autoselect", desc: "噪声调度方式，autoselect 自动匹配运动模型训练时的调度。" },
+          { name: "motion_scale", kind: "浮点数", default: "1.0", desc: "整体运动强度，画面晃得太厉害就调低。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "ADE_AnimateDiffUnload", cat: "util",
+        brief: "把模型上的 AnimateDiff 组件卸载，恢复普通模型。",
+        desc: "输入一个带运动模块的 MODEL，把挂载的运动模块、上下文与采样设置全部剥离后输出干净的 MODEL。典型用法是在切换回静态生成分支前卸载动画组件，或用它结束动画链路以便复用同一份底模。",
+        inputs: [
+          { name: "model", type: "MODEL", from: "典型上游：动画加载链", desc: "带运动模块的模型" }
+        ],
+        outputs: [
+          { type: "MODEL", to: "典型下游：静态生成链或 KSampler", desc: "卸载动画组件后的模型" }
+        ],
+        why: "显存紧张时及时卸载运动模块，是动画与静图混合工作流的保命手段。",
+        params: [],
+        tips: ""
+      },
+      {
+        name: "ADE_AnimateDiffCombine", cat: "video",
+        brief: "官方标记弃用的成片节点，功能已被 VHS Video Combine 取代。",
+        desc: "AnimateDiff 早期的视频合成出口：把帧批次按 frame_rate 编码成动图或视频文件输出。作者明确建议改用 Video Helper Suite 的 Video Combine，后者格式更全、功能更强。保留认识它的意义在于读懂旧工作流，新工作流请直接用 VHS。",
+        inputs: [
+          { name: "images", type: "IMAGE", from: "典型上游：VAE Decode", desc: "待合成的帧序列" },
+          { name: "frame_rate", type: "INT", from: "节点面板填写", desc: "输出帧率" },
+          { name: "format", type: "COMBO", from: "节点面板选择", desc: "输出格式" }
+        ],
+        outputs: [
+          { type: "GIF", to: "无，终端输出节点", desc: "合成结果直接落盘" }
+        ],
+        why: "旧教程与老工作流里大量出现，认识它才能顺利把旧链路迁移到 VHS。",
+        params: [
+          { name: "frame_rate", kind: "整数", default: "8", desc: "输出帧率，AnimateDiff 默认 8 帧节奏。" },
+          { name: "pingpong", kind: "开关", default: "false", desc: "正放倒放交替，帧数少时动作显得更流畅。" }
+        ],
+        tips: ""
       }
     ]
   });
@@ -724,6 +1194,141 @@
           { name: "filename_prefix", kind: "文本", default: "AnimateDiff", desc: "输出文件名前缀，成品保存在 output 目录。" }
         ],
         tips: "出片前先用 gif 或高 crf 快速预览运动效果，确认后再导出高质量 mp4。"
+      },
+      {
+        name: "VHS Meta Batch Manager", cat: "util",
+        brief: "把长视频切成多个批次排队执行，压平显存峰值。",
+        desc: "输出一个 VHS_BatchManager 元批次对象：设好 frames_per_batch 后，长视频会被拆成若干次队列执行，每次只处理一批帧，显存占用恒定。需要把输出发给支持元批次的处理链（如 Batched Nodes 系列与采样链路），并与 Video Combine 配合逐批写出成品。",
+        inputs: [],
+        outputs: [
+          { type: "VHS_BATCHMANAGER", to: "典型下游：支持元批次的 VHS 处理链", desc: "元批次对象，控制每次队列处理多少帧" }
+        ],
+        why: "低显存设备跑长视频，分批执行几乎是唯一可行路线，它就是官方给出的分批开关。",
+        params: [
+          { name: "frames_per_batch", kind: "整数", default: "16", desc: "每次队列执行的帧数，显存越紧调得越小。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "VHS Select Images", cat: "video",
+        brief: "按索引表达式挑选帧，支持范围、负数与逗号组合。",
+        desc: "输入帧批次与索引字符串，按规则挑出子集：0,2,4 挑单帧、区间写法挑一段、负数从尾部倒数。err_if_missing 与 err_if_empty 控制索引越界或结果为空时是报错停跑还是容忍继续。做删帧、抽帧、重排时它是瑞士军刀。",
+        inputs: [
+          { name: "image", type: "IMAGE", from: "典型上游：VHS 加载节点或 VAE Decode", desc: "帧批次" }
+        ],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：合成、插帧或采样链", desc: "挑出的帧子集" }
+        ],
+        why: "原生节点没有按索引挑帧的能力，序列处理几乎绕不开它。",
+        params: [
+          { name: "indexes", kind: "文本", default: "0", desc: "索引表达式，逗号分隔单帧、区间写法选一段，负数从末尾倒数。" },
+          { name: "err_if_missing", kind: "开关", default: "true", desc: "索引超出范围时是否报错，关掉则静默跳过。" },
+          { name: "err_if_empty", kind: "开关", default: "true", desc: "结果为空时是否报错，关掉则输出空批次继续跑。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "VHS Get Image Count", cat: "util",
+        brief: "统计帧批次数量，输出帧数整数。",
+        desc: "输入 IMAGE 批次，输出包含多少帧的 INT。看似简单却是自动化工作流的重要积木：用帧数驱动条件分支、计算批次切分、或把帧数喂给其他参数节点，实现纯数据流联动。",
+        inputs: [
+          { name: "images", type: "IMAGE", from: "典型上游：VHS 加载节点", desc: "帧批次" }
+        ],
+        outputs: [
+          { type: "INT", to: "典型下游：需要帧数的节点", desc: "帧数" }
+        ],
+        why: "帧数是视频工作流最常被下游引用的元数据，没有它就得靠外部脚本数。",
+        params: [],
+        tips: ""
+      },
+      {
+        name: "VHS Split Images", cat: "video",
+        brief: "在指定位置把帧批次一分为二。",
+        desc: "输入帧批次与 split_index 切分点，输出前后两段帧批次及各自帧数。典型用途：把首帧或末帧单独拆出来当参考帧处理，其余帧走主链路，处理完再用 Merge Images 拼回去。",
+        inputs: [
+          { name: "images", type: "IMAGE", from: "典型上游：VHS 加载节点", desc: "帧批次" }
+        ],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：处理链 A 段", desc: "切分点之前的帧" },
+          { type: "INT", to: "典型下游：需要帧数的节点", desc: "A 段帧数" },
+          { type: "IMAGE", to: "典型下游：处理链 B 段", desc: "切分点之后的帧" },
+          { type: "INT", to: "典型下游：需要帧数的节点", desc: "B 段帧数" }
+        ],
+        why: "序列处理经常要「留头去尾」分别处理，拆分节点让这类操作不再需要重复加载。",
+        params: [
+          { name: "split_index", kind: "整数", default: "0", desc: "切分位置，第几帧之后切开。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "VHS Merge Images", cat: "video",
+        brief: "把两个帧批次合并为一个，处理尺寸与裁切策略。",
+        desc: "输入 A、B 两路帧批次合并输出，merge_strategy 决定两边长度不一致时怎么办，scale_method 与 crop 决定合并前是否缩放与如何裁切对齐。常与 Split Images 配对使用，拆开处理完再无缝拼回。",
+        inputs: [
+          { name: "images_A", type: "IMAGE", from: "典型上游：处理链 A 段", desc: "第一批帧" },
+          { name: "images_B", type: "IMAGE", from: "典型上游：处理链 B 段", desc: "第二批帧" }
+        ],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：合成或后处理链", desc: "合并后的帧批次" },
+          { type: "INT", to: "典型下游：需要帧数的节点", desc: "合并后总帧数" }
+        ],
+        why: "拆开处理完的帧要拼回去，合并策略能兜住两边帧数不一致的坑。",
+        params: [
+          { name: "merge_strategy", kind: "下拉选择", default: "—", desc: "帧数不一致时的对齐策略，例如匹配 A、匹配 B、取较小者等。" },
+          { name: "scale_method", kind: "下拉选择", default: "—", desc: "合并前的缩放算法。" },
+          { name: "crop", kind: "下拉选择", default: "—", desc: "尺寸不齐时的裁切方式。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "VHS Select Every Nth Image", cat: "video",
+        brief: "隔帧抽帧，顺带支持跳过开头若干帧。",
+        desc: "从帧批次中每 select_every_nth 帧取一帧，可先用 skip_first_images 跳过开头，输出 count 提示剩余帧数。与 Load Video 里的 select_every_nth 参数功能一致，但作用于任意帧批次，可插在链路中间随时使用。",
+        inputs: [
+          { name: "images", type: "IMAGE", from: "典型上游：VHS 加载节点", desc: "帧批次" }
+        ],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：合成或后处理链", desc: "抽帧后的批次" },
+          { type: "INT", to: "典型下游：需要帧数的节点", desc: "抽帧后的帧数" }
+        ],
+        why: "对已有帧批次做二次抽帧或降帧率时，插一个节点就能完成。",
+        params: [
+          { name: "select_every_nth", kind: "整数", default: "1", desc: "每 n 帧取 1 帧，设 2 表示帧数减半。" },
+          { name: "skip_first_images", kind: "整数", default: "0", desc: "先跳过开头的帧数再抽帧。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "VHS VAE Decode Batched", cat: "vae",
+        brief: "分小批解码潜空间，大批次解码不再爆显存。",
+        desc: "与内置 VAE Decode 功能相同，但把潜空间按 per_batch 分成小块逐批解码再拼接，把显存峰值压平。视频工作流动辄上百帧，整批一次性解码是常见的爆显存点，这个节点就是官方解药。",
+        inputs: [
+          { name: "samples", type: "LATENT", from: "典型上游：KSampler", desc: "潜空间批次" },
+          { name: "vae", type: "VAE", from: "典型上游：Load Checkpoint 或 VAE Loader", desc: "编解码器" }
+        ],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：VHS Video Combine 或插帧节点", desc: "解码后的帧序列" }
+        ],
+        why: "长视频出图链路里它几乎是标配，代价只是分批之间的微小调度开销。",
+        params: [
+          { name: "per_batch", kind: "整数", default: "16", desc: "每次解码的帧数，爆显存就调小，速度优先可调大。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "VHS Prune Outputs", cat: "util",
+        brief: "自动清理 Video Combine 留下的中间文件。",
+        desc: "接收 Video Combine 输出的 VHS_FILENAMES 文件名信息，按 options 选择删除中间产物（如 gif 预览、帧序列缓存）或连同工具文件一起删，防止输出目录无限膨胀。只清理输出与临时目录内的文件，成品文件会保留。",
+        inputs: [
+          { name: "filenames", type: "VHS_FILENAMES", from: "典型上游：VHS Video Combine", desc: "本次合成写出的文件清单" }
+        ],
+        outputs: [],
+        why: "调试视频工作流会产生大量废弃中间文件，这个清理节点让输出目录保持干净。",
+        params: [
+          { name: "options", kind: "下拉选择", default: "Intermediate", desc: "清理范围。",
+            options: [["Intermediate", "只删中间产物，保留成品"], ["Intermediate and Utility", "连工具文件一起删，目录更干净"]] }
+        ],
+        tips: ""
       }
     ]
   });
@@ -821,6 +1426,87 @@
           { name: "multiplier", kind: "整数", default: "2", desc: "插帧倍率，2 表示帧数翻倍。" }
         ],
         tips: "实拍素材仍优先 RIFE 或 FILM；动画素材可以把几个模型并排对比选效果。"
+      },
+      {
+        name: "AMT VFI", cat: "video",
+        brief: "大运动插帧模型 AMT，三档模型按速度与质量取舍。",
+        desc: "AMT 通过全场双向相关性估计合成中间帧，对大运动与复杂遮挡比 RIFE 更稳。提供 amt-s、amt-l 等三档模型，s 最快、l 质量最高，首次使用会自动下载对应权重。multiplier 从 2 起，帧数按倍率增长。",
+        inputs: [
+          { name: "frames", type: "IMAGE", from: "典型上游：VAE Decode 或 VHS 加载节点", desc: "待插帧的序列" },
+          { name: "ckpt_name", type: "COMBO", from: "节点面板选择", desc: "AMT 模型档位" },
+          { name: "multiplier", type: "INT", from: "节点面板填写", desc: "插帧倍率" },
+          { name: "clear_cache_after_n_frames", type: "INT", from: "节点面板填写", desc: "每处理多少帧清理一次缓存" }
+        ],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：VHS Video Combine 的 images 输入", desc: "插帧后的序列" }
+        ],
+        why: "镜头运动大的素材是 RIFE 的翻车重灾区，AMT 是常用的升级替代。",
+        params: [
+          { name: "ckpt_name", kind: "下拉选择", default: "amt-s.pth", desc: "AMT 模型档位。",
+            options: [["amt-s.pth", "最小最快，先跑通用它"], ["amt-l.pth", "参数更多质量更高，定稿镜头用"]] },
+          { name: "multiplier", kind: "整数", default: "2", desc: "插帧倍率，2 表示帧数翻倍，最小为 2。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "CAIN VFI", cat: "video",
+        brief: "通道注意力插帧模型 CAIN，轻量经典，画面柔和。",
+        desc: "CAIN 用通道注意力直接合成中间帧，不做显式光流对齐，计算轻、显存友好，画面风格偏柔。只有一个 pretrained_cain 权重，接口与系列其它 VFI 节点保持一致，首次使用自动下载。",
+        inputs: [
+          { name: "frames", type: "IMAGE", from: "典型上游：VAE Decode 或 VHS 加载节点", desc: "待插帧的序列" },
+          { name: "ckpt_name", type: "COMBO", from: "节点面板选择", desc: "CAIN 模型文件" },
+          { name: "multiplier", type: "INT", from: "节点面板填写", desc: "插帧倍率" },
+          { name: "clear_cache_after_n_frames", type: "INT", from: "节点面板填写", desc: "每处理多少帧清理一次缓存" }
+        ],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：VHS Video Combine", desc: "插帧后的序列" }
+        ],
+        why: "老牌轻量选项，低配机器或想快速看效果的场合依然好用。",
+        params: [
+          { name: "ckpt_name", kind: "下拉选择", default: "pretrained_cain.pth", desc: "CAIN 预训练权重，官方只提供一个版本。" },
+          { name: "multiplier", kind: "整数", default: "2", desc: "插帧倍率，2 表示帧数翻倍。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "IFRNet VFI", cat: "video",
+        brief: "高效率插帧网络 IFRNet，速度与质量兼顾的均衡选择。",
+        desc: "IFRNet 为高效率插帧设计，编码解码结构压缩了计算量：S 小模型速度极快、L 大模型质量更高，另有 Vimeo90K 与 GoPro 两个训练集版本可选。接口保持系列统一，适合大批量补帧。",
+        inputs: [
+          { name: "frames", type: "IMAGE", from: "典型上游：VAE Decode 或 VHS 加载节点", desc: "待插帧的序列" },
+          { name: "ckpt_name", type: "COMBO", from: "节点面板选择", desc: "IFRNet 模型版本" },
+          { name: "multiplier", type: "INT", from: "节点面板填写", desc: "插帧倍率" },
+          { name: "clear_cache_after_n_frames", type: "INT", from: "节点面板填写", desc: "每处理多少帧清理一次缓存" }
+        ],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：VHS Video Combine", desc: "插帧后的序列" }
+        ],
+        why: "追求插帧吞吐量时它比多数同类更省时，效果却不掉队。",
+        params: [
+          { name: "ckpt_name", kind: "下拉选择", default: "IFRNet_S_Vimeo90K.pth", desc: "模型版本，S 快 L 好，Vimeo90K 与 GoPro 是两个训练集方向。" },
+          { name: "multiplier", kind: "整数", default: "2", desc: "插帧倍率，2 表示帧数翻倍。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Sepconv VFI", cat: "video",
+        brief: "可分离卷积插帧 SepConv，经典老牌，慢而稳。",
+        desc: "SepConv 用可分离卷积核估计运动信息合成中间帧，是插帧领域的经典方法，画面干净但速度偏慢，权重体积也较大。适合对个别镜头精修，或与 RIFE、FILM 并排评测时使用。",
+        inputs: [
+          { name: "frames", type: "IMAGE", from: "典型上游：VAE Decode 或 VHS 加载节点", desc: "待插帧的序列" },
+          { name: "ckpt_name", type: "COMBO", from: "节点面板选择", desc: "SepConv 模型文件" },
+          { name: "multiplier", type: "INT", from: "节点面板填写", desc: "插帧倍率" },
+          { name: "clear_cache_after_n_frames", type: "INT", from: "节点面板填写", desc: "每处理多少帧清理一次缓存" }
+        ],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：VHS Video Combine", desc: "插帧后的序列" }
+        ],
+        why: "与 RIFE、FILM 并列的经典选项，多一个模型就多一种素材适配可能。",
+        params: [
+          { name: "ckpt_name", kind: "下拉选择", default: "sepconv.pth", desc: "SepConv 预训练权重，官方只提供一个版本。" },
+          { name: "multiplier", kind: "整数", default: "2", desc: "插帧倍率，2 表示帧数翻倍。" }
+        ],
+        tips: ""
       }
     ]
   });
@@ -898,6 +1584,53 @@
             options: [["Half Tile", "在接缝处再跑一次半块去噪，效果最好"], ["Band Pass", "在接缝处画一条修复带"], ["None", "不修复，最快"]] }
         ],
         tips: "当作全图精修用：denoise 0.15 到 0.3、块尺寸 1024，正负提示词沿用出图时那一套，画面不会变构图。"
+      },
+      {
+        name: "Ultimate SD Upscale (Custom Sample)", cat: "sampler",
+        brief: "主节点的自定义采样变体，可外接采样器与噪声调度。",
+        desc: "分块重绘逻辑与主节点完全一致，区别是放宽了输入：放大模型改为可选（不接则用 Lanczos 插值放大），并新增 custom_sampler 与 custom_sigmas 两个可选输入，允许接入 ComfyUI 采样器体系里的 SAMPLER 与 SIGMAS 对象，两者需同时提供才生效。想在分块重绘里用非内置采样流程时选它。",
+        inputs: [
+          { name: "image", type: "IMAGE", from: "典型上游：VAE Decode", desc: "待放大的原图" },
+          { name: "model", type: "MODEL", from: "典型上游：Load Checkpoint / LoRA 链", desc: "用于重绘的底模" },
+          { name: "positive", type: "CONDITIONING", from: "典型上游：正向 CLIP Text Encode", desc: "正向条件" },
+          { name: "negative", type: "CONDITIONING", from: "典型上游：负向 CLIP Text Encode", desc: "负向条件" },
+          { name: "vae", type: "VAE", from: "典型上游：Load Checkpoint 或 VAE Loader", desc: "编解码器" },
+          { name: "custom_sampler", type: "SAMPLER", from: "可选，采样器对象节点", desc: "替代内置采样的自定义采样器" },
+          { name: "custom_sigmas", type: "SIGMAS", from: "可选，噪声调度节点", desc: "替代内置调度的自定义 sigma 序列" }
+        ],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：Save Image", desc: "放大并补足细节的成图" }
+        ],
+        why: "想要分块重绘的稳定性又想用社区新采样器时，它是唯一留了接口的变体。",
+        params: [
+          { name: "upscale_by", kind: "浮点数", default: "2.0", desc: "放大倍率，含义与主节点相同。" },
+          { name: "denoise", kind: "浮点数", default: "0.2", desc: "分块重绘幅度，取值经验与主节点一致。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Ultimate SD Upscale (Guider)", cat: "sampler",
+        brief: "面向新版采样体系的变体，用 Guider 封装模型与条件。",
+        desc: "为 ComfyUI 新版采样架构准备的变体：不再分别接模型与正负条件，而是接一个 guider（GUIDER 类型，由 BasicGuider 类节点生成，内部已封装模型、条件与 CFG），配合 sampler 与 sigmas 两个输入驱动每个分块的采样。其余分块、接缝修复等逻辑与主节点一致。",
+        inputs: [
+          { name: "image", type: "IMAGE", from: "典型上游：VAE Decode", desc: "待放大的原图" },
+          { name: "guider", type: "GUIDER", from: "典型上游：BasicGuider 类节点", desc: "封装模型、条件与 CFG 的引导器" },
+          { name: "sampler", type: "SAMPLER", from: "可选，采样器对象节点", desc: "每个分块使用的采样器" },
+          { name: "sigmas", type: "SIGMAS", from: "可选，噪声调度节点", desc: "采样噪声调度" },
+          { name: "vae", type: "VAE", from: "典型上游：VAE Loader", desc: "编解码器" },
+          { name: "upscale_model", type: "UPSCALE_MODEL", from: "典型上游：Upscale Model Loader", desc: "放大模型" }
+        ],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：Save Image", desc: "放大并补足细节的成图" }
+        ],
+        why: "新版工作流把模型与条件封进 Guider 后，主节点的老接口接不上，这个变体就是为它们准备的。",
+        params: [
+          { name: "upscale_by", kind: "浮点数", default: "2.0", desc: "放大倍率。" },
+          { name: "seed", kind: "整数", default: "0", desc: "噪声种子，供分块采样生成噪声使用。" },
+          { name: "tile_width", kind: "整数", default: "512", desc: "分块宽度，含义与主节点相同。" },
+          { name: "tile_height", kind: "整数", default: "512", desc: "分块高度。" }
+        ],
+        tips: ""
       }
     ]
   });
@@ -1019,6 +1752,24 @@
           { name: "type", kind: "下拉选择", default: "stable_diffusion", desc: "四编码器的组合架构，按所用模型选择对应档位。" }
         ],
         tips: "四个编码器总体积可观，逐个查看体积并按需选档，优先压缩体积最大的那一路。"
+      },
+      {
+        name: "Unet Loader (GGUF/Advanced)", cat: "load",
+        brief: "带补丁精度控制的进阶量化加载器，微调反量化行为。",
+        desc: "在基础版之上增加 patch_dtype（LoRA 补丁计算精度）与 patch_on_device（补丁是否常驻显卡计算）两个开关：LoRA 与量化模型精度不匹配导致报错或效果异常时，就在这里调整。dequant_dtype 控制反量化目标精度，其余行为与基础版完全一致。",
+        inputs: [
+          { name: "unet_name", type: "COMBO", from: "models/unet 目录中的 gguf 文件列表", desc: "选择量化模型文件" }
+        ],
+        outputs: [
+          { type: "MODEL", to: "典型下游：LoRA 链或 KSampler 的 model 输入", desc: "量化加载的扩散模型" }
+        ],
+        why: "高阶排错与性能调优的入口，普通场景用基础版即可，遇到补丁精度问题才需要它。",
+        params: [
+          { name: "dequant_dtype", kind: "下拉选择", default: "default", desc: "反量化计算精度，default 跟随目标，也可强制指定精度。" },
+          { name: "patch_dtype", kind: "下拉选择", default: "default", desc: "LoRA 补丁的计算精度，与主权重精度不一致时报错时改这里。" },
+          { name: "patch_on_device", kind: "开关", default: "false", desc: "补丁是否放显卡计算，显存充裕时打开能提速。" }
+        ],
+        tips: ""
       }
     ]
   });
@@ -1186,6 +1937,616 @@
           { name: "filename_prefix", kind: "文本", default: "ComfyUI", desc: "输出文件名前缀，生成的 PNG 保存在 output 目录并带透明通道。" }
         ],
         tips: "遮罩先做一次轻微羽化再当透明通道用，边缘合成时更自然。"
+      },
+      {
+        name: "String Constant", cat: "util",
+        brief: "输出一个固定字符串，供全图引用的文本常量。",
+        desc: "在节点上写一段文本，输出 STRING。与 INT Constant 同类的积木：把模型名、文件名、提示词片段等集中管理，再经 SetNode 与 GetNode 分发，改一处全图生效。",
+        inputs: [],
+        outputs: [
+          { type: "STRING", to: "典型下游：任何接受字符串的输入", desc: "设定的固定文本" }
+        ],
+        why: "参数化工作流里文本常量比散落在各节点的值好维护得多。",
+        params: [
+          { name: "string", kind: "文本", default: "", desc: "输出的固定文本内容。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "String Constant Multiline", cat: "util",
+        brief: "多行文本常量，适合长提示词与大段说明。",
+        desc: "String Constant 的多行版：以多行编辑框输入文本并输出 STRING，strip_newlines 可选择自动去掉换行符，把多行内容压成一行喂给只认单行的下游。",
+        inputs: [],
+        outputs: [
+          { type: "STRING", to: "典型下游：提示词编码或文本处理节点", desc: "多行文本" }
+        ],
+        why: "写长提示词时挤在单行输入框里是灾难，多行常量让文本可读可改。",
+        params: [
+          { name: "strip_newlines", kind: "开关", default: "true", desc: "输出前移除换行符，把多行内容压成单行。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Float Constant", cat: "util",
+        brief: "输出一个固定浮点数，精确控制小数参数。",
+        desc: "设置一个小数值输出 FLOAT，精度到五位小数。与 INT Constant 互补：凡是需要小数的参数源，比如强度、倍率、比例，都由它提供，再经变量路由分发。",
+        inputs: [],
+        outputs: [
+          { type: "FLOAT", to: "典型下游：任何接受浮点数的输入", desc: "设定的浮点值" }
+        ],
+        why: "原生面板的小数输入藏在各节点深处，常量化后调参集中又不易漏改。",
+        params: [
+          { name: "value", kind: "浮点数", default: "0.0", desc: "输出的固定浮点值。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "BOOL Constant", cat: "util",
+        brief: "输出一个固定布尔值，当开关常量用。",
+        desc: "设置开或关，输出 BOOLEAN。用于把某些节点的开关输入集中管理，或配合条件类节点做流程开关。",
+        inputs: [],
+        outputs: [
+          { type: "BOOLEAN", to: "典型下游：接受布尔输入的节点", desc: "设定的开关值" }
+        ],
+        why: "流程级的开关集中到一个常量节点，试跑与定稿切换就不必满图找开关。",
+        params: [
+          { name: "value", kind: "开关", default: "true", desc: "输出的布尔值。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Join String Multi", cat: "util",
+        brief: "把任意多路字符串按分隔符拼接成一路。",
+        desc: "从两个输入口起步，inputcount 调大后前端会自动长出更多输入口，把所有字符串按 delimiter 拼接输出。return_list 打开后改为输出字符串列表而非拼接结果，供列表类下游使用。",
+        inputs: [
+          { name: "string_1", type: "STRING", from: "典型上游：文本类节点", desc: "第一段文本" },
+          { name: "string_2", type: "STRING", from: "可选，文本类节点", desc: "第二段文本，输入口可继续扩展" }
+        ],
+        outputs: [
+          { type: "STRING", to: "典型下游：提示词编码或文本节点", desc: "拼接后的文本" }
+        ],
+        why: "组装动态提示词时，原生只有两路拼接可用，多路拼接全靠它。",
+        params: [
+          { name: "inputcount", kind: "整数", default: "2", desc: "输入口数量，调大后点更新按钮生成更多输入口。" },
+          { name: "delimiter", kind: "文本", default: " ", desc: "各段文本之间的分隔符，常用逗号加空格。" },
+          { name: "return_list", kind: "开关", default: "false", desc: "改为输出字符串列表，不拼接。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Something To String", cat: "util",
+        brief: "把任意类型的输出转成字符串，调试打印两相宜。",
+        desc: "接受 ANY 类型的输入，转成 STRING 输出，可加前后缀。用途有二：一是把整数、浮点、遮罩尺寸等元数据转文本显示或拼接；二是接到预览类节点查看数值内容，排查数据流问题。",
+        inputs: [
+          { name: "input", type: "*", from: "典型上游：任何数据输出", desc: "任意类型数据" }
+        ],
+        outputs: [
+          { type: "STRING", to: "典型下游：文本拼接或显示节点", desc: "转换后的字符串" }
+        ],
+        why: "排查数据流时能「看见」变量的值，比对着连线瞎猜高效得多。",
+        params: [
+          { name: "prefix", kind: "文本", default: "", desc: "加在结果前面的文字标注。" },
+          { name: "suffix", kind: "文本", default: "", desc: "加在结果后面的文字标注。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Dummy Out", cat: "util",
+        brief: "什么都不做的占位节点，数据原样透传。",
+        desc: "接受 ANY 类型输入并原样输出 ANY。看似无用却有两个高频用途：一是临时替掉链路中某个节点做对比测试；二是接住暂时用不上的分支输出，避免报错。类似的还有 Image Pass、Model Pass Through 等专型透传节点。",
+        inputs: [
+          { name: "any_input", type: "*", from: "任何数据输出", desc: "任意类型数据" }
+        ],
+        outputs: [
+          { type: "*", to: "典型下游：原链路下一个节点", desc: "原样透传的数据" }
+        ],
+        why: "调试与临时改造工作流时，它是随时可插拔的中性转接头。",
+        params: [],
+        tips: ""
+      },
+      {
+        name: "ImagePass", cat: "util",
+        brief: "图像原样透传，中间插桩不改变数据。",
+        desc: "接受可选的 IMAGE 输入并原样输出。作为纯图像版透传节点，常用来在关键位置插入断点做对比，或给长连线留一个「中转站」让布线更整洁。",
+        inputs: [
+          { name: "image", type: "IMAGE", from: "可选，任何图像输出", desc: "透传的图像" }
+        ],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：下一个图像节点", desc: "原样透传的图像" }
+        ],
+        why: "长图链里做 A 与 B 对比时，一个透传节点就是最轻量的实验开关。",
+        params: [],
+        tips: ""
+      },
+      {
+        name: "VRAM Debug", cat: "util",
+        brief: "输出执行前后的空闲显存数值，顺带清理缓存。",
+        desc: "执行时记录清理前后的空闲显存并输出两个 INT，any_input、image_pass、model_pass 三路输入都原样透传，因此可以塞进任意链路当「显存探头」。empty_cache 释放 PyTorch 缓存，gc_collect 触发垃圾回收，unload_all_models 可卸载全部模型。",
+        inputs: [
+          { name: "any_input", type: "*", from: "可选，任何数据输出", desc: "原样透传的数据" },
+          { name: "image_pass", type: "IMAGE", from: "可选，图像输出", desc: "原样透传的图像" },
+          { name: "model_pass", type: "MODEL", from: "可选，模型输出", desc: "原样透传的模型" }
+        ],
+        outputs: [
+          { type: "*", to: "典型下游：原链路下一个节点", desc: "透传的数据" },
+          { type: "IMAGE", to: "典型下游：图像链下一个节点", desc: "透传的图像" },
+          { type: "MODEL", to: "典型下游：模型链下一个节点", desc: "透传的模型" },
+          { type: "INT", to: "典型下游：数值显示节点", desc: "执行前空闲显存" },
+          { type: "INT", to: "典型下游：数值显示节点", desc: "执行后空闲显存" }
+        ],
+        why: "爆显存问题需要先量化再解决，这个节点让显存水位变得可见。",
+        params: [
+          { name: "empty_cache", kind: "开关", default: "true", desc: "执行时释放 PyTorch 的缓存显存。" },
+          { name: "gc_collect", kind: "开关", default: "true", desc: "执行时触发一次 Python 垃圾回收。" },
+          { name: "unload_all_models", kind: "开关", default: "false", desc: "卸载当前所有已加载模型，显存极度紧张时才用。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Superprompt", cat: "util",
+        brief: "用本地 T5 模型把简短提示词扩写成详细描述。",
+        desc: "接入 SuperPrompt 微调过的 T5 小模型，把一句话提示词扩写成细节丰富的描述，首次运行自动下载模型。输出 STRING 直接接提示词编码。作为出图前的自动润色步骤，对文本理解类模型提升明显，但也可能引入不需要的描述，需要酌情取舍。",
+        inputs: [
+          { name: "prompt", type: "STRING", from: "典型上游：String Constant 或文本节点", desc: "待扩写的简短提示词" }
+        ],
+        outputs: [
+          { type: "STRING", to: "典型下游：CLIP Text Encode 的 text 输入", desc: "扩写后的详细提示词" }
+        ],
+        why: "不会写长提示词的用户靠它一键补细节，也常用来给批量素材生成差异化描述。",
+        params: [
+          { name: "instruction_prompt", kind: "文本", default: "Expand the following prompt to add more detail", desc: "给模型的扩写指令，可以改成指定风格方向的指令。" },
+          { name: "max_new_tokens", kind: "整数", default: "128", desc: "扩写结果的长度上限，越大越详细也越慢。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Image Batch Multi", cat: "image",
+        brief: "把任意多张图合并成一个批次。",
+        desc: "从两个输入口起步，inputcount 调大后可继续添加，把多路 IMAGE 合成一个批次输出。要求各图尺寸一致，否则需先用缩放节点对齐。与原生 Image Batch 的两路固定输入相比，多路合并一步到位。",
+        inputs: [
+          { name: "image_1", type: "IMAGE", from: "典型上游：Load Image 或 VAE Decode", desc: "第一张图" },
+          { name: "image_2", type: "IMAGE", from: "可选，同上", desc: "第二张图，输入口可继续扩展" }
+        ],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：批次处理或序列节点", desc: "合并后的图像批次" }
+        ],
+        why: "做网格图、序列处理、多图对比前的合批，这个节点省掉层层嵌套的两两合并。",
+        params: [
+          { name: "inputcount", kind: "整数", default: "2", desc: "输入口数量，调大后点更新按钮生成更多输入口。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Image Concatenate Multi", cat: "image",
+        brief: "把多张图按方向拼成一张大图。",
+        desc: "多路输入按 direction 方向（右、下、左、上）拼接成一张图，match_image_size 决定拼接前是否把后续图缩放到与第一张同尺寸。与 Batch Multi 的区别是这里拼的是一张图而不是批次，适合做对比图与长条预览。",
+        inputs: [
+          { name: "image_1", type: "IMAGE", from: "典型上游：Load Image 或 VAE Decode", desc: "第一张图，决定输出尺寸基准" },
+          { name: "image_2", type: "IMAGE", from: "可选，同上", desc: "第二张图，输入口可继续扩展" }
+        ],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：Save Image 或预览节点", desc: "拼接成的大图" }
+        ],
+        why: "出对比图与长条拼图时一步到位，不用再套多层原生拼接节点。",
+        params: [
+          { name: "inputcount", kind: "整数", default: "2", desc: "输入口数量。" },
+          { name: "direction", kind: "下拉选择", default: "right", desc: "拼接方向，依次向右、向下、向左或向上排。" },
+          { name: "match_image_size", kind: "开关", default: "false", desc: "拼接前把后续图缩放到与第一张一致，尺寸不齐时打开。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Image Grid Composite 2x2", cat: "image",
+        brief: "把四张图合成带标注的 2x2 网格大图。",
+        desc: "输入四张图，自动排成两行两列的网格并附坐标标注，常用于一次性预览四个变体。四张图尺寸不一致时会自动对齐到统一网格，输出单张 IMAGE。",
+        inputs: [
+          { name: "image1", type: "IMAGE", from: "典型上游：VAE Decode", desc: "第一格图像" },
+          { name: "image2", type: "IMAGE", from: "典型上游：VAE Decode", desc: "第二格图像" },
+          { name: "image3", type: "IMAGE", from: "典型上游：VAE Decode", desc: "第三格图像" },
+          { name: "image4", type: "IMAGE", from: "典型上游：VAE Decode", desc: "第四格图像" }
+        ],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：Save Image", desc: "2x2 网格大图" }
+        ],
+        why: "对比种子或参数的四个变体时，网格合成比手动拼图省事得多。",
+        params: [],
+        tips: ""
+      },
+      {
+        name: "Image Grid Composite 3x3", cat: "image",
+        brief: "把九张图合成 3x3 网格大图。",
+        desc: "Image Grid Composite 2x2 的九宫格版：输入九张图排成三行三列并附坐标标注，输出单张 IMAGE。一次对比九个变体时是效率神器。",
+        inputs: [
+          { name: "image1", type: "IMAGE", from: "典型上游：VAE Decode", desc: "第一格图像，其余八格同理" }
+        ],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：Save Image", desc: "3x3 网格大图" }
+        ],
+        why: "九个变体一图看全，挑种子挑参数的效率直接翻三倍。",
+        params: [],
+        tips: ""
+      },
+      {
+        name: "Image Crop By Mask And Resize", cat: "image",
+        brief: "按遮罩裁出主体并缩放到目标分辨率。",
+        desc: "对输入图按遮罩范围裁剪出最小外接区域，缩放到 max_crop_resolution 以内的合适尺寸输出，同时输出裁剪区域的遮罩与 BBOX 边界框。与配套的 Uncrop 节点组合，构成「抠出来修好再贴回去」的局部重绘标准流程。",
+        inputs: [
+          { name: "image", type: "IMAGE", from: "典型上游：Load Image 或 VAE Decode", desc: "原图" },
+          { name: "mask", type: "MASK", from: "典型上游：遮罩生成节点", desc: "指定裁剪范围的遮罩" }
+        ],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：局部重绘或放大链", desc: "裁剪并缩放后的局部图" },
+          { type: "MASK", to: "典型下游：局部处理链", desc: "裁剪区域的遮罩" },
+          { type: "BBOX", to: "典型下游：Image Uncrop By Mask 的 bbox 输入", desc: "裁剪区域边界框，贴回时用" }
+        ],
+        why: "局部重绘的第一步就是把目标区域抠出来放大处理，这个节点把裁剪缩放打包成一步。",
+        params: [
+          { name: "base_resolution", kind: "整数", default: "512", desc: "基准分辨率，裁剪结果按它对齐。" },
+          { name: "padding", kind: "整数", default: "0", desc: "裁剪范围向外扩的像素数，多留点上下文过渡更自然。" },
+          { name: "min_crop_resolution", kind: "整数", default: "128", desc: "裁剪结果的最小边长。" },
+          { name: "max_crop_resolution", kind: "整数", default: "512", desc: "裁剪结果的最大边长，超出会被缩小。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Image Uncrop By Mask", cat: "image",
+        brief: "把处理好的局部图贴回原图，完成局部重绘闭环。",
+        desc: "与 Crop By Mask 系列配对的收尾节点：输入原图 destination、处理后的局部图 source、对应遮罩与 BBOX 边界框，把局部图按记录的位置贴回原处并做边缘融合，输出完整大图。",
+        inputs: [
+          { name: "destination", type: "IMAGE", from: "典型上游：原大图", desc: "要贴回去的底图" },
+          { name: "source", type: "IMAGE", from: "典型上游：局部处理结果", desc: "修好的局部图" },
+          { name: "mask", type: "MASK", from: "典型上游：裁剪时输出的遮罩", desc: "对应区域的遮罩" },
+          { name: "bbox", type: "BBOX", from: "典型上游：裁剪时输出的 BBOX", desc: "记录裁剪位置的边界框" }
+        ],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：Save Image", desc: "贴回完成的完整图" }
+        ],
+        why: "局部重绘最怕贴回去有色差错位，配套的裁剪贴回节点把坐标对齐问题彻底解决。",
+        params: [],
+        tips: ""
+      },
+      {
+        name: "Image Pad For Outpaint Masked", cat: "image",
+        brief: "按遮罩方向外扩画布并生成羽化过渡，做扩图预处理。",
+        desc: "扩展图布的四边（left、top、right、bottom 指定各边扩多少），可选输入遮罩决定扩图区域，feathering 控制原内容边缘的羽化过渡。输出扩大后的图与配套遮罩，直接喂给扩图采样流程。",
+        inputs: [
+          { name: "image", type: "IMAGE", from: "典型上游：Load Image 或 VAE Decode", desc: "原图" },
+          { name: "mask", type: "MASK", from: "可选，遮罩生成节点", desc: "决定扩图方向的遮罩" }
+        ],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：扩图采样链", desc: "外扩后的图" },
+          { type: "MASK", to: "典型下游：扩图采样链", desc: "外扩区域的遮罩" }
+        ],
+        why: "原生外扩节点不带遮罩与羽化控制，扩图边界生硬时它是最快的替代。",
+        params: [
+          { name: "left", kind: "整数", default: "0", desc: "向左扩展的像素数，步长 8。" },
+          { name: "top", kind: "整数", default: "0", desc: "向上扩展的像素数。" },
+          { name: "right", kind: "整数", default: "0", desc: "向右扩展的像素数。" },
+          { name: "bottom", kind: "整数", default: "0", desc: "向下扩展的像素数。" },
+          { name: "feathering", kind: "整数", default: "0", desc: "原内容边缘的羽化宽度，过渡自然度靠它。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Get Image Size & Count", cat: "image",
+        brief: "输出图像宽、高与批次数量，数据原样透传。",
+        desc: "输入 IMAGE，输出透传的图像以及 width、height、count 三个 INT。把尺寸元数据接给缩放节点、条件分支或显示节点，让分辨率信息在链路里流动起来。",
+        inputs: [
+          { name: "image", type: "IMAGE", from: "典型上游：任何图像输出", desc: "待读取的图像" }
+        ],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：下一个图像节点", desc: "原样透传的图像" },
+          { type: "INT", to: "典型下游：需要宽度的节点", desc: "图像宽度" },
+          { type: "INT", to: "典型下游：需要高度的节点", desc: "图像高度" },
+          { type: "INT", to: "典型下游：需要数量的节点", desc: "批次中的图像数量" }
+        ],
+        why: "让分辨率与帧数成为可参与计算的数据，是自动化工作流的基础能力。",
+        params: [],
+        tips: ""
+      },
+      {
+        name: "Get Image or Mask Range From Batch", cat: "image",
+        brief: "从批次中按起始索引截取一段帧或图。",
+        desc: "输入图像或遮罩批次，用 start_index 与 num_frames 截取一段输出：start_index 填 -1 表示从末尾倒数。典型用途是视频首尾帧提取、分段处理与滚动窗口式重绘。",
+        inputs: [
+          { name: "images", type: "IMAGE", from: "可选，图像批次", desc: "待截取的图像批次" },
+          { name: "masks", type: "MASK", from: "可选，遮罩批次", desc: "待截取的遮罩批次" }
+        ],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：处理或合成链", desc: "截取出的图像段" },
+          { type: "MASK", to: "典型下游：处理或合成链", desc: "截取出的遮罩段" }
+        ],
+        why: "批次的分段处理全靠索引截取，一个节点同时伺候图像与遮罩两路。",
+        params: [
+          { name: "start_index", kind: "整数", default: "0", desc: "起始索引，-1 表示从末尾开始倒数。" },
+          { name: "num_frames", kind: "整数", default: "1", desc: "截取的帧数。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Cross Fade Images", cat: "image",
+        brief: "在两组帧之间做可调曲线的交叉淡化转场。",
+        desc: "输入两组帧序列，从 transition_start_index 开始用 transitioning_frames 帧完成交叉淡化，interpolation 提供线性、缓入缓出、弹性、故障感等多种过渡曲线，start_level 与 end_level 控制淡化起止幅度。输出合成后的完整序列。",
+        inputs: [
+          { name: "images_1", type: "IMAGE", from: "典型上游：VAE Decode 或视频加载", desc: "前一段帧序列" },
+          { name: "images_2", type: "IMAGE", from: "典型上游：VAE Decode 或视频加载", desc: "后一段帧序列" }
+        ],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：VHS Video Combine", desc: "带转场的完整序列" }
+        ],
+        why: "两段动画硬切太生硬，交叉淡化是最低成本的转场方案。",
+        params: [
+          { name: "interpolation", kind: "下拉选择", default: "linear", desc: "过渡曲线，linear 平直、ease 系柔和、glitchy 带故障感。" },
+          { name: "transition_start_index", kind: "整数", default: "1", desc: "从第几帧开始转场，负数表示从末尾倒数。" },
+          { name: "transitioning_frames", kind: "整数", default: "1", desc: "转场持续的帧数，越多过渡越缓。" },
+          { name: "start_level", kind: "浮点数", default: "0.0", desc: "转场起始混合比例。" },
+          { name: "end_level", kind: "浮点数", default: "1.0", desc: "转场结束混合比例。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "ImageAndMaskPreview", cat: "image",
+        brief: "把遮罩以指定颜色半透明叠加到图上预览。",
+        desc: "临时预览节点：把遮罩按 mask_color 与 mask_opacity 叠加显示在图像上，不产生正式输出文件。pass_through 打开后把预览图转成正式图像输出。排查遮罩范围与羽化是否正确时几乎天天用它。",
+        inputs: [
+          { name: "image", type: "IMAGE", from: "可选，任何图像输出", desc: "底图" },
+          { name: "mask", type: "MASK", from: "可选，任何遮罩输出", desc: "要叠加显示的遮罩" }
+        ],
+        outputs: [],
+        why: "遮罩对不对肉眼说了算，这个预览节点是遮罩工作流的排错标配。",
+        params: [
+          { name: "mask_opacity", kind: "浮点数", default: "1.0", desc: "遮罩叠加的透明度，1 为不透明。" },
+          { name: "mask_color", kind: "文本", default: "255, 255, 255", desc: "遮罩颜色，支持 RGB 数组、RGBA 数组与十六进制写法。" },
+          { name: "pass_through", kind: "开关", default: "false", desc: "把叠加结果作为正式图像输出给下游。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Preview Animation", cat: "image",
+        brief: "在工作流内把帧批次快速预览成动画。",
+        desc: "把 IMAGE 批次按 fps 播放成节点内嵌的临时动画预览，也支持遮罩批次。写临时文件、不进 output 目录，用来确认帧序列节奏，确认后再接 Video Combine 正式导出。",
+        inputs: [
+          { name: "images", type: "IMAGE", from: "可选，VAE Decode 或插帧节点", desc: "待预览的帧序列" },
+          { name: "masks", type: "MASK", from: "可选，遮罩批次", desc: "待预览的遮罩序列" }
+        ],
+        outputs: [],
+        why: "出片前看一眼动态节奏，能省掉一整轮不必要的正式渲染。",
+        params: [
+          { name: "fps", kind: "浮点数", default: "8.0", desc: "预览播放的帧率，与导出帧率保持一致最直观。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Color Match", cat: "image",
+        brief: "把目标图的色彩分布对齐到参考图。",
+        desc: "以 image_ref 为色彩基准，调整 image_target 的色彩分布，method 提供 mkl、reinhard 等多种统计匹配算法，strength 控制匹配力度。视频工作流里逐帧统一色调、风格迁移后校正色偏都靠它。",
+        inputs: [
+          { name: "image_ref", type: "IMAGE", from: "典型上游：色彩基准图", desc: "色彩参考图" },
+          { name: "image_target", type: "IMAGE", from: "典型上游：待校正的目标图", desc: "要被调整的图" }
+        ],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：Save Image 或合成链", desc: "色彩对齐后的图" }
+        ],
+        why: "多批次生成的画面色调飘忽时，色彩匹配是拉回一致性的最快手段。",
+        params: [
+          { name: "method", kind: "下拉选择", default: "mkl", desc: "色彩统计算法，mkl 通用且稳，reinhard 经典快速，hm-mkl-hm 组合算法更精细。" },
+          { name: "strength", kind: "浮点数", default: "1.0", desc: "匹配强度，1 为完全对齐，调低保留部分原色调。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Grow Mask With Blur", cat: "mask",
+        brief: "一个节点完成遮罩扩张、填洞与边缘羽化。",
+        desc: "遮罩处理瑞士军刀：expand 正负值控制膨胀收缩，tapered_corners 让直角变圆滑，blur_radius 对边缘羽化，fill_holes 补上遮罩内部的小洞。局部重绘前几乎都要过一遍它，把生硬的手绘遮罩变成边缘柔和的可用遮罩。",
+        inputs: [
+          { name: "mask", type: "MASK", from: "典型上游：遮罩生成节点", desc: "待处理的遮罩" }
+        ],
+        outputs: [
+          { type: "MASK", to: "典型下游：重绘、预览或混合节点", desc: "处理后的遮罩" }
+        ],
+        why: "原生膨胀与羽化要串好几个节点，这里一个旋钮全包，参数还好回溯。",
+        params: [
+          { name: "expand", kind: "整数", default: "0", desc: "扩张像素数，正数膨胀负数收缩。" },
+          { name: "tapered_corners", kind: "开关", default: "true", desc: "圆化直角，遮罩边缘更自然。" },
+          { name: "blur_radius", kind: "浮点数", default: "0.0", desc: "边缘羽化半径，重绘过渡是否自然就看它。" },
+          { name: "fill_holes", kind: "开关", default: "false", desc: "填补遮罩内部空洞。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Create Text Mask", cat: "mask",
+        brief: "把文字渲染成图像与遮罩，可加旋转动画。",
+        desc: "按字体与字号把 text 渲染到指定尺寸的画布上，同时输出 IMAGE 与 MASK 两路，text_x、text_y 控制位置，start_rotation 与 end_rotation 不同时可生成逐帧旋转动画。做水印、文字遮罩、逐帧文字动效都很方便。",
+        inputs: [],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：预览或合成链", desc: "文字图像" },
+          { type: "MASK", to: "典型下游：遮罩处理或局部重绘链", desc: "文字遮罩" }
+        ],
+        why: "文字转遮罩省去了去外部软件画字的往返，配合变量路由还能做动态字幕。",
+        params: [
+          { name: "text", kind: "文本", default: "HELLO!", desc: "要渲染的文字内容。" },
+          { name: "font_size", kind: "整数", default: "32", desc: "字号。" },
+          { name: "frames", kind: "整数", default: "1", desc: "输出帧数，配合旋转参数做文字动画。" },
+          { name: "font", kind: "下拉选择", default: "—", desc: "字体文件，来自插件自带的 fonts 目录。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Create Gradient Mask", cat: "mask",
+        brief: "生成黑白渐变遮罩，多帧可做渐变流动动画。",
+        desc: "生成横向黑到白的线性渐变遮罩：单帧时直接可用，frames 大于 1 时每帧的渐变位置随时间偏移，形成循环流动的渐变，常用于视频局部渐变控制与过渡遮罩。width 与 height 指定尺寸。",
+        inputs: [],
+        outputs: [
+          { type: "MASK", to: "典型下游：遮罩混合或条件控制", desc: "渐变遮罩" }
+        ],
+        why: "渐变遮罩是最常用的过渡素材，按帧生成流动渐变更是原生节点做不到的。",
+        params: [
+          { name: "frames", kind: "整数", default: "0", desc: "帧数，0 或 1 输出单帧，大于 1 时渐变逐帧偏移成动画。" },
+          { name: "width", kind: "整数", default: "256", desc: "遮罩宽度。" },
+          { name: "height", kind: "整数", default: "256", desc: "遮罩高度。" },
+          { name: "invert", kind: "开关", default: "false", desc: "黑白反转。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Separate Masks", cat: "mask",
+        brief: "把含多个目标的遮罩拆成每个目标一张。",
+        desc: "输入一张含多个独立区域的遮罩，按几何分析把每个区域拆成单独的遮罩批次输出，可用面积或轮廓模式过滤小噪点。配合索引截取节点可对每个目标分别处理，实现多主体分别重绘。",
+        inputs: [
+          { name: "mask", type: "MASK", from: "典型上游：遮罩生成或检测节点", desc: "含多个区域的遮罩" }
+        ],
+        outputs: [
+          { type: "MASK", to: "典型下游：索引截取或逐区域处理链", desc: "逐区域拆分的遮罩批次" }
+        ],
+        why: "多主体图想逐个分别处理，第一步就是把粘连的遮罩拆开。",
+        params: [
+          { name: "mode", kind: "下拉选择", default: "area", desc: "区域识别方式，area 按连通面积、box 按外接框、convex_polygons 按多边形轮廓。" },
+          { name: "size_threshold_width", kind: "整数", default: "256", desc: "宽度阈值，小于它的区域会被过滤掉。" },
+          { name: "size_threshold_height", kind: "整数", default: "256", desc: "高度阈值，与宽度阈值配合过滤小噪点。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Offset Mask", cat: "mask",
+        brief: "按位移与角度整体挪动遮罩，支持逐帧递增。",
+        desc: "把遮罩按 x、y 平移并按 angle 旋转，incremental 打开后批次内每帧递增叠加变换，形成持续漂移的遮罩动画；roll 决定出界部分是否从另一侧绕回。视频工作流里让重绘区域随时间移动就靠它。",
+        inputs: [
+          { name: "mask", type: "MASK", from: "典型上游：遮罩生成节点", desc: "待变换的遮罩" }
+        ],
+        outputs: [
+          { type: "MASK", to: "典型下游：重绘或混合链", desc: "位移旋转后的遮罩" }
+        ],
+        why: "让遮罩跟着镜头动起来，是视频局部重绘区别于静图的关键一招。",
+        params: [
+          { name: "x", kind: "整数", default: "0", desc: "水平位移像素数。" },
+          { name: "y", kind: "整数", default: "0", desc: "垂直位移像素数。" },
+          { name: "angle", kind: "整数", default: "0", desc: "旋转角度，正负 360 度。" },
+          { name: "incremental", kind: "开关", default: "false", desc: "逐帧累加变换量，形成连续漂移动画。" },
+          { name: "roll", kind: "开关", default: "false", desc: "边缘环绕，出界内容从对侧回来。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Conditioning Multi Combine", cat: "cond",
+        brief: "把任意多路条件合并成一路，可叠加或拼接。",
+        desc: "从两路条件起步，inputcount 调大后继续扩展，把多路正负条件合成一路输出：operation 选 combine 时按加权求和叠加，选 concat 时按序列拼接。多主体多区域工作流里合并各分支条件的总装台。",
+        inputs: [
+          { name: "conditioning_1", type: "CONDITIONING", from: "典型上游：CLIP Text Encode 等", desc: "第一路条件" },
+          { name: "conditioning_2", type: "CONDITIONING", from: "可选，同上", desc: "第二路条件，输入口可继续扩展" }
+        ],
+        outputs: [
+          { type: "CONDITIONING", to: "典型下游：KSampler 的 positive 或 negative 输入", desc: "合并后的条件" },
+          { type: "INT", to: "典型下游：需要输入数的节点", desc: "实际合并的路数" }
+        ],
+        why: "多分支条件的合并需求远超原生两路节点的上限，这个节点就是为此而生。",
+        params: [
+          { name: "inputcount", kind: "整数", default: "2", desc: "输入口数量，调大后点更新按钮生成更多输入口。" },
+          { name: "operation", kind: "下拉选择", default: "combine", desc: "combine 按强度叠加合并，concat 按顺序拼接。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "ConditioningSetMaskAndCombine", cat: "cond",
+        brief: "两路条件各自挂遮罩后合并，多区域控制一步到位。",
+        desc: "相当于把两组「设遮罩加合并」原生节点压成一个：positive_1 与 negative_1 挂 mask_1，positive_2 与 negative_2 挂 mask_2，各自的强度由 mask_1_strength 与 mask_2_strength 控制，最后合并输出一对条件。还有三、四、五路扩展版本。",
+        inputs: [
+          { name: "positive_1", type: "CONDITIONING", from: "典型上游：正向 CLIP Text Encode", desc: "区域一正向条件" },
+          { name: "negative_1", type: "CONDITIONING", from: "典型上游：负向 CLIP Text Encode", desc: "区域一负向条件" },
+          { name: "positive_2", type: "CONDITIONING", from: "典型上游：正向 CLIP Text Encode", desc: "区域二正向条件" },
+          { name: "negative_2", type: "CONDITIONING", from: "典型上游：负向 CLIP Text Encode", desc: "区域二负向条件" },
+          { name: "mask_1", type: "MASK", from: "典型上游：遮罩节点", desc: "区域一遮罩" },
+          { name: "mask_2", type: "MASK", from: "典型上游：遮罩节点", desc: "区域二遮罩" }
+        ],
+        outputs: [
+          { type: "CONDITIONING", to: "典型下游：KSampler 的 positive 输入", desc: "合并后的正向条件" },
+          { type: "CONDITIONING", to: "典型下游：KSampler 的 negative 输入", desc: "合并后的负向条件" }
+        ],
+        why: "左右分区不同提示词的多区域出图，用它比手拼原生节点少一半连线。",
+        params: [
+          { name: "mask_1_strength", kind: "浮点数", default: "1.0", desc: "区域一遮罩的作用强度。" },
+          { name: "mask_2_strength", kind: "浮点数", default: "1.0", desc: "区域二遮罩的作用强度。" },
+          { name: "set_cond_area", kind: "下拉选择", default: "default", desc: "default 全图生效，mask bounds 把作用范围收缩到遮罩边界。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Inject Noise To Latent", cat: "latent",
+        brief: "往潜空间里注入可控强度的噪声，局部或全图皆可。",
+        desc: "输入 latents 与 noise 两路潜空间，按 strength 混合输出：mask 可把注入限制在局部，normalize 把结果归一化防止数值爆炸，average 改为取平均，mix_randn_amount 还能再混入一份随机噪声。常用于 img2img 加细节、局部重绘加随机性或清洗噪声。",
+        inputs: [
+          { name: "latents", type: "LATENT", from: "典型上游：KSampler 或 Empty Latent", desc: "基底潜空间" },
+          { name: "noise", type: "LATENT", from: "典型上游：Generate Noise 或另一份潜空间", desc: "要注入的噪声潜空间" },
+          { name: "mask", type: "MASK", from: "可选，遮罩节点", desc: "限定注入区域" },
+          { name: "seed", type: "INT", from: "可选，INT 常量", desc: "随机噪声的种子" }
+        ],
+        outputs: [
+          { type: "LATENT", to: "典型下游：KSampler 的 latent_image 输入", desc: "注入噪声后的潜空间" }
+        ],
+        why: "精确控制加噪的位置与强度，是 img2img 调质感和局部重绘补随机性的利器。",
+        params: [
+          { name: "strength", kind: "浮点数", default: "0.1", desc: "噪声注入强度，从小值起试，过大画面会被噪声淹没。" },
+          { name: "normalize", kind: "开关", default: "false", desc: "输出前做标准差归一化，防止数值漂移。" },
+          { name: "average", kind: "开关", default: "false", desc: "改为基底与噪声取平均，效果更温和。" },
+          { name: "mix_randn_amount", kind: "浮点数", default: "0.0", desc: "额外混入的随机噪声比例，配合 seed 使用。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Generate Noise", cat: "latent",
+        brief: "按尺寸与种子生成纯噪声潜空间。",
+        desc: "按 width、height、batch_size 生成一份随机噪声，以 LATENT 形式输出：可以Inject 到别的潜空间，也可以在采样器关闭加噪时直接当初始潜空间用。multiplier 放大噪声幅度，constant_batch_noise 让同批次共享同一份噪声，latent_channels 与 shape 支持新一代视频模型的不同潜空间形状。",
+        inputs: [],
+        outputs: [
+          { type: "LATENT", to: "典型下游：Inject Noise To Latent 或 KSampler", desc: "噪声潜空间" }
+        ],
+        why: "可控的噪声来源是很多进阶玩法的起点，从 FreeNoise 到潜空间混合都离不开它。",
+        params: [
+          { name: "width", kind: "整数", default: "512", desc: "噪声画布宽度，按像素填，内部自动换算成潜空间尺寸。" },
+          { name: "height", kind: "整数", default: "512", desc: "噪声画布高度。" },
+          { name: "batch_size", kind: "整数", default: "1", desc: "批次大小，即生成几份噪声。" },
+          { name: "seed", kind: "整数", default: "123", desc: "随机种子，固定它噪声就可复现。" },
+          { name: "multiplier", kind: "浮点数", default: "1.0", desc: "噪声幅度倍率。" },
+          { name: "constant_batch_noise", kind: "开关", default: "false", desc: "批次内所有噪声相同，做一致性实验时用。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Spline Editor", cat: "mask",
+        brief: "在节点上画样条曲线，输出坐标序列与遮罩。",
+        desc: "交互式编辑器：在节点面板的画布上绘制样条曲线并调整插值方式，输出坐标串、按 points_to_sample 采样的 FLOAT 序列、采样点数与 normalized 坐标串，同时可输出沿曲线的遮罩。常用于给视频工作流提供随时间变化的轨迹控制，比如镜头路径或效果强度曲线。",
+        inputs: [],
+        outputs: [
+          { type: "MASK", to: "典型下游：遮罩处理链", desc: "沿曲线生成的遮罩" },
+          { type: "STRING", to: "典型下游：坐标解析节点", desc: "曲线坐标字符串" },
+          { type: "FLOAT", to: "典型下游：需要数值序列的节点", desc: "按曲线采样的数值序列" },
+          { type: "INT", to: "典型下游：需要数量的节点", desc: "采样点数" }
+        ],
+        why: "把「随时间变化的数值曲线」变成可视化编辑，比手写关键帧序列直观一个量级。",
+        params: [
+          { name: "points_to_sample", kind: "整数", default: "16", desc: "沿曲线采样的点数，对应输出序列长度。" },
+          { name: "interpolation", kind: "下拉选择", default: "cardinal", desc: "曲线插值方式，cardinal 平滑、linear 折线、step-before 阶梯等。" },
+          { name: "mask_width", kind: "整数", default: "512", desc: "编辑器画布宽度，决定坐标范围。" },
+          { name: "mask_height", kind: "整数", default: "512", desc: "编辑器画布高度。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Sound Reactive", cat: "audio",
+        brief: "读取浏览器声音输入，输出实时声音强度数值。",
+        desc: "通过浏览器麦克风或系统声音获取实时音量，经频段过滤（start_range_hz 到 end_range_hz）、倍率放大与平滑后输出 FLOAT 与 INT 两路声音强度。配合实时扩散与自动队列，可以让画面强度随音乐律动。",
+        inputs: [],
+        outputs: [
+          { type: "FLOAT", to: "典型下游：强度类参数输入", desc: "实时声音强度" },
+          { type: "INT", to: "典型下游：整数参数输入", desc: "取整后的声音强度" }
+        ],
+        why: "音乐可视化与声音驱动生成的入门节点，无需任何音频预处理链。",
+        params: [
+          { name: "multiplier", kind: "浮点数", default: "1.0", desc: "强度放大倍率。" },
+          { name: "smoothing_factor", kind: "浮点数", default: "0.5", desc: "平滑系数，越大曲线越柔和、跟随越慢。" },
+          { name: "start_range_hz", kind: "整数", default: "150", desc: "参与统计的频段下限。" },
+          { name: "end_range_hz", kind: "整数", default: "2000", desc: "参与统计的频段上限，只听低音鼓点就把上限调低。" }
+        ],
+        tips: ""
       }
     ]
   });
