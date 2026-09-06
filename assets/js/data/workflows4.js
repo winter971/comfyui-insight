@@ -30,60 +30,106 @@
           widgets: ["wan2.1_vace_14B_fp16.safetensors", "default"],
           inputs: [],
           outputs: [ { type: "MODEL" } ],
+          params: [
+            { name: "unet_name", kind: "下拉选择", default: "wan2.1_vace_14B_fp16.safetensors", desc: "models/diffusion_models 目录中的 Wan 2.1 VACE 14B 主模型；源文件留有被 bypass 的 1.3B 低显存分支，但 1.3B 只支持 480P。" },
+            { name: "weight_dtype", kind: "下拉选择", default: "default", desc: "保持 default 按文件精度读取；切换模型分支时配套的 CausVid LoRA 也要换成对应规模。" }
+          ],
           brief: "载入 Wan 2.1 VACE 14B 文生视频主模型。",
           desc: "在 diffusion_models 目录选择 14B 的 fp16 权重。源文件里还有一个处于 bypass 状态的 1.3B 分支（wan2.1_vace_1.3B_fp16）供低显存用户切换，但 1.3B 只支持 480P。" },
         { id: "clip", title: "CLIPLoader", cat: "load", x: 30, y: 240,
           widgets: ["umt5_xxl_fp16.safetensors", "wan"],
           inputs: [],
           outputs: [ { type: "CLIP" } ],
+          params: [
+            { name: "clip_name", kind: "下拉选择", default: "umt5_xxl_fp16.safetensors", desc: "UMT5-XXL 文本编码器，中英双语友好；显存不足可换源文件里 bypass 着的 fp8 量化版。" },
+            { name: "type", kind: "下拉选择", default: "wan", desc: "编码器用途类型，Wan 系必须选 wan。" }
+          ],
           brief: "载入 UMT5-XXL 文本编码器，类型选 wan。",
           desc: "为 Wan 系模型提供文本理解能力，中文提示词也能准确解析。源文件另有 fp8 量化版（umt5_xxl_fp8_e4m3fn_scaled）的加载节点处于 bypass，是低显存替代方案。" },
         { id: "vae", title: "VAELoader", cat: "load", x: 30, y: 430,
           widgets: ["wan_2.1_vae.safetensors"],
           inputs: [],
           outputs: [ { type: "VAE" } ],
+          params: [
+            { name: "vae_name", kind: "下拉选择", default: "wan_2.1_vae.safetensors", desc: "Wan 2.1 全系共用 VAE，同时供给 WanVaceToVideo 铺画布与 VAEDecode 解码；1.3B 与 14B 切换时不用换。" }
+          ],
           brief: "载入 Wan 2.1 专用 VAE，一路两用。",
           desc: "输出同时送入 WanVaceToVideo 铺设视频潜空间画布与 VAEDecode 最终解码。1.3B 与 14B 共用这一个 VAE，切换模型分支时不需要更换。" },
         { id: "lora", title: "LoraLoader", cat: "model", x: 380, y: 40,
           widgets: ["Wan21_CausVid_14B_T2V_lora_rank32.safetensors", "0.7"],
           inputs: [ { name: "model", type: "MODEL" }, { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "MODEL" }, { type: "CLIP" } ],
+          params: [
+            { name: "lora_name", kind: "下拉选择", default: "Wan21_CausVid_14B_T2V_lora_rank32.safetensors", desc: "CausVid 蒸馏加速 LoRA，把 20 步 cfg 6 压缩到 4 步 cfg 1，81 帧 720P 从约 40 分钟降到约 4 分钟。" },
+            { name: "strength_model", kind: "浮点数", default: "0.7", desc: "对模型主干的强度，官方建议在 0.3 到 0.7 之间试验，过高会画面抖动模糊。" },
+            { name: "strength_clip", kind: "浮点数", default: "0.7", desc: "对文本编码器的强度，与模型端保持一致。" }
+          ],
           brief: "挂载 CausVid 蒸馏加速 LoRA，强度 0.7。",
           desc: "同时作用于 MODEL 与 CLIP 两路。CausVid 把默认 20 步 cfg 6 压缩到 4 步 cfg 1，官方注释给出数据：RTX 4090 上 81 帧 720P 从约 40 分钟降到约 4 分钟。强度建议在 0.3 到 0.7 之间试验。" },
         { id: "pos", title: "CLIPTextEncode", cat: "cond", x: 380, y: 280,
           widgets: ["Fujifilm Portra 400H film still, slammed Nissan Skyline R33 GTR LM JGTC, in heavy motion blur, 7-11 Tokyo, Midnight"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "Fujifilm Portra 400H film still, slammed Nissan Skyline R33 GTR LM JGTC, in heavy motion blur, 7-11 Tokyo, Midnight", desc: "正向提示词；示例用富士胶片风格强调运动模糊，是典型的电影感写法，写清主体、场景、光线与镜头意图比堆画质词有效。" }
+          ],
           brief: "把正向提示词编码为正向条件。",
           desc: "示例用富士胶片风格描写午夜东京的重改装战神 R33，强调运动模糊，是典型的电影感写法。umt5 编码器对长句描述的响应优于标签堆砌。" },
         { id: "neg", title: "CLIPTextEncode", cat: "cond", x: 380, y: 530,
           widgets: ["过曝，静态，细节模糊不清，字幕，风格，作品，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "过曝，静态，细节模糊不清，字幕，风格，作品，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走", desc: "Wan 官方模板习惯的中文负向词长表；注意 CausVid 加速模式 cfg 为 1，此时负向条件基本不产生引导，bypass LoRA 恢复 cfg 6 后才真正生效。" }
+          ],
           brief: "把中文负向提示词编码为负向条件。",
           desc: "覆盖静态画面、模糊、肢体畸形、背景杂乱等常见视频问题，是 Wan 官方模板的习惯写法。注意在 CausVid 加速模式下 cfg 为 1，负向条件基本不产生引导作用。" },
         { id: "vace", title: "WanVaceToVideo", cat: "cond", x: 680, y: 40,
           widgets: ["1280 x 720", "81", "1", "1"],
           inputs: [ { name: "positive", type: "CONDITIONING" }, { name: "negative", type: "CONDITIONING" }, { name: "vae", type: "VAE" } ],
           outputs: [ { type: "CONDITIONING" }, { type: "CONDITIONING" }, { type: "LATENT" }, { type: "INT" } ],
+          params: [
+            { name: "width", kind: "整数", default: "1280", desc: "画布宽度；14B 支持 480P 与 720P，1.3B 分支只支持 480P。" },
+            { name: "height", kind: "整数", default: "720", desc: "画布高度，与宽度构成 16 比 9 的 720P 档。" },
+            { name: "length", kind: "整数", default: "81", desc: "生成帧数，须满足 4 的倍数加 1 约束（81 即 4 x 20 加 1），16fps 下约 5 秒。" },
+            { name: "batch_size", kind: "整数", default: "1", desc: "视频生成显存消耗大，保持 1。" }
+          ],
           brief: "VACE 核心编排节点：生成 81 帧视频潜空间并改写条件。",
           desc: "宽 1280 高 720、81 帧（16fps 下约 5 秒，满足 Wan 的 4 的倍数加 1 约束），输出改写后的正负条件、初始 latent 与 trim_latent 四路。control_video、control_masks、reference_image 三个可选输入在本模板留空，接入后即变成 VACE 主打的视频编辑模式。" },
         { id: "shift", title: "ModelSamplingSD3", cat: "model", x: 680, y: 330,
           widgets: ["8"],
           inputs: [ { name: "model", type: "MODEL" } ],
           outputs: [ { type: "MODEL" } ],
+          params: [
+            { name: "shift", kind: "整数", default: "8", desc: "噪声调度偏移量，Wan 系推荐值，把更多去噪预算分配给高噪声阶段，影响动态与结构稳定性。" }
+          ],
           brief: "以 shift 8 调整采样噪声调度分布。",
           desc: "Wan 系推荐的偏移量，让调度把更多去噪预算分配给高噪声阶段。节点在源文件中是折叠状态，位于 LoRA 与 KSampler 之间，容易被忽略但影响成片动态表现。" },
         { id: "ks", title: "KSampler", cat: "sampler", x: 920, y: 40,
           widgets: ["675909971186865", "randomize", "4", "1", "uni_pc", "simple", "1"],
           inputs: [ { name: "model", type: "MODEL" }, { name: "positive", type: "CONDITIONING" }, { name: "negative", type: "CONDITIONING" }, { name: "latent_image", type: "LATENT" } ],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "seed", kind: "整数", default: "675909971186865", desc: "种子值；固定后可复现同一段视频，是对比调参的基础。" },
+            { name: "control_after_generate", kind: "下拉选择", default: "randomize", desc: "每次生成后的种子行为，randomize 每次随机，复现时改 fixed。",
+              options: [["randomize", "每次运行换随机种子"], ["fixed", "保持不变，可复现"], ["increment", "每次加一"]] },
+            { name: "steps", kind: "整数", default: "4", desc: "与 CausVid LoRA 绑定的加速步数；bypass LoRA 追求质量时官方要求改回 20 步。" },
+            { name: "cfg", kind: "浮点数", default: "1", desc: "加速模式必须配 1；恢复默认参数时改回 6。" },
+            { name: "sampler_name", kind: "下拉选择", default: "uni_pc", desc: "Wan 官方模板推荐组合，加速与默认模式都适用。",
+              options: [["uni_pc", "高阶求解器，低步数表现好"], ["euler", "朴素稳定，可尝试"], ["dpmpp_2m", "锐度更高，非官方组合"]] },
+            { name: "scheduler", kind: "下拉选择", default: "simple", desc: "简化日程，与 uni_pc 配合是 Wan 模板默认。",
+              options: [["simple", "简化日程，官方默认"], ["sgm_uniform", "可对比尝试"], ["normal", "线性计划"]] },
+            { name: "denoise", kind: "浮点数", default: "1", desc: "从纯噪声完整生成，保持 1。" }
+          ],
           brief: "4 步 uni_pc 采样，cfg 1，配合 CausVid LoRA 的加速组合。",
           desc: "模型来自 ModelSamplingSD3，正负条件与画布来自 WanVaceToVideo。若 bypass 掉 LoRA 追求质量，官方注释要求改回 20 步 cfg 6。seed 为 randomize，固定后可复现同一段视频。" },
         { id: "trim", title: "TrimVideoLatent", cat: "latent", x: 920, y: 330,
           widgets: ["0"],
           inputs: [ { name: "samples", type: "LATENT" }, { name: "trim_amount", type: "INT" } ],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "trim_amount", kind: "整数", default: "0", desc: "裁掉的参考占位帧数，由 WanVaceToVideo 的 trim_latent 输出驱动；未接参考图时为 0 等于直通，接入 reference_image 后自动裁掉对应数量。" }
+          ],
           brief: "按 trim_latent 裁掉参考图占用的潜空间帧。",
           desc: "trim_amount 由 WanVaceToVideo 的 trim_latent 输出驱动。未接参考图时值为 0，节点等于直通；一旦接入 reference_image，输出帧数会自动少去参考帧对应的数量，这是 VACE 工作流特有的收尾细节。" },
         { id: "decode", title: "VAEDecode", cat: "vae", x: 1160, y: 40,
@@ -96,12 +142,20 @@
           widgets: ["16"],
           inputs: [ { name: "images", type: "IMAGE" } ],
           outputs: [ { type: "VIDEO" } ],
+          params: [
+            { name: "fps", kind: "整数", default: "16", desc: "合成帧率，与 Wan 2.1 训练帧率一致；调高只会让动作播放变快而不是更流畅。" }
+          ],
           brief: "以 16fps 把帧序列组装成 VIDEO 对象。",
           desc: "新版 ComfyUI 内置的官方合成节点，替代了老模板里常见的第三方 VHS_VideoCombine。16fps 与 Wan 2.1 的训练帧率一致，调高帧率只会让动作变快而不是更流畅。音频输入留空即无声视频。" },
         { id: "save", title: "SaveVideo", cat: "video", x: 1430, y: 260,
           widgets: ["video/ComfyUI", "auto", "auto"],
           inputs: [ { name: "video", type: "VIDEO" } ],
           outputs: [],
+          params: [
+            { name: "filename_prefix", kind: "文本", default: "video/ComfyUI", desc: "输出文件命名前缀，支持子目录写法，产物在 output 目录自动编号。" },
+            { name: "format", kind: "下拉选择", default: "auto", desc: "容器格式，auto 由 ComfyUI 按内容自动选择，实测输出 MP4。" },
+            { name: "codec", kind: "下拉选择", default: "auto", desc: "编码器，auto 自动匹配容器；相比 WebP 体积更小、兼容性更好。" }
+          ],
           brief: "把 VIDEO 对象写出为 MP4 文件。",
           desc: "前缀 video/ComfyUI，格式与编码均为 auto，由 ComfyUI 按容器自动选择。输出位于 output 目录并自动编号，相比 WebP 体积更小、兼容性更好。" }
       ],
@@ -202,54 +256,85 @@
           widgets: ["ltx-2-19b-dev-fp8.safetensors"],
           inputs: [],
           outputs: [ { type: "MODEL" }, { type: "CLIP" }, { type: "VAE" } ],
+          params: [
+            { name: "ckpt_name", kind: "下拉选择", default: "ltx-2-19b-dev-fp8.safetensors", desc: "LTX-2 19B 的 fp8 一体包，一个文件同时提供视频扩散主模型与音频 VAE；显存充裕可换完整精度版。" }
+          ],
           brief: "载入 LTX-2 19B fp8 一体包，同时提供视频模型与 VAE。",
           desc: "一个 checkpoint 同时封装视频扩散模型与音频 VAE，放进 models/checkpoints。VAE 输出供给潜空间放大器与分块解码器，MODEL 输出经模型侧包装后进入两个阶段的 guider。" },
         { id: "textenc", title: "LTXAVTextEncoderLoader", cat: "load", x: 30, y: 240,
           widgets: ["gemma_3_12B_it_fp4_mixed.safetensors", "ltx-2-19b-dev-fp8.safetensors"],
           inputs: [],
           outputs: [ { type: "CLIP" } ],
+          params: [
+            { name: "text_encoder", kind: "下拉选择", default: "gemma_3_12B_it_fp4_mixed.safetensors", desc: "Gemma 3 12B 的 fp4 混合量化文本编码器，LTX-2 能理解长提示词、时间线与对白的关键。" },
+            { name: "ckpt_name", kind: "下拉选择", default: "ltx-2-19b-dev-fp8.safetensors", desc: "关联的 LTX-2 checkpoint，用于对齐编码器与主模型的组件版本，两个下拉框应指向配套文件。" }
+          ],
           brief: "载入 Gemma 3 12B 文本编码器。",
           desc: "LTX-2 用 Gemma 3 12B 理解长提示词与对白，fp4 混合量化把显存压力压到可用范围。官方提示指南要求按时间描述事件动作、描述视觉细节、再描述需要出现的声音与对白。" },
         { id: "audiovae", title: "LTXVAudioVAELoader", cat: "load", x: 30, y: 450,
           widgets: ["ltx-2-19b-dev-fp8.safetensors"],
           inputs: [],
           outputs: [ { type: "VAE" } ],
+          params: [
+            { name: "ckpt_name", kind: "下拉选择", default: "ltx-2-19b-dev-fp8.safetensors", desc: "从该 LTX-2 checkpoint 中取出音频 VAE；断开这条音频链路整图就退化为无声视频。" }
+          ],
           brief: "从 LTX-2 checkpoint 中取出音频 VAE。",
           desc: "音频链路的入口：一路供给 LTXVEmptyLatentAudio 生成音频潜空间，一路在末端供给 LTXVAudioVAEDecode 还原声音。想做无声视频时从这一路断开即可。" },
         { id: "upscaler", title: "LatentUpscaleModelLoader", cat: "load", x: 30, y: 640,
           widgets: ["ltx-2-spatial-upscaler-x2-1.0.safetensors"],
           inputs: [],
           outputs: [ { type: "LATENT_UPSCALE_MODEL" } ],
+          params: [
+            { name: "model_name", kind: "下拉选择", default: "ltx-2-spatial-upscaler-x2-1.0.safetensors", desc: "models/latent_upscale_models 目录中的 2 倍潜空间放大器，在潜空间维度直接放大，省一次像素级放大开销。" }
+          ],
           brief: "载入 2 倍潜空间空间放大器。",
           desc: "它不是像素级放大器，而是在潜空间维度直接放大 2 倍，让第二阶段采样在高分辨率上继续去噪精修，从而省掉一次完整的像素放大开销。" },
         { id: "pos", title: "CLIPTextEncode", cat: "cond", x: 380, y: 40,
           widgets: ["A close-up of a cheerful girl puppet with curly auburn yarn hair and wide button eyes, holding a small red umbrella above her head. Rain falls gently around her. She looks upward and begins to sing with joy in English. Her fabric mouth opening and closing to a melodic tune. The camera holds steady as the rain sparkles against the soft lighting."],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "A close-up of a cheerful girl puppet with curly auburn yarn hair and wide button eyes, holding a small red umbrella above her head. Rain falls gently around her. She looks upward and begins to sing with joy in English. Her fabric mouth opening and closing to a melodic tune. The camera holds steady as the rain sparkles against the soft lighting.", desc: "正向提示词按三层写：随时间发生的事件动作、画面视觉细节、需要出现的声音与对白；事件按发生顺序写效果最好，明确写出唱的内容模型真的会生成歌声与口型。" }
+          ],
           brief: "把含对白描述的正向提示词编码为条件。",
           desc: "源文件示例是一段唱着歌的毛线头发条女孩在雨中撑伞的完整描述，明确写出了要唱的内容。LTX-2 对随时间推进的动作与时序描述敏感，事件按发生顺序写效果最好。" },
         { id: "neg", title: "CLIPTextEncode", cat: "cond", x: 380, y: 290,
           widgets: ["blurry, low quality, still frame, watermark, subtitles"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "blurry, low quality, still frame, watermark, subtitles", desc: "负向提示词压制模糊、静帧、水印与画面内字幕；LTX 系负向词保持精简即可，堆太多会压制画面表现力。" }
+          ],
           brief: "把负向提示词编码为负向条件。",
           desc: "固定压制模糊、静帧、水印与字幕，与正向共用同一个 Gemma 编码器。LTX 系负向词保持精简即可，堆太多会压制画面表现力。" },
         { id: "cond", title: "LTXVConditioning", cat: "cond", x: 660, y: 40,
           widgets: ["24"],
           inputs: [ { name: "positive", type: "CONDITIONING" }, { name: "negative", type: "CONDITIONING" }, { name: "frame_rate", type: "FLOAT" } ],
           outputs: [ { type: "CONDITIONING" }, { type: "CONDITIONING" } ],
+          params: [
+            { name: "frame_rate", kind: "整数", default: "24", desc: "写入条件的目标帧率，让模型知道时间基准；必须与音频画布和 CreateVideo 的帧率完全一致，否则音画错位。" }
+          ],
           brief: "把 24fps 帧率信息写进正负条件。",
           desc: "让模型在采样时知道目标时间基准，这是视频条件与图片条件的核心差别。源文件用两个常量节点分别提供 24 的整数与浮点版本，并特别注释两处帧率值必须相同。" },
         { id: "vidlatent", title: "EmptyLTXVLatentVideo", cat: "latent", x: 380, y: 570,
           widgets: ["640 x 360", "121"],
           inputs: [],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "width", kind: "整数", default: "640", desc: "第一阶段画布宽度；源文件由 1280 x 720 缩小 0.5 倍读出，第二阶段再放大回去，宽高必须能被 64 整除。" },
+            { name: "height", kind: "整数", default: "360", desc: "第一阶段画布高度；参数不合法不会报错而是静默取最接近的合法值。" },
+            { name: "length", kind: "整数", default: "121", desc: "总帧数，必须为 8 的倍数加 1，24fps 下约 5 秒。" }
+          ],
           brief: "生成第一阶段用的空视频潜空间画布。",
           desc: "源文件里宽高不是直接填写，而是由一个 1280 x 720 的 EmptyImage 经过 0.5 倍 lanczos 缩放后用 GetImageSize 读出，实际画布为 640 x 360，第二阶段再放大回 1280 x 720。长度 121 帧满足 8 的倍数加 1 约束，24fps 下约 5 秒。" },
         { id: "audlatent", title: "LTXVEmptyLatentAudio", cat: "latent", x: 380, y: 810,
           widgets: ["121", "24"],
           inputs: [ { name: "audio_vae", type: "VAE" } ],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "length", kind: "整数", default: "121", desc: "音频潜空间的帧数，必须与视频画布完全一致，由音频 VAE 参与换算实现声画时间对齐。" },
+            { name: "frame_rate", kind: "整数", default: "24", desc: "音频帧率，与条件及合成节点三处保持一致。" }
+          ],
           brief: "按帧数 121 与帧率 24 生成等长的音频潜空间。",
           desc: "由音频 VAE 参与换算，让声音与画面在同一批潜空间里时间对齐，是实现口型同步与声画匹配的前提。帧数与帧率必须与视频画布完全一致。" },
         { id: "concat1", title: "LTXVConcatAVLatent", cat: "latent", x: 660, y: 570,
@@ -262,6 +347,9 @@
           widgets: ["4"],
           inputs: [ { name: "model", type: "MODEL" }, { name: "positive", type: "CONDITIONING" }, { name: "negative", type: "CONDITIONING" } ],
           outputs: [ { type: "GUIDER" } ],
+          params: [
+            { name: "cfg", kind: "浮点数", default: "4", desc: "第一阶段引导强度，LTX-2 第一阶段的质量档位；蒸馏 LoRA 只作用于第二阶段，这里仍用标准引导。" }
+          ],
           brief: "以 cfg 4 包装模型与条件，输出第一阶段引导器。",
           desc: "源文件中它的模型路径上挂着一个被 bypass 的相机控制 LoRA（dolly left），启用后可以强迫镜头向左平移。cfg 4 是 LTX-2 第一阶段的质量档位，蒸馏 LoRA 只作用于第二阶段，因此这里仍用标准引导。" },
         { id: "stage1", title: "SamplerCustomAdvanced", cat: "sampler", x: 890, y: 40,
@@ -286,6 +374,12 @@
           widgets: ["512", "64", "4096", "8"],
           inputs: [ { name: "samples", type: "LATENT" }, { name: "vae", type: "VAE" } ],
           outputs: [ { type: "IMAGE" } ],
+          params: [
+            { name: "tile_size", kind: "整数", default: "512", desc: "空间分块尺寸，分块解码显著降低显存峰值，对 121 帧长序列尤其重要。" },
+            { name: "overlap", kind: "整数", default: "64", desc: "分块间重叠像素，消除块间接缝。" },
+            { name: "temporal_size", kind: "整数", default: "4096", desc: "时间维分块大小，4096 相当于时间维不切分，显存吃紧时可调小。" },
+            { name: "temporal_overlap", kind: "整数", default: "8", desc: "时间维分块重叠帧数，保证帧间过渡平滑。" }
+          ],
           brief: "分块解码视频潜空间，控制显存峰值。",
           desc: "512 分块、64 重叠、4096 时间块、8 时间重叠。分块方式显著降低解码峰值显存，源文件里另有一个被 bypass 的普通 VAEDecode 备选。源文件中它的输入取自分离后的视频部分，简化图直接从第二阶段输出接入。" },
         { id: "audiodec", title: "LTXVAudioVAEDecode", cat: "audio", x: 1320, y: 240,
@@ -298,12 +392,20 @@
           widgets: ["24"],
           inputs: [ { name: "images", type: "IMAGE" }, { name: "audio", type: "AUDIO" } ],
           outputs: [ { type: "VIDEO" } ],
+          params: [
+            { name: "fps", kind: "整数", default: "24", desc: "合成帧率，必须与条件里写入的 24 一致，否则音画错位；源文件用常量节点统一供给正是为了杜绝不一致。" }
+          ],
           brief: "以 24fps 把画面与音频合成为 VIDEO 对象。",
           desc: "官方内置节点，替代了第三方 VHS_VideoCombine 的角色。fps 必须与条件里写入的 24 一致，否则音画会错位；源文件的 fps 由浮点常量节点统一供给，就是为了杜绝两处数值不一致。" },
         { id: "save", title: "SaveVideo", cat: "video", x: 1520, y: 250,
           widgets: ["video/LTX-2", "mp4", "auto"],
           inputs: [ { name: "video", type: "VIDEO" } ],
           outputs: [],
+          params: [
+            { name: "filename_prefix", kind: "文本", default: "video/LTX-2", desc: "输出文件命名前缀，含音轨的 MP4 可直接发布。" },
+            { name: "format", kind: "下拉选择", default: "mp4", desc: "容器格式，明确选 mp4，兼容性最好。" },
+            { name: "codec", kind: "下拉选择", default: "auto", desc: "编码器，auto 自动匹配；改格式只需改这里，上游连线不用动。" }
+          ],
           brief: "把含音轨的 VIDEO 写出为 MP4。",
           desc: "前缀 video/LTX-2，格式明确选 mp4，编码 auto。含音轨的 MP4 可直接发布。想改输出格式只需改这里的下拉框，上游连线不用动。" }
       ],
@@ -417,72 +519,122 @@
           widgets: ["hunyuanvideo1.5_720p_t2v_fp16.safetensors", "default"],
           inputs: [],
           outputs: [ { type: "MODEL" } ],
+          params: [
+            { name: "unet_name", kind: "下拉选择", default: "hunyuanvideo1.5_720p_t2v_fp16.safetensors", desc: "混元视频 1.5 的 720p 文生视频模型；显存不足遇 OOM 时优先把 weight_dtype 改为 fp8 量化选项。" },
+            { name: "weight_dtype", kind: "下拉选择", default: "default", desc: "按文件精度加载；改 fp8_e4m3fn 是官方注释给出的第一省显存手段。" }
+          ],
           brief: "载入混元视频 1.5 的 720p 文生视频模型。",
           desc: "官方注释提示：显存不足遇到 OOM 时，把 weight_dtype 从 default 改为 fp8 量化选项可显著降低占用。文件内另有被 bypass 的 1080p 超分蒸馏模型 hunyuanvideo1.5_1080p_sr_distilled_fp16，属超分分支专用。" },
         { id: "clip", title: "DualCLIPLoader", cat: "load", x: 30, y: 240,
           widgets: ["qwen_2.5_vl_7b_fp8_scaled.safetensors", "byt5_small_glyphxl_fp16.safetensors", "hunyuan_video_15"],
           inputs: [],
           outputs: [ { type: "CLIP" } ],
+          params: [
+            { name: "clip_name1", kind: "下拉选择", default: "qwen_2.5_vl_7b_fp8_scaled.safetensors", desc: "Qwen2.5-VL 7B fp8 量化版，双编码器中负责语义理解的一路。" },
+            { name: "clip_name2", kind: "下拉选择", default: "byt5_small_glyphxl_fp16.safetensors", desc: "ByT5 小型编码器，负责字形与画面内文字渲染细节。" },
+            { name: "type", kind: "下拉选择", default: "hunyuan_video_15", desc: "编码器组合用途类型，必须选 hunyuan_video_15，缺任一文件节点会报红。" }
+          ],
           brief: "一次载入 Qwen2.5-VL 与 ByT5 双文本编码器。",
           desc: "Qwen2.5-VL 7B 的 fp8 量化版负责语义理解，ByT5 small glyphxl 负责字形与画面内文字渲染，类型选 hunyuan_video_15。双编码器是混元 1.5 的架构特色，缺任一文件节点都会报红。" },
         { id: "vae", title: "VAELoader", cat: "load", x: 30, y: 450,
           widgets: ["hunyuanvideo15_vae_fp16.safetensors"],
           inputs: [],
           outputs: [ { type: "VAE" } ],
+          params: [
+            { name: "vae_name", kind: "下拉选择", default: "hunyuanvideo15_vae_fp16.safetensors", desc: "混元 1.5 专用视频 VAE，为视频压缩率专门设计；与其他系 VAE 混用会解码失败或色彩异常。" }
+          ],
           brief: "载入混元 1.5 专用视频 VAE。",
           desc: "源文件里这一个输出分出四路：主干 VAEDecode、超分分支的 VAEDecode 与 VAEDecodeTiled、以及另一个 bypass 的分块解码节点。混元 VAE 为视频压缩率专门设计，不要与其他系 VAE 混用。" },
         { id: "cache", title: "EasyCache", cat: "model", x: 380, y: 40,
           widgets: ["0.2", "0.15", "0.95"],
           inputs: [ { name: "model", type: "MODEL" } ],
           outputs: [ { type: "MODEL" } ],
+          params: [
+            { name: "reuse_threshold", kind: "浮点数", default: "0.2", desc: "步长复用的判定阈值，越高复用越多、越省时也越损画质。" },
+            { name: "start_percent", kind: "浮点数", default: "0.15", desc: "加速生效区间的起点占比。" },
+            { name: "end_percent", kind: "浮点数", default: "0.95", desc: "加速生效区间的终点占比，收尾阶段不复用以保住细节。" }
+          ],
           brief: "推理加速开关，默认 bypass，Ctrl+B 启用。",
           desc: "通过在去噪过程中复用相似步长的计算来提速，三个数值参数控制复用判定的阈值。官方注释明确说明提速会牺牲一部分画质，因此模板默认关闭，模型输出在 bypass 状态下直通下游。" },
         { id: "pos", title: "CLIPTextEncode", cat: "cond", x: 380, y: 260,
           widgets: ["A paper airplane released from the top of a skyscraper, gliding through urban canyons, crossing traffic, flying over streets, spiraling upward between buildings. The camera follows the paper airplane perspective, shooting cityscape in first-person POV, finally flying toward the sunset, disappearing in golden light. Creative camera movement, free perspective, dreamlike colors."],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "A paper airplane released from the top of a skyscraper, gliding through urban canyons, crossing traffic, flying over streets, spiraling upward between buildings. The camera follows the paper airplane perspective, shooting cityscape in first-person POV, finally flying toward the sunset, disappearing in golden light. Creative camera movement, free perspective, dreamlike colors.", desc: "运镜叙事型正向提示词；明确写镜头跟随与 POV 视角，混元 1.5 对运镜描述友好，事件按发生顺序写。" }
+          ],
           brief: "把运镜叙事型正向提示词编码为条件。",
           desc: "示例描写一架纸飞机从摩天楼顶起飞、穿越城市峡谷、第一视角飞向夕阳的完整运镜故事，突出镜头运动与色彩氛围，符合混元 1.5 对运镜描述友好的特点。输出条件同时供给主干 guider 与被 bypass 的超分分支。" },
         { id: "neg", title: "CLIPTextEncode", cat: "cond", x: 380, y: 500,
           widgets: ["（留空）"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "（留空）", desc: "本模板有意留空：混元 1.5 对负向词依赖较低，cfg 6 标准引导即可稳定出片；想压制特定瑕疵时再自行少量补充。" }
+          ],
           brief: "负向提示词在本模板中留空。",
           desc: "混元 1.5 对负向词依赖较低，配合 cfg 6 的标准引导即可出片，这与 Wan 模板写一长串中文负向词的做法形成对比。留空不影响运行，想压制特定瑕疵时可自行补充。" },
         { id: "latent", title: "EmptyHunyuanVideo15Latent", cat: "latent", x: 380, y: 720,
           widgets: ["1280 x 720", "121", "1"],
           inputs: [],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "width", kind: "整数", default: "1280", desc: "画布宽度，混元 1.5 的 720p 档位原生尺寸，降到 480p 档可明显省显存。" },
+            { name: "height", kind: "整数", default: "720", desc: "画布高度，建议保持 16 比 9。" },
+            { name: "length", kind: "整数", default: "121", desc: "生成帧数，24fps 下约 5 秒，改时长直接改此值。" },
+            { name: "batch_size", kind: "整数", default: "1", desc: "视频采样显存消耗大，保持 1。" }
+          ],
           brief: "生成 1280 x 720、121 帧的空视频潜空间。",
           desc: "混元专用节点，内部按混元 VAE 的压缩率换算潜空间形状，不能用普通 Empty Latent Image 替代。121 帧在 24fps 下约 5 秒，改时长就改帧数，分辨率建议保持 16 比 9。" },
         { id: "shift", title: "ModelSamplingSD3", cat: "model", x: 660, y: 40,
           widgets: ["7"],
           inputs: [ { name: "model", type: "MODEL" } ],
           outputs: [ { type: "MODEL" } ],
+          params: [
+            { name: "shift", kind: "整数", default: "7", desc: "噪声调度偏移；官方 720p 文生视频原始值为 9，模板取 7 换取速度，二者都在可用甜点区间。" }
+          ],
           brief: "以 shift 7 调整采样调度分布。",
           desc: "把更多去噪预算留给高噪声阶段。混元官方原始设置中 720p 文生视频的 shift 为 9，模板默认取 7 换取速度，二者都在可用的甜点区间。" },
         { id: "guider", title: "CFGGuider", cat: "sampler", x: 660, y: 230,
           widgets: ["6"],
           inputs: [ { name: "model", type: "MODEL" }, { name: "positive", type: "CONDITIONING" }, { name: "negative", type: "CONDITIONING" } ],
           outputs: [ { type: "GUIDER" } ],
+          params: [
+            { name: "cfg", kind: "浮点数", default: "6", desc: "混元官方推荐的标准引导强度；视频模型对高 cfg 敏感，盲目上调容易过曝与闪烁。" }
+          ],
           brief: "以 cfg 6 组合模型与正负条件。",
           desc: "对应混元官方推荐的标准 cfg 值。它接收经 EasyCache 与 ModelSamplingSD3 两级包装后的模型，输出 GUIDER 给 SamplerCustomAdvanced。视频模型对高 cfg 敏感，盲目上调容易过曝。" },
         { id: "scheduler", title: "BasicScheduler", cat: "sampler", x: 660, y: 430,
           widgets: ["simple", "20", "1"],
           inputs: [ { name: "model", type: "MODEL" } ],
           outputs: [ { type: "SIGMAS" } ],
+          params: [
+            { name: "scheduler", kind: "下拉选择", default: "simple", desc: "simple 调度配 euler 是混元 1.5 模板推荐的稳妥组合。",
+              options: [["simple", "简化日程，官方默认"], ["normal", "线性计划，可对比"], ["karras", "过渡更平滑，可尝试"]] },
+            { name: "steps", kind: "整数", default: "20", desc: "官方原始设置 50 步，模板为速度降到 20；追质量可改回 50 并把等待时间纳入预期。" },
+            { name: "denoise", kind: "浮点数", default: "1", desc: "从纯噪声完整生成，保持 1。" }
+          ],
           brief: "simple 调度生成 20 步 sigma 序列。",
           desc: "denoise 1 表示从纯噪声完整生成。混元官方原始设置是 50 步，模板默认 20 步以缩短等待，官方注释的对照表里可查到各档位原始参数。模型输入同样来自 EasyCache 输出。" },
         { id: "noise", title: "RandomNoise", cat: "sampler", x: 660, y: 630,
           widgets: ["887963123424675", "fixed"],
           inputs: [],
           outputs: [ { type: "NOISE" } ],
+          params: [
+            { name: "noise_seed", kind: "整数", default: "887963123424675", desc: "初始噪声种子，模板默认固定值，可复现同一段视频方便对照调参。" },
+            { name: "control_after_generate", kind: "下拉选择", default: "fixed", desc: "种子控制模式；想抽卡把 fixed 改成 randomize。",
+              options: [["fixed", "保持不变，可复现"], ["randomize", "每次运行换随机种子"], ["increment", "每次加一"]] }
+          ],
           brief: "提供初始噪声，种子固定可复现。",
           desc: "种子 887963123424675 且控制模式为 fixed，模板默认可复现同一段视频，方便对照调参。想抽卡把控制改成 randomize 即可，它与调度器、采样器选择器、guider 一起构成采样器的五路输入。" },
         { id: "ksselect", title: "KSamplerSelect", cat: "sampler", x: 660, y: 790,
           widgets: ["euler"],
           inputs: [],
           outputs: [ { type: "SAMPLER" } ],
+          params: [
+            { name: "sampler_name", kind: "下拉选择", default: "euler", desc: "采样算法选择，euler 配 simple 调度是模板推荐的均衡组合。",
+              options: [["euler", "朴素稳定，官方默认"], ["uni_pc", "低步数表现好，可尝试"], ["dpmpp_2m", "更锐利，非官方组合"]] }
+          ],
           brief: "选择 euler 采样器。",
           desc: "euler 配 simple 调度是混元 1.5 模板推荐的稳妥组合。源文件中超分分支另有一个相同的 KSamplerSelect，两个分支各自独立选参互不影响。" },
         { id: "scustom", title: "SamplerCustomAdvanced", cat: "sampler", x: 900, y: 40,
@@ -501,12 +653,20 @@
           widgets: ["24"],
           inputs: [ { name: "images", type: "IMAGE" } ],
           outputs: [ { type: "VIDEO" } ],
+          params: [
+            { name: "fps", kind: "整数", default: "24", desc: "合成帧率，与混元训练设定一致；帧率改动只影响播放速度不影响动作流畅度。" }
+          ],
           brief: "以 24fps 把帧序列组装成 VIDEO 对象。",
           desc: "与另外两个视频官方模板一致，新版已改用内置 CreateVideo 加 SaveVideo 组合，不再依赖第三方 VHS_VideoCombine。音频输入留空即无声视频，帧率改动只影响播放速度不影响流畅度。" },
         { id: "save", title: "SaveVideo", cat: "video", x: 1400, y: 250,
           widgets: ["video/hunyuan_video_1.5", "auto", "h264"],
           inputs: [ { name: "video", type: "VIDEO" } ],
           outputs: [],
+          params: [
+            { name: "filename_prefix", kind: "文本", default: "video/hunyuan_video_1.5", desc: "输出文件命名前缀；文件内另一个带 sr 前缀的 SaveVideo 属于超分分支，处于 bypass。" },
+            { name: "format", kind: "下拉选择", default: "auto", desc: "容器格式，auto 自动选择，实测输出 MP4。" },
+            { name: "codec", kind: "下拉选择", default: "h264", desc: "编码器明确选 h264，兼容性最好的 H.264 MP4。" }
+          ],
           brief: "以 h264 编码写出 MP4 文件。",
           desc: "前缀 video/hunyuan_video_1.5，格式 auto、编码明确选 h264，兼容性最好。文件内另一个 SaveVideo（前缀带 sr）属于超分分支，处于 bypass 状态。" }
       ],

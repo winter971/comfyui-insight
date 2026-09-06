@@ -25,30 +25,54 @@
       nodes: [
         { id: "ckpt", title: "Load Checkpoint", cat: "load", x: 30, y: 340,
           widgets: ["v1-5-pruned-emaonly-fp16.safetensors"],
+          params: [
+            { name: "ckpt_name", kind: "下拉选择", default: "v1-5-pruned-emaonly-fp16.safetensors", desc: "选择 models/checkpoints 目录中的底模文件，模型决定大致画风上限；文件放进目录后刷新下拉框即可切换，连线不用动。" }
+          ],
           inputs: [],
           outputs: [ { type: "MODEL" }, { type: "CLIP" }, { type: "VAE" } ],
           brief: "读入 SD1.5 底模，并拆出 MODEL、CLIP、VAE 三路输出。",
           desc: "一个 Checkpoint 文件里同时打包了 U-Net 主干、文本编码器和 VAE 三套权重，Load Checkpoint 负责一次性加载并分发给下游。全图所有数据都从这里出发。" },
         { id: "pos", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 380, y: 80,
           widgets: ["cinematic photo of an astronaut cat on the moon, soft light, highly detailed"],
+          params: [
+            { name: "text", kind: "多行文本", default: "cinematic photo of an astronaut cat on the moon, soft light, highly detailed", desc: "正向提示词，描述想要的画面内容与氛围；SD1.5 习惯用逗号分隔的标签，支持 (词:1.2) 权重语法。" }
+          ],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
           brief: "把正向提示词编码为条件（Conditioning）向量。",
           desc: "自然语言在这里被 CLIP 文本编码器变成模型能理解的向量序列，作为采样时吸引画面的正向牵引。" },
         { id: "neg", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 380, y: 330,
           widgets: ["blurry, low quality, watermark, extra limbs"],
+          params: [
+            { name: "text", kind: "多行文本", default: "blurry, low quality, watermark, extra limbs", desc: "负向提示词，列出想避开的元素与画质问题；CFG 降到 1 时它完全不参与计算。" }
+          ],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
           brief: "把反向提示词编码为负向条件，告诉采样器避开什么。",
           desc: "它与正向编码结构完全相同，只是接到 KSampler 的 negative 端口，在每一步去噪中把画面往远离这些描述的方向推。" },
         { id: "empty", title: "Empty Latent Image", cat: "latent", x: 380, y: 580,
           widgets: ["512 x 512", "1"],
+          params: [
+            { name: "width", kind: "整数", default: "512", desc: "画布宽度，SD1.5 以 512 为基准且须为 8 的倍数；超过 768 容易构图崩坏，出大图应走高清修复。" },
+            { name: "height", kind: "整数", default: "512", desc: "画布高度，竖构图可用 512 x 768；偏离原生分辨率太多会出现人物重复。" },
+            { name: "batch_size", kind: "整数", default: "1", desc: "一次并行生成的张数，批量抽卡可调大，显存占用按张数近似线性增加。" }
+          ],
           inputs: [],
           outputs: [ { type: "LATENT" } ],
           brief: "生成一块 512 x 512 的空白潜空间画布。",
           desc: "文生图没有输入图片，起点是一块纯噪声潜空间（Latent），它比像素图小 8 倍，是扩散模型真正的工作空间。" },
         { id: "ks", title: "KSampler", cat: "sampler", x: 730, y: 200,
           widgets: ["randomize", "20", "7", "euler", "normal", "1"],
+          params: [
+            { name: "seed", kind: "下拉选择", default: "randomize", desc: "种子控制模式，randomize 表示每次运行换随机种子抽卡；改成固定数字即可复现同一张图，是调参对比的基础。" },
+            { name: "steps", kind: "整数", default: "20", desc: "去噪迭代次数，SD1.5 建议 20 到 35，越多越精细但越慢，超过 40 收益极低。" },
+            { name: "cfg", kind: "浮点数", default: "7", desc: "提示词服从度，SD1.5 常用 6 到 8；过高画面僵硬过饱和，过低开始无视提示词。" },
+            { name: "sampler_name", kind: "下拉选择", default: "euler", desc: "去噪的数学策略，影响速度与画风。",
+              options: [["euler", "最朴素稳定，通用首选，出图柔和"], ["euler_ancestral", "每步引入随机性，细节更奔放，复现性略差"], ["dpmpp_2m", "速度与质量兼顾，配 karras 是社区最热门组合"]] },
+            { name: "scheduler", kind: "下拉选择", default: "normal", desc: "控制每一步噪声强度的时间表，同样采样器配不同调度器质感不同。",
+              options: [["normal", "默认线性计划，通用"], ["karras", "步间过渡更平滑，细节更干净，最常用"], ["exponential", "指数衰减，早期去噪快，构图感强"]] },
+            { name: "denoise", kind: "浮点数", default: "1", desc: "重绘幅度，文生图从纯噪声开始必须保持 1；只有图生图类流程才会降到 1 以下。" }
+          ],
           inputs: [ { name: "model", type: "MODEL" }, { name: "positive", type: "CONDITIONING" }, { name: "negative", type: "CONDITIONING" }, { name: "latent_image", type: "LATENT" } ],
           outputs: [ { type: "LATENT" } ],
           brief: "全图核心：按条件引导对噪声潜空间迭代去噪。",
@@ -67,6 +91,9 @@
           desc: "与 Save Image 不同，Preview Image 只在界面里显示图片，重启或清缓存后消失，适合过程查看。" },
         { id: "save", title: "Save Image", cat: "image", x: 1390, y: 320,
           widgets: ["ComfyUI"],
+          params: [
+            { name: "filename_prefix", kind: "文本", default: "ComfyUI", desc: "输出文件命名前缀，重名自动追加序号不会覆盖；改成项目名便于归档，产物保存在 output 目录。" }
+          ],
           inputs: [ { name: "images", type: "IMAGE" } ],
           outputs: [],
           brief: "把最终图像写入输出目录。",
@@ -150,30 +177,54 @@
       nodes: [
         { id: "ckpt", title: "Load Checkpoint", cat: "load", x: 30, y: 320,
           widgets: ["sd_xl_base_1.0.safetensors"],
+          params: [
+            { name: "ckpt_name", kind: "下拉选择", default: "sd_xl_base_1.0.safetensors", desc: "选择 models/checkpoints 目录中的 SDXL 底模；8GB 以下显存建议换 fp8 量化版，换 sd_xl_turbo 等变体时采样参数要同步修改。" }
+          ],
           inputs: [],
           outputs: [ { type: "MODEL" }, { type: "CLIP" }, { type: "VAE" } ],
           brief: "读入约 6.9GB 的 SDXL 底模，拆出 MODEL、CLIP、VAE 三路输出。",
           desc: "SDXL 的 checkpoint 内部封装了双文本编码器与专用 VAE，对外接口与 SD1.5 完全一致，因此连线结构可以原样复用。" },
         { id: "pos", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 380, y: 60,
           widgets: ["photorealistic city street at dusk, neon signs, rain reflections, 35mm film"],
+          params: [
+            { name: "text", kind: "多行文本", default: "photorealistic city street at dusk, neon signs, rain reflections, 35mm film", desc: "正向提示词；SDXL 对自然语言长句响应远好于词标签堆叠，主体、环境、光线、镜头逐层交代即可。" }
+          ],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
           brief: "把正向提示词编码为 SDXL 的条件向量。",
           desc: "SDXL 用双编码器理解文本，对自然语言长句的响应远好于词标签堆叠。" },
         { id: "neg", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 380, y: 310,
           widgets: ["low resolution, jpeg artifacts, worst quality"],
+          params: [
+            { name: "text", kind: "多行文本", default: "low resolution, jpeg artifacts, worst quality", desc: "负向提示词；SDXL 负向词保持精简即可，堆太多反而压制画面表现力。" }
+          ],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
           brief: "把负向提示词编码为负向条件。",
           desc: "SDXL 对 CFG 更敏感，负向提示词保持精简即可，堆太多反而压制画面表现力。" },
         { id: "empty", title: "Empty Latent Image", cat: "latent", x: 380, y: 560,
           widgets: ["1024 x 1024", "1"],
+          params: [
+            { name: "width", kind: "整数", default: "1024", desc: "画布宽度，1024 是 SDXL 原生基准；可用 1152 等桶分辨率，低于 768 会触发质量崩坏，须为 8 的倍数。" },
+            { name: "height", kind: "整数", default: "1024", desc: "画布高度，竖构图用 896 x 1152，横构图用 1152 x 896。" },
+            { name: "batch_size", kind: "整数", default: "1", desc: "一次并行生成的张数；1024 分辨率下显存消耗大，批量抽卡建议不超过 3。" }
+          ],
           inputs: [],
           outputs: [ { type: "LATENT" } ],
           brief: "生成 1024 x 1024 的空白潜空间画布。",
           desc: "1024 是 SDXL 的原生训练分辨率，潜空间实际为 128 x 128，数据量是 SD1.5 同尺寸的四倍。" },
         { id: "ks", title: "KSampler", cat: "sampler", x: 730, y: 180,
           widgets: ["randomize", "30", "6", "dpmpp_2m", "karras", "1"],
+          params: [
+            { name: "seed", kind: "下拉选择", default: "randomize", desc: "种子控制模式，randomize 每次换随机种子抽卡；固定数字可复现同一张图，方便横向对比参数。" },
+            { name: "steps", kind: "整数", default: "30", desc: "SDXL 收敛稍慢，30 步起步；20 步以下细节明显不足，拉到 40 以上收益极低。" },
+            { name: "cfg", kind: "浮点数", default: "6", desc: "SDXL 对引导强度比 SD1.5 敏感，甜点值 5 到 7，超过 8 容易过饱和与死黑。" },
+            { name: "sampler_name", kind: "下拉选择", default: "dpmpp_2m", desc: "去噪的数学策略，决定锐度与速度。",
+              options: [["dpmpp_2m", "2 阶多步方法，锐度与稳定兼顾，配 karras 最热门"], ["euler", "朴素稳定，出图柔和，求稳可回退"], ["dpmpp_sde", "带噪声方程，纹理更细腻锐利，耗时上升"], ["uni_pc", "高阶求解器，低步数表现好"]] },
+            { name: "scheduler", kind: "下拉选择", default: "karras", desc: "噪声强度时间表，与采样器搭配决定画面质感。",
+              options: [["karras", "步间过渡更平滑，细节更干净，最常用"], ["normal", "默认线性计划，通用"], ["exponential", "指数衰减，早期去噪快，构图感强"]] },
+            { name: "denoise", kind: "浮点数", default: "1", desc: "文生图从纯噪声开始必须保持 1；这里没有可参照的原图潜空间，改小会残留噪声雾。" }
+          ],
           inputs: [ { name: "model", type: "MODEL" }, { name: "positive", type: "CONDITIONING" }, { name: "negative", type: "CONDITIONING" }, { name: "latent_image", type: "LATENT" } ],
           outputs: [ { type: "LATENT" } ],
           brief: "以 30 步 dpmpp_2m 采样完成 1024 分辨率去噪。",
@@ -192,6 +243,9 @@
           desc: "调试参数阶段用预览代替保存，避免输出目录被测试图淹没。" },
         { id: "save", title: "Save Image", cat: "image", x: 1390, y: 300,
           widgets: ["ComfyUI"],
+          params: [
+            { name: "filename_prefix", kind: "文本", default: "ComfyUI", desc: "输出文件命名前缀；PNG 会内嵌完整工作流参数元数据，把成图拖回画布即可复现连线。" }
+          ],
           inputs: [ { name: "images", type: "IMAGE" } ],
           outputs: [],
           brief: "把 1024 成图写入输出目录。",
@@ -277,48 +331,86 @@
       nodes: [
         { id: "unet", title: "Load Diffusion Model", cat: "load", x: 30, y: 80,
           widgets: ["flux1-dev.safetensors", "fp8_e4m3fn"],
+          params: [
+            { name: "unet_name", kind: "下拉选择", default: "flux1-dev.safetensors", desc: "models/unet 或 diffusion_models 目录中的 Flux 主干文件；dev 版语义理解与文字渲染最强，schnell 版快但少一步精修。" },
+            { name: "weight_dtype", kind: "下拉选择", default: "fp8_e4m3fn", desc: "主干权重的加载精度，fp8 把显存从约 23GB 压到 10GB 以内，画质损失轻微。",
+              options: [["fp8_e4m3fn", "消费级显卡首选，显存减半以上"], ["default", "按文件原始精度加载，画质最好但显存占用极高"], ["fp8_e4m3fn_fast", "在 e4m3fn 基础上再提速，画质略降"]] },
+          ],
           inputs: [],
           outputs: [ { type: "MODEL" } ],
           brief: "加载 Flux 主干权重，等价于 SD 时代 Checkpoint 里的 U-Net 部分。",
           desc: "Flux 官方把主干单独发布，因此不再有一步到位的 Checkpoint，主干、文本编码器和 VAE 分别用三个加载节点读取。" },
         { id: "dualclip", title: "DualCLIPLoader", cat: "load", x: 30, y: 330,
           widgets: ["clip_l.safetensors", "t5xxl_fp16.safetensors", "flux"],
+          params: [
+            { name: "clip_name1", kind: "下拉选择", default: "clip_l.safetensors", desc: "第一编码器，CLIP-L 负责短标签式的概念对齐，来自 models/clip 目录。" },
+            { name: "clip_name2", kind: "下拉选择", default: "t5xxl_fp16.safetensors", desc: "第二编码器，T5-XXL 负责长文本深度语义；显存紧张换 fp8 版可省约 5GB 且几乎不影响效果。" },
+            { name: "type", kind: "下拉选择", default: "flux", desc: "编码器组合的用途类型，必须与模型匹配；选错会导致条件格式错位而报错。",
+              options: [["flux", "Flux 系专用组合，本工作流必须选它"], ["sdxl", "SDXL 双编码器组合"], ["sd3", "SD3 系组合"]] },
+          ],
           inputs: [],
           outputs: [ { type: "CLIP" } ],
           brief: "同时加载 CLIP-L 与 T5-XXL 两个文本编码器，type 必须选 flux。",
           desc: "CLIP-L 负责短标签式的概念对齐，T5 提供长文本的深度语义理解，两路编码结果拼接后共同驱动 Flux。" },
         { id: "vae", title: "Load VAE", cat: "load", x: 30, y: 600,
           widgets: ["ae.safetensors"],
+          params: [
+            { name: "vae_name", kind: "下拉选择", default: "ae.safetensors", desc: "models/vae 目录中的 Flux 专用 VAE；Flux 潜空间为 16 通道，与 SD 系互不通用，误接 SDXL VAE 会报维度错误。" }
+          ],
           inputs: [],
           outputs: [ { type: "VAE" } ],
           brief: "加载 Flux 专用的 Autoencoder，负责潜空间与像素之间的转换。",
           desc: "Flux 的潜空间通道数为 16，与 SD 系的 4 通道结构不同，所以 VAE 必须专用，不能与 SD 模型混用。" },
         { id: "pos", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 360, y: 80,
           widgets: ["a cozy wooden cabin in a snowy forest at dusk, warm light spilling from the windows, cinematic"],
+          params: [
+            { name: "text", kind: "多行文本", default: "a cozy wooden cabin in a snowy forest at dusk, warm light spilling from the windows, cinematic", desc: "正向提示词；Flux 适合自然语言整句，写清主体、动作、环境、光线即可，无需权重括号与画质词堆砌。" }
+          ],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
           brief: "把正向长句编码为 Flux 可用的条件。",
           desc: "T5 让 Flux 能理解自然语言整句，无需提示词公式，描述越具体画面越可控。" },
         { id: "neg", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 360, y: 320,
           widgets: [""],
+          params: [
+            { name: "text", kind: "多行文本", default: "", desc: "保持空字符串即可；Flux 引导不走负向相减，写负面词也不生效，但节点与连线必须保留以满足接口。" }
+          ],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
           brief: "内容为空的占位编码器，满足 KSampler 的接口要求。",
           desc: "Flux 引导机制中负向条件不参与实际计算，保持空字符串即可。" },
         { id: "fg", title: "FluxGuidance", cat: "cond", x: 610, y: 80,
           widgets: ["3.5"],
+          params: [
+            { name: "guidance", kind: "浮点数", default: "3.5", desc: "Flux 专属引导强度，3.5 是 dev 版万金油；越高越贴提示词但越死板，写实时风格 2.5 到 3.5，严格构图执行可拉到 4 以上。" }
+          ],
           inputs: [ { name: "conditioning", type: "CONDITIONING" } ],
           outputs: [ { type: "CONDITIONING" } ],
           brief: "给条件附加 Flux 专属的引导强度 guidance。",
           desc: "guidance 控制画面贴合提示词的程度，dev 版推荐 3.5 左右，数值越高越刻板、越低越自由。" },
         { id: "empty", title: "EmptySD3LatentImage", cat: "latent", x: 360, y: 560,
           widgets: ["1024 x 1024", "1"],
+          params: [
+            { name: "width", kind: "整数", default: "1024", desc: "画布宽度，Flux 宽高只需 16 的倍数，两百万像素附近的任意比例都表现良好，竖版海报可直接改 832。" },
+            { name: "height", kind: "整数", default: "1024", desc: "画布高度，与宽度自由组合，构图自由度远超 SD 系，无需担心离基准太远而崩坏。" },
+            { name: "batch_size", kind: "整数", default: "1", desc: "一次并行生成的张数；Flux 单张耗时较长且显存占用高，批量建议控制在 2 以内。" }
+          ],
           inputs: [],
           outputs: [ { type: "LATENT" } ],
           brief: "生成 Flux 尺度的空白潜空间画布。",
           desc: "Flux 在 1024 与两百万像素附近的任意宽高比上表现最好，宽高只需 16 的倍数，构图自由度远超 SD。" },
         { id: "ks", title: "KSampler", cat: "sampler", x: 780, y: 260,
           widgets: ["fixed", "20", "1", "euler", "simple", "1"],
+          params: [
+            { name: "seed", kind: "下拉选择", default: "fixed", desc: "种子控制模式，固定种子配合逐档调整 guidance，可对比同一构图在不同引导强度下的变化；抽卡阶段改回 randomize。" },
+            { name: "steps", kind: "整数", default: "20", desc: "dev 版标准步数，低于 15 画面明显变糊，拉到 30 以上收益很小；schnell 版可降到 4。" },
+            { name: "cfg", kind: "浮点数", default: "1", desc: "Flux 下必须为 1，引导职责已由 FluxGuidance 承担，改大会出现过曝与色彩漂移。" },
+            { name: "sampler_name", kind: "下拉选择", default: "euler", desc: "Flux 官方模板用 euler，稳定通用，无特殊理由不必更换。",
+              options: [["euler", "朴素稳定，Flux 默认选择"], ["euler_ancestral", "细节更奔放，复现性略差"], ["dpmpp_2m", "锐度更高，可尝试但非官方组合"]] },
+            { name: "scheduler", kind: "下拉选择", default: "simple", desc: "简化噪声日程，对 Flux 这类新模型表现更稳。",
+              options: [["simple", "简化日程，Flux 官方模板默认"], ["sgm_uniform", "SD3 系与视频模型常用，可对比尝试"], ["normal", "线性计划，Flux 下表现一般"]] },
+            { name: "denoise", kind: "浮点数", default: "1", desc: "文生图从纯噪声开始必须保持 1，改小会导致画面残留大片噪声雾。" }
+          ],
           inputs: [ { name: "model", type: "MODEL" }, { name: "positive", type: "CONDITIONING" }, { name: "negative", type: "CONDITIONING" }, { name: "latent_image", type: "LATENT" } ],
           outputs: [ { type: "LATENT" } ],
           brief: "执行 20 步去噪，CFG 固定为 1 是 Flux 的硬性要求。",
@@ -331,6 +423,9 @@
           desc: "原理与 SD 的 VAE Decode 相同，只是解码器权重来自 ae.safetensors。" },
         { id: "save", title: "Save Image", cat: "image", x: 1420, y: 280,
           widgets: ["ComfyUI"],
+          params: [
+            { name: "filename_prefix", kind: "文本", default: "ComfyUI", desc: "输出文件命名前缀；Flux 单张耗时较长，建议改成带主题的名字便于整理。" }
+          ],
           inputs: [ { name: "images", type: "IMAGE" } ],
           outputs: [],
           brief: "把成图写入输出目录。",
@@ -417,24 +512,36 @@
       nodes: [
         { id: "ckpt", title: "Load Checkpoint", cat: "load", x: 30, y: 240,
           widgets: ["sd_xl_base_1.0.safetensors"],
+          params: [
+            { name: "ckpt_name", kind: "下拉选择", default: "sd_xl_base_1.0.safetensors", desc: "models/checkpoints 目录中的底模，任何 SD1.5 或 SDXL 模型都可直接使用；换模型即换风格，连线不用动。" }
+          ],
           inputs: [],
           outputs: [ { type: "MODEL" }, { type: "CLIP" }, { type: "VAE" } ],
           brief: "读入 SDXL 底模，为采样、编码与解码提供全部权重。",
           desc: "图生图对模型的要求与文生图相同，任何 SD1.5 或 SDXL 模型都可以直接使用。" },
         { id: "img", title: "Load Image", cat: "load", x: 30, y: 560,
           widgets: ["input_photo.png"],
+          params: [
+            { name: "image", kind: "下拉选择", default: "input_photo.png", desc: "从 input 目录选择底图或点击上传；底图尺寸决定输出尺寸，宽高须为 8 的倍数，奇数尺寸会报错。" }
+          ],
           inputs: [],
           outputs: [ { type: "IMAGE" }, { type: "MASK" } ],
           brief: "读入作为底图的原始图片。",
           desc: "图片以像素形式进入工作流，其 MASK 输出在本图中闲置，重绘类工作流才会用到。" },
         { id: "pos", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 380, y: 60,
           widgets: ["oil painting style, thick brush strokes, vivid colors, gallery lighting"],
+          params: [
+            { name: "text", kind: "多行文本", default: "oil painting style, thick brush strokes, vivid colors, gallery lighting", desc: "正向提示词重点写风格与氛围，构图信息已由底图携带，不必重复描述；与 denoise 联动，强度低时只能小幅着色。" }
+          ],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
           brief: "描述改造后的画面应该长什么样。",
           desc: "图生图的提示词重点是风格与氛围，构图信息已经由底图携带，不必重复描述。" },
         { id: "neg", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 380, y: 300,
           widgets: ["blurry, deformed, extra fingers, lowres"],
+          params: [
+            { name: "text", kind: "多行文本", default: "blurry, deformed, extra fingers, lowres", desc: "负向提示词与文生图共用一套即可，重点防模糊与肢体崩坏；denoise 低时它的作用也相应减弱。" }
+          ],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
           brief: "负向条件约束画面不要出现的问题。",
@@ -447,6 +554,16 @@
           desc: "VAE 把 1024 像素图压缩成 128 x 128 的潜数据，压缩与还原都伴随信息取舍，这是图生图与文生图唯一的结构差异。" },
         { id: "ks", title: "KSampler", cat: "sampler", x: 730, y: 240,
           widgets: ["fixed", "24", "7", "dpmpp_2m", "karras", "0.65"],
+          params: [
+            { name: "seed", kind: "下拉选择", default: "fixed", desc: "固定种子配合同一底图，是横向对比提示词与参数的前提；抽卡阶段改 randomize。" },
+            { name: "steps", kind: "整数", default: "24", desc: "去噪步数，与文生图习惯一致，20 到 30 均可。" },
+            { name: "cfg", kind: "浮点数", default: "7", desc: "提示词服从度，过高会在低 denoise 下产生脏斑。" },
+            { name: "sampler_name", kind: "下拉选择", default: "dpmpp_2m", desc: "去噪策略，影响改画风格。",
+              options: [["dpmpp_2m", "贴合原图，风格转换细腻"], ["euler_ancestral", "更自由奔放，适合大改"], ["euler", "朴素稳定，通用兜底"]] },
+            { name: "scheduler", kind: "下拉选择", default: "karras", desc: "噪声强度时间表，karras 过渡平滑、细节干净。",
+              options: [["karras", "最常用，细节干净"], ["normal", "线性计划，通用"], ["exponential", "早期去噪快，构图感强"]] },
+            { name: "denoise", kind: "浮点数", default: "0.65", desc: "本工作流的核心旋钮：0.3 只修光影细节，0.5 到 0.7 完成风格转换，0.85 以上接近重新生成。" }
+          ],
           inputs: [ { name: "model", type: "MODEL" }, { name: "positive", type: "CONDITIONING" }, { name: "negative", type: "CONDITIONING" }, { name: "latent_image", type: "LATENT" } ],
           outputs: [ { type: "LATENT" } ],
           brief: "以 0.65 的去噪强度在原图潜空间上重绘。",
@@ -459,6 +576,9 @@
           desc: "解码用与编码相同的 VAE，保证色彩空间一致。" },
         { id: "save", title: "Save Image", cat: "image", x: 1390, y: 260,
           widgets: ["ComfyUI"],
+          params: [
+            { name: "filename_prefix", kind: "文本", default: "ComfyUI", desc: "输出文件命名前缀；图生图常做参数扫描，建议带上 denoise 数值便于对比归档。" }
+          ],
           inputs: [ { name: "images", type: "IMAGE" } ],
           outputs: [],
           brief: "保存风格转换结果。",
@@ -542,30 +662,54 @@
       nodes: [
         { id: "ckpt", title: "Load Checkpoint", cat: "load", x: 30, y: 300,
           widgets: ["v1-5-pruned-emaonly-fp16.safetensors"],
+          params: [
+            { name: "ckpt_name", kind: "下拉选择", default: "v1-5-pruned-emaonly-fp16.safetensors", desc: "两段采样共用的底模文件；进阶玩法是克隆一个节点让两遍各用不同模型，第一遍重构图、第二遍重细节。" }
+          ],
           inputs: [],
           outputs: [ { type: "MODEL" }, { type: "CLIP" }, { type: "VAE" } ],
           brief: "读入底模，同时供给两段采样与两处解码。",
           desc: "两段采样共用同一个 Checkpoint，MODEL 同时供给 ks1 与 ks2，VAE 同时供给两个解码器，因此它的连线多达五条。" },
         { id: "pos", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 380, y: 40,
           widgets: ["1girl, masterpiece, best quality, detailed face, soft lighting"],
+          params: [
+            { name: "text", kind: "多行文本", default: "1girl, masterpiece, best quality, detailed face, soft lighting", desc: "正向提示词同时驱动两遍采样；想在大图上单独强调画质，需克隆新节点给第二遍追加高细节类词汇。" }
+          ],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
           brief: "编码正向条件，同时驱动两遍采样。",
           desc: "第一遍条件决定内容与构图，第二遍在放大后的画布上重新解读同样的条件来补细节。" },
         { id: "neg", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 380, y: 280,
           widgets: ["lowres, bad anatomy, blurry, watermark"],
+          params: [
+            { name: "text", kind: "多行文本", default: "lowres, bad anatomy, blurry, watermark", desc: "负向提示词两段共用；lowres 在第二遍尤其有用，能阻止模型把放大画布当成低质图来理解。" }
+          ],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
           brief: "编码负向条件，两段采样共用。",
           desc: "与正向编码一样输出两份条件，分别进入两个 KSampler 的 negative 端口。" },
         { id: "empty", title: "Empty Latent Image", cat: "latent", x: 380, y: 520,
           widgets: ["512 x 512", "1"],
+          params: [
+            { name: "width", kind: "整数", default: "512", desc: "第一遍画布宽度，512 到 576 构图最稳；越低构图越稳但放大倍率越大，需相应调低第二遍 denoise。" },
+            { name: "height", kind: "整数", default: "512", desc: "第一遍画布高度，与放大目标配合决定总倍率，须为 8 的倍数。" },
+            { name: "batch_size", kind: "整数", default: "1", desc: "一次并行生成的张数；先小图批量抽卡挑构图，正是本方案的高效用法。" }
+          ],
           inputs: [],
           outputs: [ { type: "LATENT" } ],
           brief: "生成第一遍采样的 512 低分辨率画布。",
           desc: "低分辨率是模型把握构图最稳的区间，先小后大是本方案的核心思想。" },
         { id: "ks1", title: "KSampler", cat: "sampler", x: 720, y: 120,
           widgets: ["randomize", "24", "7", "euler", "normal", "1"],
+          params: [
+            { name: "seed", kind: "下拉选择", default: "randomize", desc: "先随机抽卡挑构图，满意后改成固定值，再单独调第二遍参数，两段才能分开优化互不干扰。" },
+            { name: "steps", kind: "整数", default: "24", desc: "低分辨率下构图所需步数，20 到 28 均可；细节留给第二遍补。" },
+            { name: "cfg", kind: "浮点数", default: "7", desc: "提示词服从度，两段共用，SD1.5 常规值 6 到 8。" },
+            { name: "sampler_name", kind: "下拉选择", default: "euler", desc: "第一遍只管构图，euler 出图柔和稳定足够。",
+              options: [["euler", "朴素稳定，构图柔和"], ["dpmpp_2m", "构图更锐，可尝试"], ["euler_ancestral", "细节奔放，构图阶段不必"]]},
+            { name: "scheduler", kind: "下拉选择", default: "normal", desc: "噪声强度时间表，第一遍 normal 与第二遍保持一致即可。",
+              options: [["normal", "线性计划，通用"], ["karras", "过渡更平滑，可与第二遍一起换"], ["exponential", "构图感强"]] },
+            { name: "denoise", kind: "浮点数", default: "1", desc: "第一遍从纯噪声生成，必须保持 1。" }
+          ],
           inputs: [ { name: "model", type: "MODEL" }, { name: "positive", type: "CONDITIONING" }, { name: "negative", type: "CONDITIONING" }, { name: "latent_image", type: "LATENT" } ],
           outputs: [ { type: "LATENT" } ],
           brief: "第一遍采样：512 低分辨率下完成整体构图。",
@@ -584,12 +728,30 @@
           desc: "与 Save Image 不同不写文件，方便反复抽卡看构图而不污染输出目录。" },
         { id: "up", title: "Upscale Latent", cat: "latent", x: 720, y: 560,
           widgets: ["bilinear", "768 x 768", "disabled"],
+          params: [
+            { name: "upscale_method", kind: "下拉选择", default: "bilinear", desc: "潜空间插值方式，差异会被第二遍采样抹平，选顺手的即可。",
+              options: [["bilinear", "双线性，速度快，整体平滑"], ["nearest-exact", "最近邻，硬边像素感"], ["bicubic", "三次卷积，较锐利"]] },
+            { name: "width", kind: "整数", default: "768", desc: "放大目标宽度，1.5 倍是 SD1.5 的甜点倍率；再上 1024 时第二遍 denoise 要降到 0.35 左右。" },
+            { name: "height", kind: "整数", default: "768", desc: "放大目标高度，与第一遍画布的比例尽量一致，须为 8 的倍数。" },
+            { name: "crop", kind: "下拉选择", default: "disabled", desc: "比例不一致时的处理方式，保持 disabled 构图完整。",
+              options: [["disabled", "直接缩放到目标尺寸，构图完整"], ["centered", "按中心裁齐到目标比例，会切掉边缘"]] }
+          ],
           inputs: [ { name: "samples", type: "LATENT" } ],
           outputs: [ { type: "LATENT" } ],
           brief: "把第一遍输出的潜空间放大 1.5 倍。",
           desc: "潜空间放大计算量极小，瞬间把 512 画布变成 768，但只放大不去噪会得到糊图，所以后面必须接第二遍采样。" },
         { id: "ks2", title: "KSampler", cat: "sampler", x: 1050, y: 430,
           widgets: ["fixed", "18", "7", "euler", "normal", "0.45"],
+          params: [
+            { name: "seed", kind: "下拉选择", default: "fixed", desc: "第二遍种子固定或随机均可；调参阶段固定，便于只观察 denoise 与放大倍率的影响。" },
+            { name: "steps", kind: "整数", default: "18", desc: "精修步数，低 denoise 下 15 到 20 已足够，更多只是浪费时间。" },
+            { name: "cfg", kind: "浮点数", default: "7", desc: "提示词服从度，与第一遍共用同一组条件，保持一致即可。" },
+            { name: "sampler_name", kind: "下拉选择", default: "euler", desc: "低 denoise 精修对采样器不敏感，euler 稳定够用。",
+              options: [["euler", "稳定通用，低强度精修首选"], ["dpmpp_2m", "细节更锐，可尝试"], ["euler_ancestral", "随机性强，精修阶段不建议"]] },
+            { name: "scheduler", kind: "下拉选择", default: "normal", desc: "噪声强度时间表，与第一遍一致避免步数表错位。",
+              options: [["normal", "线性计划，通用"], ["karras", "过渡更平滑，可与第一遍一起换"], ["exponential", "早期去噪快"]] },
+            { name: "denoise", kind: "浮点数", default: "0.45", desc: "本工作流的灵魂参数：0.3 到 0.5 细节自然，0.6 以上模型开始改构图，容易长出多余肢体。" }
+          ],
           inputs: [ { name: "model", type: "MODEL" }, { name: "positive", type: "CONDITIONING" }, { name: "negative", type: "CONDITIONING" }, { name: "latent_image", type: "LATENT" } ],
           outputs: [ { type: "LATENT" } ],
           brief: "第二遍采样：在大尺寸潜空间上以低去噪精修细节。",
@@ -602,6 +764,9 @@
           desc: "输出的 768 图已经历两遍采样，细节密度远高于一次性放大。" },
         { id: "save", title: "Save Image", cat: "image", x: 1600, y: 430,
           widgets: ["ComfyUI"],
+          params: [
+            { name: "filename_prefix", kind: "文本", default: "ComfyUI", desc: "输出文件命名前缀；高清修复常做多组参数对比，prefix 里写上 denoise 与放大倍率便于归档。" }
+          ],
           inputs: [ { name: "images", type: "IMAGE" } ],
           outputs: [],
           brief: "保存最终大图。",
@@ -696,30 +861,47 @@
       nodes: [
         { id: "ckpt", title: "Load Checkpoint", cat: "load", x: 30, y: 240,
           widgets: ["v1-5-pruned-emaonly-fp16.safetensors"],
+          params: [
+            { name: "ckpt_name", kind: "下拉选择", default: "v1-5-pruned-emaonly-fp16.safetensors", desc: "普通底模即可胜任小面积重绘；遮罩越大越建议换 inpainting 专用模型，代价是未遮罩区域还原能力略降。" }
+          ],
           inputs: [],
           outputs: [ { type: "MODEL" }, { type: "CLIP" }, { type: "VAE" } ],
           brief: "读入底模，提供重绘所需的全部权重。",
           desc: "普通底模即可完成小面积重绘；大面积重绘建议换 inpainting 专用模型。" },
         { id: "img", title: "Load Image", cat: "load", x: 30, y: 540,
           widgets: ["living_room.png"],
+          params: [
+            { name: "image", kind: "下拉选择", default: "living_room.png", desc: "从 input 目录选择底图或点击上传；右键打开 MaskEditor 可直接涂抹遮罩，能省掉独立的遮罩节点。" }
+          ],
           inputs: [],
           outputs: [ { type: "IMAGE" }, { type: "MASK" } ],
           brief: "读入要重绘的底图。",
           desc: "除了提供像素，Load Image 还自带 MaskEditor，右键即可涂抹遮罩。" },
         { id: "mask", title: "Load Image (as Mask)", cat: "mask", x: 30, y: 800,
           widgets: ["mask_sofa.png", "red"],
+          params: [
+            { name: "image", kind: "下拉选择", default: "mask_sofa.png", desc: "input 目录中的遮罩图，高亮区域对应要重画的部分；必须与底图同宽高，可用任何修图软件制作黑白图。" },
+            { name: "channel", kind: "下拉选择", default: "red", desc: "从遮罩图的哪个颜色通道读取遮罩强度，标准黑白图保持 red 即可。",
+              options: [["red", "红色通道，标准黑白遮罩的默认选择"], ["green", "绿色通道，特殊调色遮罩用"], ["blue", "蓝色通道"], ["alpha", "透明度通道"]] }
+          ],
           inputs: [],
           outputs: [ { type: "MASK" } ],
           brief: "从单独的遮罩图读取重绘范围。",
           desc: "遮罩图中被覆盖的区域对应画面里要重画的部分，可用任何修图软件制作黑白图。" },
         { id: "pos", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 380, y: 60,
           widgets: ["modern gray fabric sofa, bright living room, photorealistic, soft daylight"],
+          params: [
+            { name: "text", kind: "多行文本", default: "modern gray fabric sofa, bright living room, photorealistic, soft daylight", desc: "只描述遮罩内想要的新内容；遮罩圈范围、提示词定内容，把整幅画面塞进来反而导致构图怪异。" }
+          ],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
           brief: "描述遮罩区域内想要的新内容。",
           desc: "提示词只需覆盖被重画的局部，例如新家具、新发型，不要把整幅画面重复描述一遍。" },
         { id: "neg", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 380, y: 300,
           widgets: ["blurry, low quality, deformed, artifacts"],
+          params: [
+            { name: "text", kind: "多行文本", default: "blurry, low quality, deformed, artifacts", desc: "负向提示词只作用于遮罩内部，重点防重绘边缘最常见的模糊与伪影。" }
+          ],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
           brief: "约束重绘区域的画质。",
@@ -738,6 +920,16 @@
           desc: "遮罩注入后，KSampler 只会在遮罩范围内加噪与去噪，范围外数据原样通过。" },
         { id: "ks", title: "KSampler", cat: "sampler", x: 900, y: 240,
           widgets: ["fixed", "24", "8", "dpmpp_2m", "karras", "1"],
+          params: [
+            { name: "seed", kind: "下拉选择", default: "fixed", desc: "固定后可在同一遮罩下反复改提示词，做局部方案对比。" },
+            { name: "steps", kind: "整数", default: "24", desc: "重绘步数，与全图生成一致即可，20 到 30 均可。" },
+            { name: "cfg", kind: "浮点数", default: "8", desc: "略高于常规值，让新内容更服从提示词、更快融入周边环境。" },
+            { name: "sampler_name", kind: "下拉选择", default: "dpmpp_2m", desc: "小面积重绘下采样器差异不大，dpmpp_2m 细腻稳妥。",
+              options: [["dpmpp_2m", "细腻稳妥，重绘质感好"], ["euler", "朴素稳定，通用兜底"], ["dpmpp_2m_sde", "纹理更锐利，可尝试"]] },
+            { name: "scheduler", kind: "下拉选择", default: "karras", desc: "噪声强度时间表，karras 让重绘过渡更干净。",
+              options: [["karras", "步间过渡平滑，细节干净"], ["normal", "线性计划，通用"], ["exponential", "早期去噪快"]] },
+            { name: "denoise", kind: "浮点数", default: "1", desc: "遮罩内完全重画；降到 0.75 到 0.9 可保留原结构，边缘衔接更柔和。" }
+          ],
           inputs: [ { name: "model", type: "MODEL" }, { name: "positive", type: "CONDITIONING" }, { name: "negative", type: "CONDITIONING" }, { name: "latent_image", type: "LATENT" } ],
           outputs: [ { type: "LATENT" } ],
           brief: "只在遮罩内执行去噪，其余区域保持原样。",
@@ -750,6 +942,9 @@
           desc: "解码的是完整潜数据，遮罩外与原图逐像素一致。" },
         { id: "save", title: "Save Image", cat: "image", x: 1420, y: 260,
           widgets: ["ComfyUI"],
+          params: [
+            { name: "filename_prefix", kind: "文本", default: "ComfyUI", desc: "输出文件命名前缀；局部重绘常需多轮迭代，prefix 带上遮罩版本号方便回溯。" }
+          ],
           inputs: [ { name: "images", type: "IMAGE" } ],
           outputs: [],
           brief: "保存重绘成品。",
@@ -837,30 +1032,49 @@
       nodes: [
         { id: "ckpt", title: "Load Checkpoint", cat: "load", x: 30, y: 200,
           widgets: ["sd_xl_base_1.0.safetensors"],
+          params: [
+            { name: "ckpt_name", kind: "下拉选择", default: "sd_xl_base_1.0.safetensors", desc: "SDXL 对场景连续性的理解优于 SD1.5，扩图衔接更自然；换模型即换扩图画风。" }
+          ],
           inputs: [],
           outputs: [ { type: "MODEL" }, { type: "CLIP" }, { type: "VAE" } ],
           brief: "读入 SDXL 底模，为补全采样提供权重。",
           desc: "扩图内容与原图的衔接质量很大程度取决于模型能力，SDXL 对场景连续性的理解优于 SD1.5。" },
         { id: "img", title: "Load Image", cat: "load", x: 30, y: 560,
           widgets: ["landscape.png"],
+          params: [
+            { name: "image", kind: "下拉选择", default: "landscape.png", desc: "从 input 目录选择要外扩的原图；建议原图控制在 1024 见方以内，四边各扩 256 后仍在 1536 的舒适区。" }
+          ],
           inputs: [],
           outputs: [ { type: "IMAGE" }, { type: "MASK" } ],
           brief: "读入需要外扩的原图。",
           desc: "原图尺寸决定扩边后的总画布，扩边像素会叠加在四周或指定边。" },
         { id: "pad", title: "ImagePadForOutpainting", cat: "image", x: 360, y: 480,
           widgets: ["256", "256", "256", "256", "64"],
+          params: [
+            { name: "left", kind: "整数", default: "256", desc: "向左扩张的像素数，建议取 8 的倍数；只想单向扩图就把其余三边设为 0。" },
+            { name: "top", kind: "整数", default: "256", desc: "向上扩张的像素数，扩边后总尺寸建议不超过 1536。" },
+            { name: "right", kind: "整数", default: "256", desc: "向右扩张的像素数，四边可独立设置。" },
+            { name: "bottom", kind: "整数", default: "256", desc: "向下扩张的像素数，扩边后宽高仍须是 8 的倍数，否则编码报错。" },
+            { name: "feathering", kind: "整数", default: "64", desc: "新旧交界的羽化带宽度，过小出明显接缝，过大新内容向原图渗透，64 到 96 是稳妥区间。" }
+          ],
           inputs: [ { name: "image", type: "IMAGE" } ],
           outputs: [ { type: "IMAGE" }, { type: "MASK" } ],
           brief: "给图片四周各加 256 像素空白，并产出标记新增区域的遮罩。",
           desc: "一个节点同时产出大画布与遮罩，feathering 64 控制原边界处的羽化过渡带，让新旧内容在交界处互相渗透而不是硬拼。" },
         { id: "pos", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 360, y: 60,
           widgets: ["expansive mountain panorama at golden hour, dramatic clouds, seamless continuation, highly detailed"],
+          params: [
+            { name: "text", kind: "多行文本", default: "expansive mountain panorama at golden hour, dramatic clouds, seamless continuation, highly detailed", desc: "提示词面向扩边后的整幅大图而非仅新增区域，强调 seamless continuation 让新旧内容自然延续。" }
+          ],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
           brief: "描述扩边后整幅画面的内容与氛围。",
           desc: "提示词面向完整大图而非仅新增区域，模型会自然延续已有内容。" },
         { id: "neg", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 360, y: 260,
           widgets: ["blurry, lowres, watermark, visible seam, cropped"],
+          params: [
+            { name: "text", kind: "多行文本", default: "blurry, lowres, watermark, visible seam, cropped", desc: "负向提示词；visible seam 与 cropped 是扩图场景的特色负向词，对抑制接缝感与裁切感有实际帮助。" }
+          ],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
           brief: "排除扩图常见瑕疵。",
@@ -879,6 +1093,16 @@
           desc: "只有空白新增区域会参与去噪，原画面内容被完整保护。" },
         { id: "ks", title: "KSampler", cat: "sampler", x: 1080, y: 160,
           widgets: ["fixed", "28", "6", "dpmpp_2m", "karras", "1"],
+          params: [
+            { name: "seed", kind: "下拉选择", default: "fixed", desc: "固定种子后可通过调 padding 与提示词迭代构图；逐边扩展时保持不变有助于风格延续。" },
+            { name: "steps", kind: "整数", default: "28", desc: "扩图步数，20 到 30 之间，略高于普通文生图以保证补全内容质量。" },
+            { name: "cfg", kind: "浮点数", default: "6", desc: "SDXL 常规值，5 到 7 之间，过高会让新增区域过饱和。" },
+            { name: "sampler_name", kind: "下拉选择", default: "dpmpp_2m", desc: "扩图内容需要一定细节密度，dpmpp_2m 配 karras 是稳妥组合。",
+              options: [["dpmpp_2m", "锐度与稳定兼顾，扩图常用"], ["euler", "柔和稳定，衔接更温和"], ["dpmpp_sde", "纹理更细，耗时上升"]] },
+            { name: "scheduler", kind: "下拉选择", default: "karras", desc: "噪声强度时间表，karras 过渡平滑有利于新旧融合。",
+              options: [["karras", "最常用，细节干净"], ["normal", "线性计划，通用"], ["exponential", "构图感强"]] },
+            { name: "denoise", kind: "浮点数", default: "1", desc: "新增区域从空白生成必须保持 1，降低它会让空白处残留灰色斑块。" }
+          ],
           inputs: [ { name: "model", type: "MODEL" }, { name: "positive", type: "CONDITIONING" }, { name: "negative", type: "CONDITIONING" }, { name: "latent_image", type: "LATENT" } ],
           outputs: [ { type: "LATENT" } ],
           brief: "在新区域内完整生成内容。",
@@ -891,6 +1115,9 @@
           desc: "输出尺寸等于原图加四边扩充值。" },
         { id: "save", title: "Save Image", cat: "image", x: 1580, y: 160,
           widgets: ["ComfyUI"],
+          params: [
+            { name: "filename_prefix", kind: "文本", default: "ComfyUI", desc: "输出文件命名前缀；建议标注扩边方向与数值，多轮扩展时便于对比管理。" }
+          ],
           inputs: [ { name: "images", type: "IMAGE" } ],
           outputs: [],
           brief: "保存扩图结果。",
@@ -981,18 +1208,27 @@
       nodes: [
         { id: "ckpt", title: "Load Checkpoint", cat: "load", x: 30, y: 60,
           widgets: ["v1-5-pruned-emaonly-fp16.safetensors"],
+          params: [
+            { name: "ckpt_name", kind: "下拉选择", default: "v1-5-pruned-emaonly-fp16.safetensors", desc: "分块重绘用的底模，与原图风格越接近，瓦片内补出的纹理越协调；差异太大会把整张图逐渐改成底模画风。" }
+          ],
           inputs: [],
           outputs: [ { type: "MODEL" }, { type: "CLIP" }, { type: "VAE" } ],
           brief: "提供分块重绘用的底模与 VAE。",
           desc: "底模负责在瓦片内补出真实纹理，与原图风格越接近，精修越协调。" },
         { id: "img", title: "Load Image", cat: "load", x: 30, y: 340,
           widgets: ["lowres_photo.png"],
+          params: [
+            { name: "image", kind: "下拉选择", default: "lowres_photo.png", desc: "从 input 目录选择待放大的原图；原图质量决定放大上限，压缩严重的 JPG 建议先轻微降噪再进链路。" }
+          ],
           inputs: [],
           outputs: [ { type: "IMAGE" }, { type: "MASK" } ],
           brief: "读入待放大的低分辨率原图。",
           desc: "放大流程的起点，尺寸不必规整，超分模型对输入尺寸没有 8 的倍数要求。" },
         { id: "upmodel", title: "Upscale Model Loader", cat: "load", x: 30, y: 620,
           widgets: ["4x-UltraSharp.pth"],
+          params: [
+            { name: "model_name", kind: "下拉选择", default: "4x-UltraSharp.pth", desc: "models/upscale_models 目录中的超分模型；4x-UltraSharp 通用锐利，人像可用 RealESRGAN 系列，风景用 UltraSharp 效果都不错。" }
+          ],
           inputs: [],
           outputs: [ { type: "UPSCALE_MODEL" } ],
           brief: "读入超分放大模型权重。",
@@ -1005,24 +1241,44 @@
           desc: "超分只插值像素不创造语义，放大结果清晰却缺少真实纹理，细节要交给下一步分块重绘。" },
         { id: "pos", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 360, y: 60,
           widgets: ["masterpiece, best quality, sharp focus, detailed skin texture"],
+          params: [
+            { name: "text", kind: "多行文本", default: "masterpiece, best quality, sharp focus, detailed skin texture", desc: "每个瓦片都会参考这份条件，描述要面向全图共性；只写适合局部的内容会错误引导其他瓦片。" }
+          ],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
           brief: "为分块重绘提供正向引导。",
           desc: "画质类词汇为主，例如 sharp focus、detailed texture，帮助瓦片补出高频细节。" },
         { id: "neg", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 360, y: 280,
           widgets: ["blurry, low quality, jpeg artifacts"],
+          params: [
+            { name: "text", kind: "多行文本", default: "blurry, low quality, jpeg artifacts", desc: "负向提示词；jpeg artifacts 与 blurry 对老照片、压缩图的放大精修尤其有效。" }
+          ],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
           brief: "抑制放大后常见的涂抹感与伪影。",
           desc: "blurry、jpeg artifacts 等词能有效减少瓦片内的模糊块。" },
         { id: "usdu", title: "Ultimate SD Upscale", cat: "sampler", x: 700, y: 180,
           widgets: ["1.00", "fixed", "20", "7", "euler", "normal", "0.30"],
+          params: [
+            { name: "upscale_by", kind: "浮点数", default: "1.00", desc: "节点自行承担的放大倍率；大图已提前放大 4 倍，保持 1.00 表示不再额外放大、只做分块精修。" },
+            { name: "seed", kind: "下拉选择", default: "fixed", desc: "固定种子便于横向对比不同 denoise 的精修效果。" },
+            { name: "steps", kind: "整数", default: "20", desc: "每个瓦片内部的采样步数，与常规文生图一致即可。" },
+            { name: "cfg", kind: "浮点数", default: "7", desc: "条件服从度，与底模习惯一致。" },
+            { name: "sampler_name", kind: "下拉选择", default: "euler", desc: "瓦片内去噪的采样算法，低 denoise 下差异不大，euler 最稳。",
+              options: [["euler", "稳定通用，低强度精修首选"], ["dpmpp_2m", "细节更锐，可尝试"], ["euler_ancestral", "随机性强，不建议用于精修"]] },
+            { name: "scheduler", kind: "下拉选择", default: "normal", desc: "瓦片内噪声强度时间表，保持 normal 即可。",
+              options: [["normal", "线性计划，通用"], ["karras", "过渡更平滑，可尝试"], ["exponential", "早期去噪快"]] },
+            { name: "denoise", kind: "浮点数", default: "0.30", desc: "分块重绘强度：0.2 保守、0.35 均衡，超过 0.5 模型会开始改画内容。" }
+          ],
           inputs: [ { name: "image", type: "IMAGE" }, { name: "model", type: "MODEL" }, { name: "positive", type: "CONDITIONING" }, { name: "negative", type: "CONDITIONING" }, { name: "vae", type: "VAE" }, { name: "upscale_model", type: "UPSCALE_MODEL" } ],
           outputs: [ { type: "IMAGE" } ],
           brief: "把大图分块，逐块执行低去噪采样来补真实细节。",
           desc: "它内嵌了完整的 KSampler 流程，一块一块处理，因此再大的图显存占用也只与瓦片尺寸有关。" },
         { id: "save", title: "Save Image", cat: "image", x: 1060, y: 220,
           widgets: ["ComfyUI"],
+          params: [
+            { name: "filename_prefix", kind: "文本", default: "ComfyUI", desc: "输出文件命名前缀；4K 级 PNG 体积可观，前缀标注放大倍率便于归档。" }
+          ],
           inputs: [ { name: "images", type: "IMAGE" } ],
           outputs: [],
           brief: "输出高分辨率成品。",
@@ -1108,36 +1364,65 @@
       nodes: [
         { id: "ckpt", title: "Load Checkpoint", cat: "load", x: 30, y: 120,
           widgets: ["sd_xl_base_1.0.safetensors"],
+          params: [
+            { name: "ckpt_name", kind: "下拉选择", default: "sd_xl_base_1.0.safetensors", desc: "LoRA 挂载的基础底模，可随意替换成任意 SDXL 系模型，结构都不用动。" }
+          ],
           inputs: [],
           outputs: [ { type: "MODEL" }, { type: "CLIP" }, { type: "VAE" } ],
           brief: "读入 SDXL 底模作为 LoRA 的挂载基础。",
           desc: "Turbo 方案不换模型，靠 LoRA 补丁改写采样行为，因此底模可以随意替换成任意 SDXL 系。" },
         { id: "lora", title: "Load LoRA", cat: "load", x: 30, y: 420,
           widgets: ["lcm_lora_xl.safetensors", "1.0", "1.0"],
+          params: [
+            { name: "lora_name", kind: "下拉选择", default: "lcm_lora_xl.safetensors", desc: "models/loras 目录中的 LCM-LoRA 补丁，把 SDXL 改造成 4 到 8 步即可出图的快速形态，约 1.7GB。" },
+            { name: "strength_model", kind: "浮点数", default: "1.0", desc: "LoRA 对模型主干的强度；低于 0.8 时少步出图会发灰，保持 1.0 最稳。" },
+            { name: "strength_clip", kind: "浮点数", default: "1.0", desc: "LoRA 对文本编码器的强度，与模型强度保持一致，保证少步发色正常。" }
+          ],
           inputs: [ { name: "model", type: "MODEL" }, { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "MODEL" }, { type: "CLIP" } ],
           brief: "把 LCM-LoRA 权重叠加到底模上，让模型适应少步采样。",
           desc: "LoRA 是小体量的权重补丁，strength_model 与 strength_clip 都设 1.0 表示完全启用 LCM 行为。" },
         { id: "pos", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 380, y: 60,
           widgets: ["a cute corgi puppy running on grass, photo, natural light"],
+          params: [
+            { name: "text", kind: "多行文本", default: "a cute corgi puppy running on grass, photo, natural light", desc: "正向提示词宜短，主体加风格两三个短语即可；长句在 6 步内来不及充分展开。" }
+          ],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
           brief: "编码正向提示词。",
           desc: "Turbo 场景提示词宜短，长句在少步采样中来不及充分表达。" },
         { id: "neg", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 380, y: 300,
           widgets: ["blurry, low quality"],
+          params: [
+            { name: "text", kind: "多行文本", default: "blurry, low quality", desc: "负向提示词仅在 CFG 大于 1 时有微弱牵引力；CFG 降到 1 时完全不参与计算，连线仍需保留。" }
+          ],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
           brief: "编码负向提示词，仅在 CFG 大于 1 时有效。",
           desc: "CFG 1.5 下负向词仍有一点牵引力，CFG 1 时完全不参与计算。" },
         { id: "empty", title: "Empty Latent Image", cat: "latent", x: 380, y: 540,
           widgets: ["1024 x 1024", "1"],
+          params: [
+            { name: "width", kind: "整数", default: "1024", desc: "画布宽度；LCM-LoRA 方案 1024 工作良好，换 SDXL Turbo 专用模型时建议降到 512 到 768。" },
+            { name: "height", kind: "整数", default: "1024", desc: "画布高度，SDXL 系仍须为 8 的倍数。" },
+            { name: "batch_size", kind: "整数", default: "1", desc: "一次并行生成的张数；极速出图加批量抽卡，是找构图的组合拳。" }
+          ],
           inputs: [],
           outputs: [ { type: "LATENT" } ],
           brief: "给出 1024 x 1024 的潜空间画布。",
           desc: "LCM-LoRA 方案在 1024 分辨率工作良好，SDXL Turbo 专用模型则建议 512 到 768。" },
         { id: "ks", title: "KSampler", cat: "sampler", x: 730, y: 200,
           widgets: ["randomize", "6", "1.5", "euler", "sgm_uniform", "1"],
+          params: [
+            { name: "seed", kind: "下拉选择", default: "randomize", desc: "randomize 每次换种子，几秒一张地抽构图；找到满意的改固定值再精修。" },
+            { name: "steps", kind: "整数", default: "6", desc: "LCM 改写了去噪轨迹，4 到 8 步皆可收敛，6 步在速度与质量间最平衡。" },
+            { name: "cfg", kind: "浮点数", default: "1.5", desc: "1 到 2 之间；超过 2.5 会过曝烧图，这是 Turbo 系的标志性特征，想加引导不如改提示词。" },
+            { name: "sampler_name", kind: "下拉选择", default: "euler", desc: "少步场景的采样器选择。",
+              options: [["euler", "与 LCM-LoRA 配合稳定通用"], ["lcm", "LCM 模型专用采样器，4 到 8 步出图"], ["dpmpp_2m", "少步下收益不明显"]] },
+            { name: "scheduler", kind: "下拉选择", default: "sgm_uniform", desc: "少步采样的关键搭配，换 normal 会出现明显欠拟合的糊图。",
+              options: [["sgm_uniform", "少步场景收益最大的调度器"], ["simple", "简化日程，可对比尝试"], ["normal", "线性计划，少步下发糊"]] },
+            { name: "denoise", kind: "浮点数", default: "1", desc: "文生图保持 1，噪声一次性走完少步轨迹。" }
+          ],
           inputs: [ { name: "model", type: "MODEL" }, { name: "positive", type: "CONDITIONING" }, { name: "negative", type: "CONDITIONING" }, { name: "latent_image", type: "LATENT" } ],
           outputs: [ { type: "LATENT" } ],
           brief: "以 6 步、CFG 1.5 完成极速采样。",
@@ -1156,6 +1441,9 @@
           desc: "极速出图配合实时预览，是构图探索的最佳组合。" },
         { id: "save", title: "Save Image", cat: "image", x: 1390, y: 320,
           widgets: ["ComfyUI"],
+          params: [
+            { name: "filename_prefix", kind: "文本", default: "ComfyUI", desc: "输出文件命名前缀；可标注 steps 与 cfg，便于回溯哪组参数出的图。" }
+          ],
           inputs: [ { name: "images", type: "IMAGE" } ],
           outputs: [],
           brief: "保存选中的快速成图。",

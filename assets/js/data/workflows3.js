@@ -29,36 +29,64 @@
           widgets: ["flux_kontext_dev_basic_input_image.jpg", "image"],
           inputs: [],
           outputs: [ { type: "IMAGE" }, { type: "MASK" } ],
+          params: [
+            { name: "image", kind: "下拉选择", default: "flux_kontext_dev_basic_input_image.jpg", desc: "input 目录中的编辑基准图；换成自己的照片时直接改下拉框，连线不用动。" },
+            { name: "upload", kind: "按钮", default: "image", desc: "点击上传新图片到 input 目录并自动选中，编辑自己的照片从这里开始。" }
+          ],
           brief: "读入待编辑的基准图，进入拼接与缩放链路。",
           desc: "源文件中它是子图外的主输入，IMAGE 输出接 ImageStitch 的 image1 端口，MASK 输出未使用。" },
         { id: "191", title: "LoadImage", cat: "load", x: 20, y: 230,
           widgets: ["flux_kontext_dev_basic_input_image.jpg", "image"],
           inputs: [],
           outputs: [ { type: "IMAGE" }, { type: "MASK" } ],
+          params: [
+            { name: "image", kind: "下拉选择", default: "flux_kontext_dev_basic_input_image.jpg", desc: "第二张可选参考图；源文件中默认处于 Bypass 旁路，启用后才参与双图拼接参考。" },
+            { name: "upload", kind: "按钮", default: "image", desc: "上传第二张参考图的入口，需要多图参考时使用。" }
+          ],
           brief: "第二张可选参考图，源文件中默认处于 Bypass 旁路状态。",
           desc: "启用后 IMAGE 输出接 ImageStitch 的 image2 端口，两图拼在一起供模型参考；单图编辑时保持旁路即可。" },
         { id: "37", title: "UNETLoader", cat: "load", x: 20, y: 440,
           widgets: ["flux1-dev-kontext_fp8_scaled.safetensors", "default"],
           inputs: [],
           outputs: [ { type: "MODEL" } ],
+          params: [
+            { name: "unet_name", kind: "下拉选择", default: "flux1-dev-kontext_fp8_scaled.safetensors", desc: "models/diffusion_models 目录中的 Kontext 编辑主干，在 Flux.1-dev 基础上用图文编辑对微调，专门理解编辑指令。" },
+            { name: "weight_dtype", kind: "下拉选择", default: "default", desc: "保持 default，按文件内置的 fp8 缩放精度读取，无需手动降精度。" }
+          ],
           brief: "加载 Kontext 编辑专用主干，fp8 缩放精度。",
           desc: "该模型在 Flux.1-dev 基础上用大规模图文编辑对微调，专门听得懂编辑指令，MODEL 输出直连 KSampler。" },
         { id: "38", title: "DualCLIPLoader", cat: "load", x: 20, y: 650,
           widgets: ["clip_l.safetensors", "t5xxl_fp8_e4m3fn_scaled.safetensors", "flux", "default"],
           inputs: [],
           outputs: [ { type: "CLIP" } ],
+          params: [
+            { name: "clip_name1", kind: "下拉选择", default: "clip_l.safetensors", desc: "第一编码器 CLIP-L，负责概念对齐。" },
+            { name: "clip_name2", kind: "下拉选择", default: "t5xxl_fp8_e4m3fn_scaled.safetensors", desc: "第二编码器 T5，编辑指令高度依赖它的长文本理解；fp8 版是官方推荐的省显存方案。" },
+            { name: "type", kind: "下拉选择", default: "flux", desc: "编码器组合用途，必须选 flux，选错会条件错位报错。" },
+            { name: "device", kind: "下拉选择", default: "default", desc: "设备选择保持 default 即可。" }
+          ],
           brief: "同时加载 CLIP-L 与 T5 两个文本编码器，type 选 flux。",
           desc: "编辑指令依赖 T5 的长文本理解能力，CLIP-L 负责概念对齐，两路编码结果拼接后共同驱动模型。" },
         { id: "39", title: "VAELoader", cat: "load", x: 20, y: 860,
           widgets: ["ae.safetensors"],
           inputs: [],
           outputs: [ { type: "VAE" } ],
+          params: [
+            { name: "vae_name", kind: "下拉选择", default: "ae.safetensors", desc: "Flux 专用 VAE，本图编码与解码共用一份；与 SD 系互不通用，混用报维度错误。" }
+          ],
           brief: "加载 Flux 专用 VAE，编码与解码共用。",
           desc: "一路接 VAEEncode 把输入图编码进潜空间，一路接 VAEDecode 把结果还原成图片，与 SD 系 VAE 互不通用。" },
         { id: "146", title: "ImageStitch", cat: "image", x: 360, y: 60,
           widgets: ["right", "true", "0", "white"],
           inputs: [ { name: "image1", type: "IMAGE" }, { name: "image2", type: "IMAGE" } ],
           outputs: [ { type: "IMAGE" } ],
+          params: [
+            { name: "direction", kind: "下拉选择", default: "right", desc: "拼接方向，right 表示第二张参考图拼在第一张右侧；image2 旁路时等效单图透传。",
+              options: [["right", "第二张拼在右侧"], ["down", "第二张拼在下方"], ["left", "第二张拼在左侧"], ["up", "第二张拼在上方"]] },
+            { name: "match_image_size", kind: "开关", default: "true", desc: "自动把两张图对齐到同尺寸，避免拼接错位，保持开启。" },
+            { name: "spacing", kind: "整数", default: "0", desc: "两图之间的间隔像素，0 为紧贴。" },
+            { name: "color", kind: "下拉选择", default: "white", desc: "间隔与补边的填充色；间隔为 0 时基本不出现。" }
+          ],
           brief: "把两张参考图拼接成一张，方向 right 并自动对齐尺寸。",
           desc: "image2 默认旁路时等效单图透传；拼接是实现多图参考的低成本方案，白底填充 padding 为 0。" },
         { id: "42", title: "FluxKontextImageScale", cat: "image", x: 620, y: 90,
@@ -77,6 +105,9 @@
           widgets: ["Using this elegant style, create a portrait of a swan wearing a pearl tiara and lace collar, maintaining the same refined quality and soft color tones."],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "Using this elegant style, create a portrait of a swan wearing a pearl tiara and lace collar, maintaining the same refined quality and soft color tones.", desc: "编辑指令；用 Change X to Y 的祈使句并写明要保留什么，比抽象描述稳定得多，也可以直接写中文风格指令。" }
+          ],
           brief: "把编辑指令编码为正向条件。",
           desc: "CONDITIONING 输出分两路：一路进 ReferenceLatent 附着参考潜空间，一路进 ConditioningZeroOut 生成占位负向条件。" },
         { id: "135", title: "ConditioningZeroOut", cat: "cond", x: 620, y: 860,
@@ -95,12 +126,27 @@
           widgets: ["2.5"],
           inputs: [ { name: "conditioning", type: "CONDITIONING" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "guidance", kind: "浮点数", default: "2.5", desc: "编辑比纯生成更重保真，官方把 guidance 从生成的 3.5 降到 2.5；越低越忠于原图，想更大改动升到 3 到 3.5。" }
+          ],
           brief: "给条件附加 2.5 的引导强度。",
           desc: "编辑任务比纯生成更重保真，官方把 guidance 从常见的 3.5 降到 2.5，数值越低越忠于原图。" },
         { id: "31", title: "KSampler", cat: "sampler", x: 960, y: 460,
           widgets: ["169405236028824", "randomize", "20", "1", "euler", "simple", "1"],
           inputs: [ { name: "model", type: "MODEL" }, { name: "positive", type: "CONDITIONING" }, { name: "negative", type: "CONDITIONING" }, { name: "latent_image", type: "LATENT" } ],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "seed", kind: "整数", default: "169405236028824", desc: "种子值；同一指令不同种子结果有差异，固定后便于对比指令改动。" },
+            { name: "control_after_generate", kind: "下拉选择", default: "randomize", desc: "每次生成后的种子行为，randomize 每次随机；需要复现时改 fixed。",
+              options: [["randomize", "每次运行换随机种子"], ["fixed", "保持不变，可复现"], ["increment", "每次加一，便于逐张对比"]] },
+            { name: "steps", kind: "整数", default: "20", desc: "去噪步数，Kontext 官方默认 20，低于 15 编辑融合度明显下降。" },
+            { name: "cfg", kind: "浮点数", default: "1", desc: "Flux 系固定为 1，引导职责已由 guidance 承担，改大会过曝烧图。" },
+            { name: "sampler_name", kind: "下拉选择", default: "euler", desc: "官方组合用 euler，编辑场景稳定优先。",
+              options: [["euler", "朴素稳定，官方默认"], ["euler_ancestral", "随机性强，编辑不建议"], ["dpmpp_2m", "可尝试但非官方组合"]] },
+            { name: "scheduler", kind: "下拉选择", default: "simple", desc: "简化噪声日程，Flux 系官方模板默认。",
+              options: [["simple", "简化日程，官方默认"], ["sgm_uniform", "可对比尝试"], ["normal", "线性计划，Flux 下表现一般"]] },
+            { name: "denoise", kind: "浮点数", default: "1", desc: "保持 1；编辑的保真来自参考潜空间，而不是靠降低 denoise。" }
+          ],
           brief: "从原图潜空间出发执行 20 步受控去噪，CFG 固定 1。",
           desc: "latent_image 不是空白画布而是原图潜空间，配合条件里的参考实现定向修改；euler 加 simple 是官方组合。" },
         { id: "8", title: "VAEDecode", cat: "vae", x: 1280, y: 460,
@@ -113,6 +159,9 @@
           widgets: ["flux.1_kontext_dev"],
           inputs: [ { name: "images", type: "IMAGE" } ],
           outputs: [],
+          params: [
+            { name: "filename_prefix", kind: "文本", default: "flux.1_kontext_dev", desc: "输出文件命名前缀；批量编辑时建议改成项目名，重名自动追加序号不会覆盖。" }
+          ],
           brief: "把编辑结果写入输出目录。",
           desc: "文件名前缀 flux.1_kontext_dev，PNG 内嵌完整工作流元数据，拖回画布即可还原连线。" }
       ],
@@ -213,24 +262,41 @@
           widgets: ["image_qwen_image_edit_2509_input_image.png", "image"],
           inputs: [],
           outputs: [ { type: "IMAGE" }, { type: "MASK" } ],
+          params: [
+            { name: "image", kind: "下拉选择", default: "image_qwen_image_edit_2509_input_image.png", desc: "input 目录中的待编辑原图；2509 版最多支持三张参考图，本模板只接这一张。" },
+            { name: "upload", kind: "按钮", default: "image", desc: "上传新图片到 input 目录并自动选中。" }
+          ],
           brief: "读入待编辑原图，进入统一缩放链路。",
           desc: "2509 版最多支持三张输入图，本模板只接了一张，其余输入口留空；MASK 输出未使用。" },
         { id: "37", title: "UNETLoader", cat: "load", x: 20, y: 240,
           widgets: ["qwen_image_edit_2509_fp8_e4m3fn.safetensors", "default"],
           inputs: [],
           outputs: [ { type: "MODEL" } ],
+          params: [
+            { name: "unet_name", kind: "下拉选择", default: "qwen_image_edit_2509_fp8_e4m3fn.safetensors", desc: "models/diffusion_models 目录中的 Qwen-Image-Edit 2509 主干 fp8 版，补齐了多图参考与人物一致性能力。" },
+            { name: "weight_dtype", kind: "下拉选择", default: "default", desc: "保持 default，按文件内置 fp8 精度读取。" }
+          ],
           brief: "加载 Qwen-Image-Edit 2509 主干，fp8 精度。",
           desc: "MODEL 输出两路：直连 Switch 的 on_false 作原始路径，经 LoRA 后接 on_true 作加速路径。" },
         { id: "38", title: "CLIPLoader", cat: "load", x: 20, y: 450,
           widgets: ["qwen_2.5_vl_7b_fp8_scaled.safetensors", "qwen_image", "default"],
           inputs: [],
           outputs: [ { type: "CLIP" } ],
+          params: [
+            { name: "clip_name", kind: "下拉选择", default: "qwen_2.5_vl_7b_fp8_scaled.safetensors", desc: "Qwen2.5-VL 7B 视觉语言编码器，能同时读懂文字与参考图内容，是 Qwen 编辑能力的根基。" },
+            { name: "type", kind: "下拉选择", default: "qwen_image", desc: "编码器用途类型，必须选 qwen_image。",
+              options: [["qwen_image", "Qwen-Image 系专用"], ["qwen_image_edit", "旧版编辑模板用"]] },
+            { name: "device", kind: "下拉选择", default: "default", desc: "设备选择保持 default。" }
+          ],
           brief: "加载 Qwen2.5-VL 7B 视觉语言编码器，type 选 qwen_image。",
           desc: "这不是普通文本编码器而是多模态模型，能同时读懂文字与参考图内容，是 Qwen 编辑能力的根基。" },
         { id: "39", title: "VAELoader", cat: "load", x: 20, y: 650,
           widgets: ["qwen_image_vae.safetensors"],
           inputs: [],
           outputs: [ { type: "VAE" } ],
+          params: [
+            { name: "vae_name", kind: "下拉选择", default: "qwen_image_vae.safetensors", desc: "Qwen-Image 专用 VAE，通道结构与 SD、Flux 都不同，务必配套使用。" }
+          ],
           brief: "加载 Qwen-Image 专用 VAE。",
           desc: "输出三路：进 VAEEncode 编码输入图，两路分别进正负编码节点供其内部把参考图压进条件。" },
         { id: "117", title: "FluxKontextImageScale", cat: "image", x: 400, y: 60,
@@ -249,42 +315,75 @@
           widgets: ["Replace the cat with a dalmatian, keeping the environment and scene consistent"],
           inputs: [ { name: "clip", type: "CLIP" }, { name: "vae", type: "VAE" }, { name: "image1", type: "IMAGE" }, { name: "image2", type: "IMAGE" }, { name: "image3", type: "IMAGE" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "prompt", kind: "多行文本", default: "Replace the cat with a dalmatian, keeping the environment and scene consistent", desc: "编辑指令，可直接写中文；参考图与指令一起被视觉语言模型理解后输出正向条件。" }
+          ],
           brief: "正向编码器：图与文字一起理解后输出正向条件。",
           desc: "最多接三张参考图，本图 image2 与 image3 未接线；示例指令为把猫换成斑点狗并保持环境一致。" },
         { id: "110", title: "TextEncodeQwenImageEditPlus", cat: "cond", x: 400, y: 680,
           widgets: [""],
           inputs: [ { name: "clip", type: "CLIP" }, { name: "vae", type: "VAE" }, { name: "image1", type: "IMAGE" }, { name: "image2", type: "IMAGE" }, { name: "image3", type: "IMAGE" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "prompt", kind: "多行文本", default: "", desc: "保持空字符串；Lightning 模式 CFG 为 1 时负向影响很小，保留是为了兼容原生 20 步模式。" }
+          ],
           brief: "负向编码器，结构与正向完全相同，提示词为空。",
           desc: "同样接收参考图，让负向条件也感知原图；Lightning 模式 CFG 为 1 时影响很小，保留是为了兼容原生模式。" },
         { id: "89", title: "LoraLoaderModelOnly", cat: "load", x: 680, y: 60,
           widgets: ["Qwen-Image-Edit-2509-Lightning-4steps-V1.0-bf16.safetensors", "1"],
           inputs: [ { name: "model", type: "MODEL" } ],
           outputs: [ { type: "MODEL" } ],
+          params: [
+            { name: "lora_name", kind: "下拉选择", default: "Qwen-Image-Edit-2509-Lightning-4steps-V1.0-bf16.safetensors", desc: "models/loras 目录中的 lightx2v Lightning 加速 LoRA，把 20 步原生采样压到 4 步。" },
+            { name: "strength_model", kind: "浮点数", default: "1", desc: "LoRA 强度保持 1；调低会与 4 步参数不匹配，导致画面模糊。" }
+          ],
           brief: "串载 Lightning 加速 LoRA，强度 1。",
           desc: "只作用于主干不碰文本编码器，把 20 步原生采样压缩到 4 步，速度提升约五倍。" },
         { id: "440", title: "ComfySwitchNode", cat: "util", x: 1150, y: 60,
           widgets: ["true"],
           inputs: [ { name: "on_false", type: "MODEL" }, { name: "on_true", type: "MODEL" }, { name: "switch", type: "BOOLEAN" } ],
           outputs: [ { type: "MODEL" } ],
+          params: [
+            { name: "boolean", kind: "下拉选择", default: "true", desc: "模型路径开关；true 走 Lightning LoRA 加速路径，false 走原始主干，切换时步数与 CFG 要同步改。",
+              options: [["true", "加速路径，4 步 CFG 1"], ["false", "原始路径，20 步 CFG 4"]] }
+          ],
           brief: "模型路径开关：false 走原始主干，true 走 Lightning LoRA 路径。",
           desc: "源文件中开关信号来自一个 PrimitiveBoolean 节点并同时控制步数与 CFG 两个开关，简化图中固定为实际生效值 true。" },
         { id: "66", title: "ModelSamplingAuraFlow", cat: "model", x: 1150, y: 300,
           widgets: ["3"],
           inputs: [ { name: "model", type: "MODEL" } ],
           outputs: [ { type: "MODEL" } ],
+          params: [
+            { name: "shift", kind: "整数", default: "3", desc: "AuraFlow 式采样调度偏移，决定去噪预算在高低调噪声区的分配；官方默认 3，一般不动。" }
+          ],
           brief: "附加 AuraFlow 式采样调度偏移，shift 为 3。",
           desc: "Qwen-Image 沿用 AuraFlow 的调度结构，shift 决定去噪预算在高低调噪声区的分配，官方默认 3。" },
         { id: "75", title: "CFGNorm", cat: "model", x: 1150, y: 470,
           widgets: ["1", "false"],
           inputs: [ { name: "model", type: "MODEL" } ],
           outputs: [ { type: "MODEL" } ],
+          params: [
+            { name: "strength", kind: "浮点数", default: "1", desc: "CFG 归一化强度，官方默认；删掉后 4 步快速出图可能出现色彩发灰或不收敛。" },
+            { name: "extra", kind: "开关", default: "false", desc: "预留的扩展开关，官方模板保持 false。" }
+          ],
           brief: "对模型输出做 CFG 归一化修正，强度 1。",
           desc: "官方模板固定串在采样器之前，用来稳定条件引导的一致性，保持默认即可。" },
         { id: "3", title: "KSampler", cat: "sampler", x: 880, y: 640,
           widgets: ["362225868152841", "randomize", "4", "1", "euler", "simple", "1"],
           inputs: [ { name: "model", type: "MODEL" }, { name: "positive", type: "CONDITIONING" }, { name: "negative", type: "CONDITIONING" }, { name: "latent_image", type: "LATENT" } ],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "seed", kind: "整数", default: "362225868152841", desc: "种子值；固定后可复现，对比不同编辑指令时建议固定。" },
+            { name: "control_after_generate", kind: "下拉选择", default: "randomize", desc: "每次生成后的种子行为，randomize 每次随机，复现时改 fixed。",
+              options: [["randomize", "每次运行换随机种子"], ["fixed", "保持不变，可复现"], ["increment", "每次加一"]] },
+            { name: "steps", kind: "整数", default: "4", desc: "Lightning 4 步专用；原生模式对应 20 步，与 CFG 整体联动切换。" },
+            { name: "cfg", kind: "浮点数", default: "1", desc: "闪电模式必须配 1，原生模式为 4；混搭是废片主因。" },
+            { name: "sampler_name", kind: "下拉选择", default: "euler", desc: "euler 加 simple 是 Qwen 模板的组合。",
+              options: [["euler", "朴素稳定，官方默认"], ["euler_ancestral", "随机性强，编辑不建议"], ["dpmpp_2m", "可尝试但非官方组合"]] },
+            { name: "scheduler", kind: "下拉选择", default: "simple", desc: "简化噪声日程，官方模板默认。",
+              options: [["simple", "简化日程，官方默认"], ["sgm_uniform", "可对比尝试"], ["normal", "线性计划"]] },
+            { name: "denoise", kind: "浮点数", default: "1", desc: "编辑保真来自原图潜空间与条件参考，denoise 保持 1。" }
+          ],
           brief: "4 步、CFG 1 的闪电采样，从原图潜空间受控去噪。",
           desc: "源文件里步数与 CFG 由开关节点动态切换，原生模式对应 20 步与 CFG 4，本图为 Lightning 路径的 4 与 1。" },
         { id: "8", title: "VAEDecode", cat: "vae", x: 1220, y: 640,
@@ -297,6 +396,14 @@
           widgets: ["Qwen_Image_2509", "png", "8-bit", "sRGB"],
           inputs: [ { name: "images", type: "IMAGE" } ],
           outputs: [],
+          params: [
+            { name: "filename_prefix", kind: "文本", default: "Qwen_Image_2509", desc: "输出文件命名前缀，重名自动追加序号。" },
+            { name: "format", kind: "下拉选择", default: "png", desc: "输出格式；需要小文件时换 webp 很方便。",
+              options: [["png", "通用无损，内嵌工作流元数据"], ["webp", "体积小，适合批量产物"], ["jpeg", "有损压缩，体积最小"]] },
+            { name: "bit_depth", kind: "下拉选择", default: "8-bit", desc: "位深；常规出图 8-bit 足够，不必上更高位深。",
+              options: [["8-bit", "标准 8 位，兼容性最好"], ["16-bit", "16 位，后期调色余量大"]] },
+            { name: "color_profile", kind: "下拉选择", default: "sRGB", desc: "色彩配置文件，网络发布保持 sRGB。" }
+          ],
           brief: "增强版保存节点，可选格式、位深与色彩配置。",
           desc: "当前设置为 png、8-bit、sRGB，前缀 Qwen_Image_2509，需要小文件时可换 webp。" }
       ],
@@ -396,54 +503,111 @@
           widgets: ["sd_xl_base_1.0.safetensors"],
           inputs: [],
           outputs: [ { type: "MODEL" }, { type: "CLIP" }, { type: "VAE" } ],
+          params: [
+            { name: "ckpt_name", kind: "下拉选择", default: "sd_xl_base_1.0.safetensors", desc: "Base 底模负责前 20 步的构图与主体；本图它的 VAE 输出未使用，解码由 Refiner 的 VAE 承担。" }
+          ],
           brief: "加载 SDXL Base 底模，负责构图阶段。",
           desc: "MODEL 接第一段采样器，CLIP 接本阶段两个编码器，VAE 输出在源文件中未使用，解码改用 Refiner 的 VAE。" },
         { id: "12", title: "CheckpointLoaderSimple", cat: "load", x: 20, y: 260,
           widgets: ["sd_xl_refiner_1.0.safetensors"],
           inputs: [],
           outputs: [ { type: "MODEL" }, { type: "CLIP" }, { type: "VAE" } ],
+          params: [
+            { name: "ckpt_name", kind: "下拉选择", default: "sd_xl_refiner_1.0.safetensors", desc: "Refiner 精修模型三路输出全部有用：模型接第二段采样，CLIP 接精修编码器，VAE 负责最终解码。" }
+          ],
           brief: "加载 SDXL Refiner 精修模型，三路输出全部有用。",
           desc: "MODEL 接第二段采样器，CLIP 接精修阶段编码器，VAE 接最终解码，是全图解码数据的来源。" },
         { id: "5", title: "EmptyLatentImage", cat: "latent", x: 20, y: 480,
           widgets: ["1024", "1024", "1"],
           inputs: [],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "width", kind: "整数", default: "1024", desc: "画布宽度，SDXL 原生 1024 基准，可换 1152 x 896 等桶分辨率，须为 8 的倍数。" },
+            { name: "height", kind: "整数", default: "1024", desc: "画布高度，全图只有这里决定画布尺寸。" },
+            { name: "batch_size", kind: "整数", default: "1", desc: "一次并行生成的张数，1024 下显存消耗大。" }
+          ],
           brief: "生成 1024 x 1024、批量为 1 的空白潜空间。",
           desc: "全图只有这里决定画布尺寸，SDXL 可换 1152 x 896 等桶分辨率，宽高必须是 8 的倍数。" },
         { id: "6", title: "CLIPTextEncode", cat: "cond", x: 360, y: 40,
           widgets: ["daytime sky nature dark blue galaxy bottle"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "daytime sky nature dark blue galaxy bottle", desc: "Base 阶段正向提示词，写清主体与场景即可；细节描述留给 Refiner 段放大精修收益。" }
+          ],
           brief: "Base 阶段正向编码器，决定构图与主体。",
           desc: "CLIP 来自 Base checkpoint，输出接第一段采样器的 positive 端口，提示词写清主体与场景即可。" },
         { id: "7", title: "CLIPTextEncode", cat: "cond", x: 360, y: 240,
           widgets: ["text, watermark"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "text, watermark", desc: "Base 阶段负向词保持精简，主要压制文字水印类瑕疵；编码必须用 Base 自己的 CLIP，不能错接到 Refiner。" }
+          ],
           brief: "Base 阶段负向编码器，压制文字水印类瑕疵。",
           desc: "与正向编码器共用 Base 的 CLIP，不能错接到 Refiner 的 CLIP，否则条件与模型不匹配。" },
         { id: "10", title: "KSamplerAdvanced", cat: "sampler", x: 760, y: 60,
           widgets: ["enable", "6767725640732", "randomize", "25", "8", "euler", "normal", "0", "20", "enable"],
           inputs: [ { name: "model", type: "MODEL" }, { name: "positive", type: "CONDITIONING" }, { name: "negative", type: "CONDITIONING" }, { name: "latent_image", type: "LATENT" } ],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "add_noise", kind: "开关", default: "enable", desc: "开启表示第一段从噪声开始成图。",
+              options: [["enable", "从噪声开始加噪"], ["disable", "不重新加噪，用于续采样"]] },
+            { name: "seed", kind: "整数", default: "6767725640732", desc: "第一段种子，决定构图与主体。" },
+            { name: "control_after_generate", kind: "下拉选择", default: "randomize", desc: "每次生成后的种子行为，randomize 每次随机，复现时改 fixed。",
+              options: [["randomize", "每次运行换随机种子"], ["fixed", "保持不变，可复现"], ["increment", "每次加一"]] },
+            { name: "steps", kind: "整数", default: "25", desc: "两段共享的总步数，源文件由 Primitive 节点统一供给保持联动。" },
+            { name: "cfg", kind: "浮点数", default: "8", desc: "SDXL 官方推荐值，两段一致；再高易过饱和与硬边。" },
+            { name: "sampler_name", kind: "下拉选择", default: "euler", desc: "官方默认组合，换采样器时两段要一起换。",
+              options: [["euler", "朴素稳定，官方默认"], ["dpmpp_2m", "更锐利，可两段同步尝试"], ["dpmpp_2m_sde", "纹理更细腻，耗时增加"]] },
+            { name: "scheduler", kind: "下拉选择", default: "normal", desc: "线性调度，两段步数表必须一致才能无缝衔接。",
+              options: [["normal", "线性计划，官方默认"], ["karras", "过渡更平滑，可两段同步尝试"], ["exponential", "早期去噪快"]] },
+            { name: "start_at_step", kind: "整数", default: "0", desc: "第一段从第 0 步开始执行。" },
+            { name: "end_at_step", kind: "整数", default: "20", desc: "交棒点：跑完 20 步把带残噪的潜空间交给 Refiner，必须与第二段的 start_at_step 一致。" },
+            { name: "return_with_leftover_noise", kind: "开关", default: "enable", desc: "开启让带残噪的潜空间原样传给下一段，是双阶段能否衔接的关键开关。",
+              options: [["enable", "保留残噪输出，专用于接力第一段"], ["disable", "正常收尾，不做两段接力时用"]] }
+          ],
           brief: "Base 段采样：从第 0 步跑到第 20 步，带残噪交棒。",
           desc: "add_noise 开启负责从噪声成图，return_with_leftover_noise 开启让带残噪的潜空间原样传给下一段。" },
         { id: "15", title: "CLIPTextEncode", cat: "cond", x: 360, y: 460,
           widgets: ["daytime scenery  sky nature dark blue bottle with a galaxy stars milky way in it"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "daytime scenery  sky nature dark blue bottle with a galaxy stars milky way in it", desc: "Refiner 阶段正向提示词比 Base 版更细；精修阶段补细节，侧重质感与局部描述能放大精修收益。" }
+          ],
           brief: "Refiner 阶段正向编码器，提示词比 Base 版更细。",
           desc: "CLIP 来自 Refiner checkpoint，输出接第二段 positive 端口，精修阶段补细节，提示词可侧重质感描述。" },
         { id: "16", title: "CLIPTextEncode", cat: "cond", x: 360, y: 660,
           widgets: ["text, watermark"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "text, watermark", desc: "Refiner 阶段负向词与 Base 保持一致；用 Refiner 自己的 CLIP 编码，模型换段编码器也跟着换。" }
+          ],
           brief: "Refiner 阶段负向编码器，与 Base 负向词一致。",
           desc: "使用 Refiner 自己的 CLIP 编码，两边各用各的编码器是双阶段结构的固定搭配。" },
         { id: "11", title: "KSamplerAdvanced", cat: "sampler", x: 990, y: 460,
           widgets: ["disable", "0", "fixed", "25", "8", "euler", "normal", "20", "10000", "disable"],
           inputs: [ { name: "model", type: "MODEL" }, { name: "positive", type: "CONDITIONING" }, { name: "negative", type: "CONDITIONING" }, { name: "latent_image", type: "LATENT" } ],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "add_noise", kind: "开关", default: "disable", desc: "关闭避免重新加噪破坏已有构图，从 Base 留下的第 20 步状态接着去噪。",
+              options: [["enable", "从噪声开始加噪"], ["disable", "不重新加噪，续采样必选"]] },
+            { name: "seed", kind: "整数", default: "0", desc: "第二段不加新噪声，种子不参与计算，保持 0 即可。" },
+            { name: "control_after_generate", kind: "下拉选择", default: "fixed", desc: "种子行为保持 fixed。",
+              options: [["fixed", "保持不变"], ["randomize", "每次随机，本段无意义"]] },
+            { name: "steps", kind: "整数", default: "25", desc: "与第一段共享的总步数，两段数值一致才能对齐步数表。" },
+            { name: "cfg", kind: "浮点数", default: "8", desc: "与第一段一致，SDXL 官方推荐值。" },
+            { name: "sampler_name", kind: "下拉选择", default: "euler", desc: "与第一段保持一致。",
+              options: [["euler", "朴素稳定，官方默认"], ["dpmpp_2m", "更锐利，需两段同步"], ["dpmpp_2m_sde", "纹理更细腻，需两段同步"]] },
+            { name: "scheduler", kind: "下拉选择", default: "normal", desc: "与第一段一致，步数表错位会出现接缝。",
+              options: [["normal", "线性计划，官方默认"], ["karras", "需与第一段同步"], ["exponential", "需与第一段同步"]] },
+            { name: "start_at_step", kind: "整数", default: "20", desc: "从第 20 步无缝续跑，与第一段 end_at_step 严格对齐。" },
+            { name: "end_at_step", kind: "整数", default: "10000", desc: "设一个大数表示一直跑到总步数收尾。" },
+            { name: "return_with_leftover_noise", kind: "开关", default: "disable", desc: "第二段是最终输出，保持关闭正常收尾。",
+              options: [["disable", "正常收尾"], ["enable", "保留残噪，仅接力段使用"]] }
+          ],
           brief: "Refiner 段采样：从第 20 步续跑到结束，不加新噪声。",
           desc: "add_noise 关闭避免破坏已有构图，start_at_step 20 与上一段 end_at_step 20 严格对齐，错位会出现接缝。" },
         { id: "17", title: "VAEDecode", cat: "vae", x: 1300, y: 560,
@@ -456,6 +620,9 @@
           widgets: ["ComfyUI"],
           inputs: [ { name: "images", type: "IMAGE" } ],
           outputs: [],
+          params: [
+            { name: "filename_prefix", kind: "文本", default: "ComfyUI", desc: "输出文件命名前缀；PNG 内嵌工作流参数，可拖回画布复现整条双阶段链路。" }
+          ],
           brief: "把双阶段成图写入输出目录。",
           desc: "前缀 ComfyUI，PNG 内嵌工作流参数，可拖回画布复现整条双阶段链路。" }
       ],

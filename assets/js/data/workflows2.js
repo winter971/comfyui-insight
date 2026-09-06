@@ -29,36 +29,55 @@
           widgets: ["SD1.5 人像向底模"],
           inputs: [],
           outputs: [ { type: "MODEL" }, { type: "CLIP" }, { type: "VAE" } ],
+          params: [
+            { name: "ckpt_name", kind: "下拉选择", default: "SD1.5 人像向底模", desc: "选择 models/checkpoints 目录中的底模；Canny 系控制模型主要面向 SD1.5 训练，底模必须与控制模型同代。" }
+          ],
           brief: "加载底模并吐出三大件。",
           desc: "底模提供去噪能力，CLIP 负责理解提示词，VAE 负责潜空间与像素图像的互转。" },
         { id: "ref", title: "Load Image", cat: "load", x: 30, y: 220,
           widgets: ["勾边参考图"],
           inputs: [],
           outputs: [ { type: "IMAGE" } ],
+          params: [
+            { name: "image", kind: "下拉选择", default: "勾边参考图", desc: "从 input 目录选择用于提取轮廓的参考图；它只贡献线条信息，模糊或过曝的照片会提取出断线。" }
+          ],
           brief: "载入用来提取轮廓的参考图。",
           desc: "参考图只贡献线条信息，画面内容可以与最终输出完全不同。" },
         { id: "cn", title: "Load ControlNet Model", cat: "load", x: 30, y: 400,
           widgets: ["control_v11p_sd15_canny"],
           inputs: [],
           outputs: [ { type: "CONTROL_NET" } ],
+          params: [
+            { name: "control_net_name", kind: "下拉选择", default: "control_v11p_sd15_canny", desc: "models/controlnet 目录中的 Canny 专用控制模型，把线稿图翻译成对采样的引导信号。" }
+          ],
           brief: "载入 Canny 专用控制模型。",
           desc: "它是一个挂在 U-Net 上的旁路网络，把线条图翻译成对采样的引导信号。" },
         { id: "pre", title: "CannyEdgePreprocessor", cat: "image", x: 360, y: 400,
           widgets: ["low_threshold 100", "high_threshold 200"],
           inputs: [ { name: "image", type: "IMAGE" } ],
           outputs: [ { type: "IMAGE" } ],
+          params: [
+            { name: "low_threshold", kind: "整数", default: "100", desc: "Canny 低阈值，低于此梯度的边不算边缘；线条太碎时升它，断线多时降它。" },
+            { name: "high_threshold", kind: "整数", default: "200", desc: "Canny 高阈值，高于此梯度必为边缘；两值之间为过渡区，越高只剩主要轮廓。" }
+          ],
           brief: "controlnet_aux 插件的 Canny 预处理器。",
           desc: "从参考图中提取黑白线稿，白线代表强边缘。ControlNet Canny 模型只认这种线稿格式。" },
         { id: "pos", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 360, y: 40,
           widgets: ["正向提示词"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "正向提示词", desc: "描述线稿内部长出什么内容；构图已被线稿锁定，重点写材质、光照与风格。" }
+          ],
           brief: "把正向提示词编码为条件向量。",
           desc: "描述你希望线稿内部长出什么内容，如人物、材质与光照。" },
         { id: "neg", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 360, y: 220,
           widgets: ["负向提示词"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "负向提示词", desc: "排除低画质、畸形等特征；ControlNet 场景下负向词不会破坏构图。" }
+          ],
           brief: "把负向提示词编码为要避开的条件。",
           desc: "低画质、畸形手指等要排除的特征写在这里。" },
         { id: "apply", title: "Apply ControlNet", cat: "cond", x: 660, y: 40,
@@ -70,12 +89,20 @@
             { name: "image", type: "IMAGE" }
           ],
           outputs: [ { type: "CONDITIONING" }, { type: "CONDITIONING" } ],
+          params: [
+            { name: "strength", kind: "浮点数", default: "1.0", desc: "控制强度，1.0 严格贴线；0.6 到 0.8 保留结构同时给模型更多发挥空间。" }
+          ],
           brief: "把线稿控制信号注入正负两条条件。",
           desc: "输出仍是两条 CONDITIONING，但内部已携带引导信息，KSampler 无感知地接收。" },
         { id: "latent", title: "Empty Latent Image", cat: "latent", x: 360, y: 580,
           widgets: ["512 x 768", "batch 1"],
           inputs: [],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "width", kind: "整数", default: "512", desc: "画布宽度，SD1.5 建议 512 至 768 区间且为 8 的倍数；比例尽量与参考图一致，否则线条被拉伸导致变形。" },
+            { name: "height", kind: "整数", default: "768", desc: "画布高度，竖构图 512 x 768 是人像常用档。" },
+            { name: "batch_size", kind: "整数", default: "1", desc: "一次并行生成的张数；ControlNet 实验建议逐张验收。" }
+          ],
           brief: "生成一张空白潜空间画布。",
           desc: "ControlNet 属于文生图控制，起画点依然是一张纯噪声潜空间。" },
         { id: "ks", title: "KSampler", cat: "sampler", x: 1000, y: 60,
@@ -87,6 +114,16 @@
             { name: "latent_image", type: "LATENT" }
           ],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "seed", kind: "整数", default: "42", desc: "固定种子可复现结果；固定后微调 strength 与阈值，是定位问题的标准手法。" },
+            { name: "steps", kind: "整数", default: "25", desc: "去噪步数，ControlNet 场景 20 到 30 步足够收敛。" },
+            { name: "cfg", kind: "浮点数", default: "7.0", desc: "提示词服从度，过高会过饱和并放大线条外的噪点。" },
+            { name: "sampler_name", kind: "下拉选择", default: "dpmpp_2m", desc: "去噪的数学策略，影响速度与画风。",
+              options: [["dpmpp_2m", "2 阶多步方法，速度与质量兼顾，配 karras 最热门"], ["dpmpp_2m_sde", "在 dpmpp_2m 基础上加噪声方程，纹理更锐利"], ["euler", "最朴素稳定，通用首选，出图柔和"], ["euler_ancestral", "每步引入随机性，细节更奔放，复现性略差"]] },
+            { name: "scheduler", kind: "下拉选择", default: "karras", desc: "控制每一步噪声强度的时间表。",
+              options: [["karras", "步间过渡更平滑，细节更干净，最常用"], ["normal", "默认线性计划，通用"], ["simple", "简化日程，部分新模型表现更稳"], ["sgm_uniform", "SD3 与视频模型常用，少步采样收益明显"]] },
+            { name: "denoise", kind: "浮点数", default: "1.0", desc: "文生图控制流从纯噪声开始，保持 1.0。" }
+          ],
           brief: "在线稿引导下完成整个去噪过程。",
           desc: "每一步去噪都会被 Apply ControlNet 注入的信号拉向线稿结构。" },
         { id: "dec", title: "VAE Decode", cat: "vae", x: 1290, y: 60,
@@ -102,6 +139,9 @@
           widgets: ["filename_prefix ComfyUI"],
           inputs: [ { name: "images", type: "IMAGE" } ],
           outputs: [],
+          params: [
+            { name: "filename_prefix", kind: "文本", default: "ComfyUI", desc: "输出文件命名前缀，支持日期等占位符，方便批量实验归档；产物在 output 目录。" }
+          ],
           brief: "保存最终结果。",
           desc: "文件名前缀可自定义，输出目录默认为 ComfyUI 的 output 文件夹。" }
       ],
@@ -194,60 +234,93 @@
           widgets: ["SD1.5 底模"],
           inputs: [],
           outputs: [ { type: "MODEL" }, { type: "CLIP" }, { type: "VAE" } ],
+          params: [
+            { name: "ckpt_name", kind: "下拉选择", default: "SD1.5 底模", desc: "底模的先验必须足够强才能同时满足两路约束；两个控制网共用同一底模保证特征空间一致。" }
+          ],
           brief: "加载底模三件套。",
           desc: "两个控制网共用同一底模的 MODEL 与 CLIP，保证特征空间一致。" },
         { id: "imgD", title: "Load Image", cat: "load", x: 30, y: 220,
           widgets: ["深度参考图"],
           inputs: [],
           outputs: [ { type: "IMAGE" } ],
+          params: [
+            { name: "image", kind: "下拉选择", default: "深度参考图", desc: "提供空间结构的参考图；深度路只关心远近与体块，配色无关紧要，单人照片最稳。" }
+          ],
           brief: "载入提供空间结构的参考图。",
           desc: "Depth 路只关心远近与体块，颜色和线条都会被丢弃。" },
         { id: "imgL", title: "Load Image", cat: "load", x: 30, y: 400,
           widgets: ["线稿参考图"],
           inputs: [],
           outputs: [ { type: "IMAGE" } ],
+          params: [
+            { name: "image", kind: "下拉选择", default: "线稿参考图", desc: "提供边缘细节的参考图；照片、线稿或 3D 轮廓图都可以，关键是预处理后线条干净。" }
+          ],
           brief: "载入提供边缘细节的参考图。",
           desc: "可以是照片、线稿或 3D 渲染的轮廓图。" },
         { id: "cnD", title: "Load ControlNet Model", cat: "load", x: 30, y: 580,
           widgets: ["control_v11f1p_sd15_depth"],
           inputs: [],
           outputs: [ { type: "CONTROL_NET" } ],
+          params: [
+            { name: "control_net_name", kind: "下拉选择", default: "control_v11f1p_sd15_depth", desc: "深度控制模型，f1 变体对非标准深度图更宽容；必须与底模同为 SD1.5。" }
+          ],
           brief: "载入深度控制模型。",
           desc: "把深度图转译为空间体块信号注入采样过程。" },
         { id: "cnL", title: "Load ControlNet Model", cat: "load", x: 30, y: 760,
           widgets: ["control_v11p_sd15_lineart"],
           inputs: [],
           outputs: [ { type: "CONTROL_NET" } ],
+          params: [
+            { name: "control_net_name", kind: "下拉选择", default: "control_v11p_sd15_lineart", desc: "线稿控制模型，跟随精度高于 Canny；引导偏硬，叠路时强度要低于单路使用。" }
+          ],
           brief: "载入线稿控制模型。",
           desc: "把线稿转译为边缘与轮廓信号。" },
         { id: "pos", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 360, y: 40,
           widgets: ["正向提示词"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "正向提示词", desc: "两个 Apply 节点共用这条正向条件；控制信息各自附加，语义信息保持一致。" }
+          ],
           brief: "正向条件源，两路控制共用。",
           desc: "两个 Apply 节点都从这一条条件出发，分别叠加不同的控制信号。" },
         { id: "neg", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 360, y: 220,
           widgets: ["负向提示词"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "负向提示词", desc: "本图负向只走线稿路一次；需要独立负向控制时再把两条负向也接进 Combine。" }
+          ],
           brief: "负向条件源。",
           desc: "本图负向只走一路 Apply，控制需求低时足够。" },
         { id: "preD", title: "DepthAnythingV2Preprocessor", cat: "image", x: 360, y: 400,
           widgets: ["depth_anything_v2_vitl.pth"],
           inputs: [ { name: "image", type: "IMAGE" } ],
           outputs: [ { type: "IMAGE" } ],
+          params: [
+            { name: "ckpt_name", kind: "下拉选择", default: "depth_anything_v2_vitl.pth", desc: "Depth Anything V2 的权重档位，vitl 精度最高也最吃显存；输出近亮远暗的灰度深度图。" }
+          ],
           brief: "Depth Anything V2 深度估计预处理。",
           desc: "controlnet_aux 插件节点，输出灰度深度图，越亮越近、越暗越远。" },
         { id: "preL", title: "LineArtPreprocessor", cat: "image", x: 360, y: 580,
           widgets: ["coarse disable"],
           inputs: [ { name: "image", type: "IMAGE" } ],
           outputs: [ { type: "IMAGE" } ],
+          params: [
+            { name: "coarse", kind: "下拉选择", default: "disable", desc: "控制线稿粗细，叠路场景用精细线条发挥细节分工。",
+              options: [["disable", "输出全细节线条"], ["enable", "只保留粗轮廓，锁大体形状"]] }
+          ],
           brief: "Lineart 线稿提取预处理。",
           desc: "coarse 设为 disable 输出精细线条，enable 则只保留粗轮廓。" },
         { id: "latent", title: "Empty Latent Image", cat: "latent", x: 360, y: 760,
           widgets: ["512 x 768", "batch 1"],
           inputs: [],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "width", kind: "整数", default: "512", desc: "画布宽度，尺寸比例尽量与两张参考图一致，失配会造成结构拉伸。" },
+            { name: "height", kind: "整数", default: "768", desc: "画布高度，与预处理的控制图等比最稳。" },
+            { name: "batch_size", kind: "整数", default: "1", desc: "一次并行生成的张数，多路控制先单张调通再批量。" }
+          ],
           brief: "空白潜空间画布。",
           desc: "尺寸比例尽量与两张参考图一致。" },
         { id: "aD", title: "Apply ControlNet", cat: "cond", x: 660, y: 40,
@@ -259,6 +332,11 @@
             { name: "image", type: "IMAGE" }
           ],
           outputs: [ { type: "CONDITIONING" }, { type: "CONDITIONING" } ],
+          params: [
+            { name: "strength", kind: "浮点数", default: "0.65", desc: "深度管大形，取中低强度给线稿路留空间；过强会压制细节路表现。" },
+            { name: "start_percent", kind: "浮点数", default: "0.0", desc: "保持 0，体块信号从第一步就注入。" },
+            { name: "end_percent", kind: "浮点数", default: "1.0", desc: "保持 1.0 让深度全程生效，体块从第一步就定调。" }
+          ],
           brief: "深度路条件注入。",
           desc: "全程生效，负责大形与空间关系。" },
         { id: "aL", title: "Apply ControlNet", cat: "cond", x: 660, y: 270,
@@ -270,6 +348,11 @@
             { name: "image", type: "IMAGE" }
           ],
           outputs: [ { type: "CONDITIONING" }, { type: "CONDITIONING" } ],
+          params: [
+            { name: "strength", kind: "浮点数", default: "0.9", desc: "线稿需要较高强度才能压住细节；两路 strength 总和不宜超过 1.6。" },
+            { name: "start_percent", kind: "浮点数", default: "0.0", desc: "保持 0，轮廓从第一步就锁定。" },
+            { name: "end_percent", kind: "浮点数", default: "0.8", desc: "最后两成步数放开线条约束，避免细节被描边感污染。" }
+          ],
           brief: "线稿路条件注入。",
           desc: "end_percent 收到 0.8，让收尾阶段放松线条约束以获得更自然的细节。" },
         { id: "mix", title: "Conditioning (Combine)", cat: "cond", x: 660, y: 612,
@@ -290,6 +373,16 @@
             { name: "latent_image", type: "LATENT" }
           ],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "seed", kind: "整数", default: "42", desc: "固定种子便于对比不同 strength 组合的效果。" },
+            { name: "steps", kind: "整数", default: "28", desc: "双重约束需要更多步数协调，比单路控制略增。" },
+            { name: "cfg", kind: "浮点数", default: "7.0", desc: "多路叠加时提示词权重不宜再高，过高画面僵硬。" },
+            { name: "sampler_name", kind: "下拉选择", default: "dpmpp_2m", desc: "去噪的数学策略，影响速度与画风。",
+              options: [["dpmpp_2m", "2 阶多步方法，速度与质量兼顾，配 karras 最热门"], ["dpmpp_2m_sde", "在 dpmpp_2m 基础上加噪声方程，纹理更锐利"], ["euler", "最朴素稳定，通用首选，出图柔和"], ["euler_ancestral", "每步引入随机性，细节更奔放，复现性略差"]] },
+            { name: "scheduler", kind: "下拉选择", default: "karras", desc: "控制每一步噪声强度的时间表。",
+              options: [["karras", "步间过渡更平滑，细节更干净，最常用"], ["normal", "默认线性计划，通用"], ["simple", "简化日程，部分新模型表现更稳"], ["sgm_uniform", "SD3 与视频模型常用，少步采样收益明显"]] },
+            { name: "denoise", kind: "浮点数", default: "1.0", desc: "从零开始完整生成，保持 1.0。" }
+          ],
           brief: "在双重引导下采样。",
           desc: "两路信号同时作用于每一步去噪，彼此通过 strength 与时间段划分分工。" },
         { id: "dec", title: "VAE Decode", cat: "vae", x: 1310, y: 120,
@@ -305,6 +398,9 @@
           widgets: ["filename_prefix ComfyUI"],
           inputs: [ { name: "images", type: "IMAGE" } ],
           outputs: [],
+          params: [
+            { name: "filename_prefix", kind: "文本", default: "ComfyUI", desc: "多控制参数空间大，前缀里记录两路 strength 缩写便于横向比较。" }
+          ],
           brief: "保存结果。",
           desc: "多控制实验建议在前缀里记录参数组合便于回溯。" }
       ],
@@ -410,36 +506,56 @@
           widgets: ["SD1.5 底模"],
           inputs: [],
           outputs: [ { type: "MODEL" }, { type: "CLIP" }, { type: "VAE" } ],
+          params: [
+            { name: "ckpt_name", kind: "下拉选择", default: "SD1.5 底模", desc: "IPAdapter 适配器按底模家族训练，SD1.5 适配器接 SDXL 底模会完全失效。" }
+          ],
           brief: "加载底模三件套。",
           desc: "MODEL 将被 IPAdapter 打补丁，CLIP 与 VAE 正常使用。" },
         { id: "style", title: "Load Image", cat: "load", x: 30, y: 220,
           widgets: ["风格参考图"],
           inputs: [],
           outputs: [ { type: "IMAGE" } ],
+          params: [
+            { name: "image", kind: "下拉选择", default: "风格参考图", desc: "唯一的风格来源；裁掉主体只留笔触密集区域，风格更纯、主体串扰更少。" }
+          ],
           brief: "载入风格参考图。",
           desc: "这张图的笔触与色调将被提取，主体内容不会出现在结果里。" },
         { id: "uni", title: "IPAdapter Unified Loader", cat: "load", x: 30, y: 400,
           widgets: ["preset PLUS (high strength)"],
           inputs: [ { name: "model", type: "MODEL" } ],
           outputs: [ { type: "MODEL" }, { type: "IPADAPTER" }, { type: "CLIP_VISION" } ],
+          params: [
+            { name: "preset", kind: "下拉选择", default: "PLUS (high strength)", desc: "决定自动加载的适配器权重档位；PLUS 系兼顾质量与强度，是风格迁移常用档，与底模不匹配会直接报错。" }
+          ],
           brief: "一键载入适配器与图像编码器。",
           desc: "按 preset 自动从模型目录匹配 IPAdapter 权重和对应的 CLIP Vision 编码器。" },
         { id: "pos", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 360, y: 40,
           widgets: ["主体与构图描述"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "主体与构图描述", desc: "提示词只说清画什么与怎么摆；风格词留给参考图表达，写了反而与参考图打架。" }
+          ],
           brief: "描述画面主体与构图。",
           desc: "风格交给参考图，提示词只需说清画什么与怎么摆。" },
         { id: "neg", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 360, y: 220,
           widgets: ["负向提示词"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "负向提示词", desc: "排除低画质与杂质；风格主要走图像通路，负向词对风格影响很小。" }
+          ],
           brief: "负向条件。",
           desc: "排除低画质与不想要的元素。" },
         { id: "latent", title: "Empty Latent Image", cat: "latent", x: 360, y: 400,
           widgets: ["512 x 768", "batch 1"],
           inputs: [],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "width", kind: "整数", default: "512", desc: "画布宽度；风格向量与分辨率无关，无需与参考图同比例。" },
+            { name: "height", kind: "整数", default: "768", desc: "画布高度；想要参考图氛围更浓可尝试相同长宽比。" },
+            { name: "batch_size", kind: "整数", default: "1", desc: "一次并行生成的张数，权重扫描时逐张对比更清晰。" }
+          ],
           brief: "空白潜空间。",
           desc: "风格迁移本质仍是文生图，起画点为纯噪声。" },
         { id: "ipa", title: "IPAdapter", cat: "model", x: 660, y: 60,
@@ -451,6 +567,11 @@
             { name: "clip_vision", type: "CLIP_VISION" }
           ],
           outputs: [ { type: "MODEL" } ],
+          params: [
+            { name: "weight", kind: "浮点数", default: "0.85", desc: "风格强度旋钮；0.6 轻微染色，1.0 完全继承，超过 1.2 画面常被参考图主体污染。" },
+            { name: "weight_type", kind: "下拉选择", default: "style transfer", desc: "注入方式，决定风格信息怎么写进模型。",
+              options: [["style transfer", "只迁移笔触与色彩，主体不串扰"], ["linear", "均衡迁移，风格与内容都受影响"]] }
+          ],
           brief: "把风格向量注入模型。",
           desc: "参考图经 CLIP Vision 编码后作为交叉注意力键值写入 U-Net，输出一个风格化补丁模型。" },
         { id: "ks", title: "KSampler", cat: "sampler", x: 1000, y: 60,
@@ -462,6 +583,16 @@
             { name: "latent_image", type: "LATENT" }
           ],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "seed", kind: "整数", default: "42", desc: "固定 seed 逐档调 weight，可以画出清晰的风格影响曲线。" },
+            { name: "steps", kind: "整数", default: "25", desc: "风格渗入需要足够步数，建议 25 起步。" },
+            { name: "cfg", kind: "浮点数", default: "7.0", desc: "过高会把风格感挤掉，6 到 7 区间较稳。" },
+            { name: "sampler_name", kind: "下拉选择", default: "dpmpp_2m", desc: "去噪的数学策略，影响速度与画风。",
+              options: [["dpmpp_2m", "2 阶多步方法，速度与质量兼顾，配 karras 最热门"], ["dpmpp_2m_sde", "在 dpmpp_2m 基础上加噪声方程，纹理更锐利"], ["euler", "最朴素稳定，通用首选，出图柔和"], ["euler_ancestral", "每步引入随机性，细节更奔放，复现性略差"]] },
+            { name: "scheduler", kind: "下拉选择", default: "karras", desc: "控制每一步噪声强度的时间表。",
+              options: [["karras", "步间过渡更平滑，细节更干净，最常用"], ["normal", "默认线性计划，通用"], ["simple", "简化日程，部分新模型表现更稳"], ["sgm_uniform", "SD3 与视频模型常用，少步采样收益明显"]] },
+            { name: "denoise", kind: "浮点数", default: "1.0", desc: "风格迁移本质仍是文生图，保持 1.0。" }
+          ],
           brief: "用打补丁后的模型采样。",
           desc: "每一步去噪都同时受提示词与参考图风格的双重影响。" },
         { id: "dec", title: "VAE Decode", cat: "vae", x: 1280, y: 60,
@@ -477,6 +608,9 @@
           widgets: ["filename_prefix ComfyUI"],
           inputs: [ { name: "images", type: "IMAGE" } ],
           outputs: [],
+          params: [
+            { name: "filename_prefix", kind: "文本", default: "ComfyUI", desc: "建议固定 seed 做权重扫描，前缀带上 weight 数值便于归档对比。" }
+          ],
           brief: "保存结果。",
           desc: "风格迁移建议固定 seed 做权重扫描对比。" }
       ],
@@ -568,60 +702,96 @@
           widgets: ["SD1.5 人像底模"],
           inputs: [],
           outputs: [ { type: "MODEL" }, { type: "CLIP" }, { type: "VAE" } ],
+          params: [
+            { name: "ckpt_name", kind: "下拉选择", default: "SD1.5 人像底模", desc: "InstantID 官方权重基于 SD1.5，选人像向底模五官稳定性更好。" }
+          ],
           brief: "加载底模三件套。",
           desc: "MODEL 将被 InstantID 与姿态 ControlNet 先后打补丁。" },
         { id: "ref", title: "Load Image", cat: "load", x: 30, y: 220,
           widgets: ["正面人像参考"],
           inputs: [],
           outputs: [ { type: "IMAGE" } ],
+          params: [
+            { name: "image", kind: "下拉选择", default: "正面人像参考", desc: "身份参考图；正面、无遮挡、单人、光线均匀是四个硬指标，同时供给身份与面部结构两条通路。" }
+          ],
           brief: "载入身份参考图。",
           desc: "正面、光线均匀、单人的照片识别率最高，同时供给身份与面部结构两条通路。" },
         { id: "pose", title: "Load Image", cat: "load", x: 30, y: 400,
           widgets: ["姿态参考图（可选）"],
           inputs: [],
           outputs: [ { type: "IMAGE" } ],
+          params: [
+            { name: "image", kind: "下拉选择", default: "姿态参考图（可选）", desc: "可选的姿态参考；只经 DWPose 转成骨骼后起作用，颜色与衣着都会被丢弃，不需要时整条路不搭。" }
+          ],
           brief: "载入可选的姿态参考。",
           desc: "想控制身体姿势时提供一张姿势图，经 DWPose 提取骨骼后进入姿态控制路。" },
         { id: "idm", title: "InstantID Model Loader", cat: "load", x: 30, y: 580,
           widgets: ["ip-adapter.bin"],
           inputs: [],
           outputs: [ { type: "INSTANTID" } ],
+          params: [
+            { name: "instantid_file", kind: "下拉选择", default: "ip-adapter.bin", desc: "models/instantid 目录中的 InstantID 适配器权重，内含面部注意力模块，只能接 Apply InstantID。" }
+          ],
           brief: "载入 InstantID 适配器权重。",
           desc: "这是基于 IPAdapter 架构改造的身份适配器，内含面部注意力模块。" },
         { id: "cnm", title: "ControlNet Loader", cat: "load", x: 30, y: 760,
           widgets: ["control_v11p_sd15_instantid"],
           inputs: [],
           outputs: [ { type: "CONTROL_NET" } ],
+          params: [
+            { name: "control_net_name", kind: "下拉选择", default: "control_v11p_sd15_instantid", desc: "InstantID 专用面部结构控制模型，训练信号是面部关键点，与普通姿态控制模型不同。" }
+          ],
           brief: "载入 InstantID 专用控制模型。",
           desc: "它的训练目标是面部关键点，与普通姿态控制模型不同。" },
         { id: "pos", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 360, y: 40,
           widgets: ["正向提示词"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "正向提示词", desc: "描述场景、发型、服装与画风；绝不要写长相，身份特征完全由参考图提供。" }
+          ],
           brief: "描述场景、发型、服装与风格。",
           desc: "不要在提示词里描述长相，身份特征完全由参考图提供。" },
         { id: "neg", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 360, y: 220,
           widgets: ["负向提示词"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "负向提示词", desc: "常规低画质词之外，可加多人、多余的手、面部模糊等针对性排除项。" }
+          ],
           brief: "负向条件。",
           desc: "常规低画质与畸形词之外，可加多人、面部特写模糊等针对性排除项。" },
         { id: "face", title: "InstantID Face Analysis", cat: "util", x: 360, y: 400,
           widgets: ["provider CUDA"],
           inputs: [ { name: "image", type: "IMAGE" } ],
           outputs: [ { type: "FACE_ANALYSIS" } ],
+          params: [
+            { name: "provider", kind: "下拉选择", default: "CUDA", desc: "InsightFace 的运行设备；分析对象只能是一张脸，多人图会取到不确定目标。",
+              options: [["CUDA", "显卡加速，速度最快"], ["CPU", "无显卡环境使用，速度慢"]] }
+          ],
           brief: "InsightFace 人脸检测与特征提取。",
           desc: "从参考图定位人脸并输出身份特征向量，供 Apply 节点选用。" },
         { id: "dw", title: "DWPose_Preprocessor", cat: "image", x: 360, y: 580,
           widgets: ["detect_hand enable", "detect_body enable"],
           inputs: [ { name: "image", type: "IMAGE" } ],
           outputs: [ { type: "IMAGE" } ],
+          params: [
+            { name: "detect_hand", kind: "下拉选择", default: "enable", desc: "是否检测手部关键点；需要控制手部姿态时打开。",
+              options: [["enable", "检测手部关键点"], ["disable", "跳过手部，速度更快"]] },
+            { name: "detect_body", kind: "下拉选择", default: "enable", desc: "是否检测躯干关键点，是身体姿态控制的主要信号来源。",
+              options: [["enable", "检测躯干与四肢关键点"], ["disable", "跳过躯干检测"]] }
+          ],
           brief: "DWPose 骨骼点提取。",
           desc: "把姿态参考图转成骨骼火柴人，供姿态控制路使用。" },
         { id: "latent", title: "Empty Latent Image", cat: "latent", x: 360, y: 760,
           widgets: ["512 x 768", "batch 1"],
           inputs: [],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "width", kind: "整数", default: "512", desc: "半身人像用 512 x 768 起步，脸部占比过小会稀释身份特征。" },
+            { name: "height", kind: "整数", default: "768", desc: "画布高度，全身构图想保脸需后续接 FaceDetailer。" },
+            { name: "batch_size", kind: "整数", default: "1", desc: "一致性实验不宜并行出多张，保持 1 逐张验收。" }
+          ],
           brief: "空白潜空间。",
           desc: "半身人像用 512 x 768 起步，脸部占比过小会削弱一致性。" },
         { id: "aid", title: "Apply InstantID", cat: "cond", x: 660, y: 40,
@@ -636,6 +806,11 @@
             { name: "insightface", type: "FACE_ANALYSIS" }
           ],
           outputs: [ { type: "CONDITIONING" }, { type: "CONDITIONING" } ],
+          params: [
+            { name: "weight", kind: "浮点数", default: "1.0", desc: "身份相似度总旋钮，0.8 到 1.0 之间最稳，过高会向参考图照片感靠拢。" },
+            { name: "start_at", kind: "浮点数", default: "0.0", desc: "身份注入的起始时间占比，保持 0 让五官从第一步就被锁定。" },
+            { name: "end_at", kind: "浮点数", default: "1.0", desc: "身份注入截止时间；降到 0.8 可减轻照片感、增加画风自由度。" }
+          ],
           brief: "身份与面部结构一次注入。",
           desc: "一个节点同时完成 IPAdapter 式身份注入与面部 ControlNet 注入，输出增强后的正负条件。" },
         { id: "acn", title: "Apply ControlNet", cat: "cond", x: 660, y: 340,
@@ -647,6 +822,11 @@
             { name: "image", type: "IMAGE" }
           ],
           outputs: [ { type: "CONDITIONING" }, { type: "CONDITIONING" } ],
+          params: [
+            { name: "strength", kind: "浮点数", default: "0.65", desc: "骨骼约束强度，0.5 到 0.7 之间不会挤压面部特征。" },
+            { name: "start_percent", kind: "浮点数", default: "0.0", desc: "控制从采样的第几成开始生效。" },
+            { name: "end_percent", kind: "浮点数", default: "0.85", desc: "收尾阶段放松身体约束，有利于画面自然收束。" }
+          ],
           brief: "可选的姿态控制注入。",
           desc: "把骨骼图作为第二重约束叠在身份条件之上。" },
         { id: "mix", title: "Conditioning (Combine)", cat: "cond", x: 660, y: 660,
@@ -667,6 +847,16 @@
             { name: "latent_image", type: "LATENT" }
           ],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "seed", kind: "整数", default: "42", desc: "固定后仅改提示词，可产出同脸不同场景的系列图。" },
+            { name: "steps", kind: "整数", default: "28", desc: "面部细节收敛需要足够步数。" },
+            { name: "cfg", kind: "浮点数", default: "7.0", desc: "标准引导强度，人像不宜超过 8。" },
+            { name: "sampler_name", kind: "下拉选择", default: "dpmpp_2m", desc: "去噪的数学策略，影响速度与画风。",
+              options: [["dpmpp_2m", "2 阶多步方法，速度与质量兼顾，配 karras 最热门"], ["dpmpp_2m_sde", "在 dpmpp_2m 基础上加噪声方程，纹理更锐利"], ["euler", "最朴素稳定，通用首选，出图柔和"], ["euler_ancestral", "每步引入随机性，细节更奔放，复现性略差"]] },
+            { name: "scheduler", kind: "下拉选择", default: "karras", desc: "控制每一步噪声强度的时间表。",
+              options: [["karras", "步间过渡更平滑，细节更干净，最常用"], ["normal", "默认线性计划，通用"], ["simple", "简化日程，部分新模型表现更稳"], ["sgm_uniform", "SD3 与视频模型常用，少步采样收益明显"]] },
+            { name: "denoise", kind: "浮点数", default: "1.0", desc: "从纯噪声完整生成，保持 1.0。" }
+          ],
           brief: "在身份锁定下采样。",
           desc: "一致性主要来自条件通路，模型本体未被改动。" },
         { id: "dec", title: "VAE Decode", cat: "vae", x: 1310, y: 100,
@@ -682,6 +872,9 @@
           widgets: ["filename_prefix ComfyUI"],
           inputs: [ { name: "images", type: "IMAGE" } ],
           outputs: [],
+          params: [
+            { name: "filename_prefix", kind: "文本", default: "ComfyUI", desc: "一致性工作流建议把参考图与参数一并归档，便于后续接 FaceDetailer 或放大流复用。" }
+          ],
           brief: "保存结果。",
           desc: "固定 seed 与参数即可批量产出同一人物的不同场景。" }
       ],
@@ -789,18 +982,27 @@
           widgets: ["目标图"],
           inputs: [],
           outputs: [ { type: "IMAGE" } ],
+          params: [
+            { name: "image", kind: "下拉选择", default: "目标图", desc: "被换脸的画布；必须能检测到清晰人脸，目标脸角度过大或被遮挡时对齐会失败。" }
+          ],
           brief: "载入被换脸的目标图。",
           desc: "目标图中必须能检测到清晰人脸，否则节点直接报错。" },
         { id: "src", title: "Load Image", cat: "load", x: 30, y: 220,
           widgets: ["输入人脸"],
           inputs: [],
           outputs: [ { type: "IMAGE" } ],
+          params: [
+            { name: "image", kind: "下拉选择", default: "输入人脸", desc: "提供身份的源图；正面清晰、表情自然的照片迁移效果最好，多人图会取第一张检测到的脸。" }
+          ],
           brief: "载入提供人脸的源图。",
           desc: "正面清晰的源脸换出来的相似度与质感最好。" },
         { id: "bfm", title: "ReActorBuildFaceModel", cat: "model", x: 30, y: 400,
           widgets: ["send_always false"],
           inputs: [ { name: "reference_face", type: "IMAGE" } ],
           outputs: [ { type: "FACE_MODEL" } ],
+          params: [
+            { name: "send_always", kind: "开关", default: "false", desc: "脸模型是否每次执行都强制发送；批处理多图平均时设为 true 更稳，单图场景保持 false。" }
+          ],
           brief: "把源脸固化成脸模型对象。",
           desc: "可选节点：多张同脸照片平均后相似度更高，单图场景也可直接把源图接进换脸节点。" },
         { id: "swap", title: "ReActorFastFaceSwap", cat: "image", x: 650, y: 40,
@@ -811,12 +1013,21 @@
             { name: "face_model", type: "FACE_MODEL" }
           ],
           outputs: [ { type: "IMAGE" } ],
+          params: [
+            { name: "swap_model", kind: "下拉选择", default: "inswapper_128.onnx", desc: "核心换脸权重，128 指内部面部工作分辨率；输出面部必糊，必须配合修复节点。" },
+            { name: "det_model", kind: "下拉选择", default: "retinaface_resnet50", desc: "人脸检测模型，负责在目标图中定位并对齐人脸；检测不到脸时先检查它。" },
+            { name: "face_restore_model", kind: "下拉选择", default: "GFPGANv1.4", desc: "节点内直选的修复模型，可在换脸同时一步完成面部重建。" }
+          ],
           brief: "检测并对齐人脸后完成交换。",
           desc: "先在目标图定位人脸，再把源脸身份特征迁移过去，输出整张替换后的图。" },
         { id: "fix", title: "FaceRestoreGFPGANWithModel", cat: "image", x: 950, y: 40,
           widgets: ["GFPGANv1.4", "visibility 1.0"],
           inputs: [ { name: "image", type: "IMAGE" } ],
           outputs: [ { type: "IMAGE" } ],
+          params: [
+            { name: "face_restore_model", kind: "下拉选择", default: "GFPGANv1.4", desc: "独立修复节点使用的人脸重建模型，与换脸节点解耦便于单独调参。" },
+            { name: "visibility", kind: "浮点数", default: "1.0", desc: "修复强度；1.0 完全采用重建脸，0.5 左右保留一半原图细节以保住身份相似度。" }
+          ],
           brief: "对换脸结果做人脸修复。",
           desc: "inswapper 输出固定 128 分辨率的面部，GFPGAN 负责把它重建为高清质感。" },
         { id: "prev", title: "Preview Image", cat: "image", x: 1260, y: 40,
@@ -829,6 +1040,9 @@
           widgets: ["filename_prefix ComfyUI"],
           inputs: [ { name: "images", type: "IMAGE" } ],
           outputs: [],
+          params: [
+            { name: "filename_prefix", kind: "文本", default: "ComfyUI", desc: "换脸属敏感操作，前缀建议记录源脸与目标图的对应关系，便于审计。" }
+          ],
           brief: "保存最终图像。",
           desc: "换脸属敏感操作，输出文件请按合规要求管理。" }
       ],
@@ -908,36 +1122,56 @@
           widgets: ["SD1.5 人像底模"],
           inputs: [],
           outputs: [ { type: "MODEL" }, { type: "CLIP" }, { type: "VAE" } ],
+          params: [
+            { name: "ckpt_name", kind: "下拉选择", default: "SD1.5 人像底模", desc: "精修必须用与主图同一底模，否则脸部风格会与身体脱节。" }
+          ],
           brief: "加载底模三件套。",
           desc: "FaceDetailer 需要完整的模型、文本编码器与 VAE 来独立完成一次小规模重绘。" },
         { id: "det", title: "UltralyticsDetectorProvider", cat: "load", x: 30, y: 240,
           widgets: ["bbox/face_yolov8m.pt"],
           inputs: [],
           outputs: [ { type: "BBOX_DETECTOR" }, { type: "SEGM_DETECTOR" } ],
+          params: [
+            { name: "model_name", kind: "下拉选择", default: "bbox/face_yolov8m.pt", desc: "models/ultralytics 目录中的检测模型；bbox 版只给矩形框配 SAM 使用，segm 版自带分割可不接 SAM。" }
+          ],
           brief: "提供人脸检测器。",
           desc: "bbox 模型输出检测框，segm 模型直接输出分割遮罩，二选一即可。" },
         { id: "sam", title: "SAMLoader", cat: "load", x: 30, y: 420,
           widgets: ["sam_vit_b_01ec64.pth"],
           inputs: [],
           outputs: [ { type: "SAM_MODEL" } ],
+          params: [
+            { name: "model_name", kind: "下拉选择", default: "sam_vit_b_01ec64.pth", desc: "models/sams 目录中的 SAM 分割权重，把粗框细化成贴脸遮罩；vit_b 基础档，vit_h 更准但显存翻倍。" }
+          ],
           brief: "加载 SAM 分割模型。",
           desc: "把粗糙的检测框细化成沿脸部轮廓的精细遮罩。" },
         { id: "pos", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 360, y: 40,
           widgets: ["正向提示词"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "正向提示词", desc: "主提示词同时驱动主图与脸部重绘；可用通配符给脸部单独加细节词。" }
+          ],
           brief: "主提示词，同时也是脸部精修的提示词。",
           desc: "FaceDetailer 默认复用主提示词重绘面部，也可用通配符给脸部单独加细节词。" },
         { id: "neg", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 360, y: 220,
           widgets: ["负向提示词"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "负向提示词", desc: "特写重绘对畸形词更敏感，保留五官与手部畸形词收益明显。" }
+          ],
           brief: "负向条件。",
           desc: "精修同样执行负向排除，畸形词在特写重绘时更重要。" },
         { id: "latent", title: "Empty Latent Image", cat: "latent", x: 360, y: 400,
           widgets: ["512 x 768", "batch 1"],
           inputs: [],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "width", kind: "整数", default: "512", desc: "主图画布宽度，决定脸部像素占比，脸小于 200 像素时精修收益最大。" },
+            { name: "height", kind: "整数", default: "768", desc: "画布高度，全身图把 FaceDetailer 当默认配件。" },
+            { name: "batch_size", kind: "整数", default: "1", desc: "批量大于 1 时逐张检测处理，耗时线性增加。" }
+          ],
           brief: "主图生成的画布。",
           desc: "先正常生成一张全身图，再交给 FaceDetailer 修脸。" },
         { id: "ks", title: "KSampler", cat: "sampler", x: 660, y: 60,
@@ -949,6 +1183,12 @@
             { name: "latent_image", type: "LATENT" }
           ],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "seed", kind: "整数", default: "42", desc: "固定后主图与精修结果都可复现。" },
+            { name: "steps", kind: "整数", default: "25", desc: "主图生成步数，与普通文生图一致。" },
+            { name: "cfg", kind: "浮点数", default: "7.0", desc: "提示词服从度，常规值即可。" },
+            { name: "denoise", kind: "浮点数", default: "1.0", desc: "主图从纯噪声生成，保持 1.0；脸部精修强度由 FaceDetailer 自己的 denoise 控制。" }
+          ],
           brief: "先生成主图。",
           desc: "这一步与普通文生图完全相同，崩脸在此发生，也在此被下一阶段拯救。" },
         { id: "dec", title: "VAE Decode", cat: "vae", x: 660, y: 420,
@@ -973,6 +1213,14 @@
             { name: "sam_model", type: "SAM_MODEL" }
           ],
           outputs: [ { type: "IMAGE" }, { type: "IMAGE" }, { type: "MASK" } ],
+          params: [
+            { name: "guide_size", kind: "整数", default: "512", desc: "脸部被放大到的目标边长，决定重绘的工作分辨率。" },
+            { name: "max_size", kind: "整数", default: "1024", desc: "放大上限，防止极小人脸被放大到夸张尺寸浪费算力。" },
+            { name: "denoise", kind: "浮点数", default: "0.5", desc: "脸部重绘强度；0.4 到 0.6 平衡结构与自由度，高于 0.7 脸可能变成另一个人。" },
+            { name: "bbox_threshold", kind: "浮点数", default: "0.5", desc: "人脸检测置信度阈值；漏检时降到 0.35，误检时升到 0.6。" },
+            { name: "feather", kind: "整数", default: "20", desc: "遮罩羽化像素，控制贴回接缝的柔和度。" },
+            { name: "cycle", kind: "整数", default: "1", desc: "精修轮数；2 轮对重度崩脸有效但可能磨平特征。" }
+          ],
           brief: "检测、分割、放大、重绘、贴回，一步完成。",
           desc: "脸部区域被放大到 guide_size 独立采样后，按 SAM 遮罩带羽化贴回原图。" },
         { id: "prev", title: "Preview Image", cat: "image", x: 1290, y: 40,
@@ -985,6 +1233,9 @@
           widgets: ["filename_prefix ComfyUI"],
           inputs: [ { name: "images", type: "IMAGE" } ],
           outputs: [],
+          params: [
+            { name: "filename_prefix", kind: "文本", default: "ComfyUI", desc: "建议把 denoise 与 guide_size 记入文件名，方便跨批次对比。" }
+          ],
           brief: "保存最终图像。",
           desc: "输出为整图，脸部已替换为精修版本。" }
       ],
@@ -1080,30 +1331,50 @@
           widgets: ["SD1.5 动画向底模"],
           inputs: [],
           outputs: [ { type: "MODEL" }, { type: "CLIP" }, { type: "VAE" } ],
+          params: [
+            { name: "ckpt_name", kind: "下拉选择", default: "SD1.5 动画向底模", desc: "动画向底模与运动模块配合更顺滑；必须是 SD1.5 家族，mm_sd_v15 系运动模块不兼容 SDXL。" }
+          ],
           brief: "加载底模三件套。",
           desc: "MODEL 将被注入运动模块，变成能输出帧序列的时序模型。" },
         { id: "ctx", title: "ADE_StandardStaticContextOptions", cat: "util", x: 30, y: 260,
           widgets: ["context_length 16", "context_overlap 4", "context_stride 1"],
           inputs: [],
           outputs: [ { type: "CONTEXT_OPTIONS" } ],
+          params: [
+            { name: "context_length", kind: "整数", default: "16", desc: "上下文窗口长度，v2 运动模块的训练窗口是 16，不建议改大。" },
+            { name: "context_overlap", kind: "整数", default: "4", desc: "窗口间重叠帧数，越大衔接越平滑、显存越高。" },
+            { name: "context_stride", kind: "整数", default: "1", desc: "窗口内抽帧步长，保持 1 逐帧处理。" }
+          ],
           brief: "配置运动上下文窗口。",
           desc: "长于 16 帧的序列被切成滑动窗口逐段处理，overlap 保证段间衔接。" },
         { id: "pos", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 380, y: 40,
           widgets: ["正向提示词"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "正向提示词", desc: "所有帧共用；镜头感靠缓慢推近、环绕等镜头词汇描述，主体描述要具体且简短。" }
+          ],
           brief: "描述画面与镜头运动。",
           desc: "所有帧共享同一条提示词，镜头感靠 motion 与镜头词汇描述。" },
         { id: "neg", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 380, y: 220,
           widgets: ["负向提示词"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "负向提示词", desc: "全帧共享；闪烁、抖动、重复帧等视频特有负向词值得写入。" }
+          ],
           brief: "负向条件。",
           desc: "视频场景下闪烁、抖动、重复帧等词值得写入。" },
         { id: "latent", title: "ADE_EmptyLatentImage", cat: "latent", x: 30, y: 460,
           widgets: ["width 512", "height 512", "length 16", "batch 1"],
           inputs: [],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "width", kind: "整数", default: "512", desc: "视频画布宽度；512 是质量与速度的甜点位，放大交给后续补帧与超分。" },
+            { name: "height", kind: "整数", default: "512", desc: "视频画布高度，与宽度同为 8 的倍数。" },
+            { name: "length", kind: "整数", default: "16", desc: "总帧数；等于窗口长度时质量最稳，32 帧以上依赖滑窗衔接。" },
+            { name: "batch_size", kind: "整数", default: "1", desc: "帧序列显存占用大，保持 1。" }
+          ],
           brief: "生成带帧数维度的空视频潜空间。",
           desc: "AnimateDiff 专用空潜空间，length 即总帧数，区别于普通单帧 Empty Latent。" },
         { id: "ad", title: "ADE_AnimateDiffLoaderGen1", cat: "model", x: 680, y: 40,
@@ -1113,6 +1384,11 @@
             { name: "context_options", type: "CONTEXT_OPTIONS" }
           ],
           outputs: [ { type: "MODEL" }, { type: "CONDITIONING" }, { type: "CONDITIONING" } ],
+          params: [
+            { name: "model_name", kind: "下拉选择", default: "mm_sd_v15_v2.ckpt", desc: "models/animatediff_models 目录中的运动模块；v2 是公认最稳的通用档。" },
+            { name: "beta_schedule", kind: "下拉选择", default: "autoselect", desc: "噪声调度按运动模块自动匹配，一般保持默认。",
+              options: [["autoselect", "按运动模块自动匹配，通用"], ["linear", "线性调度，v2 模块的典型匹配"]] }
+          ],
           brief: "把运动模块注入底模。",
           desc: "加载 mm 权重并挂到 U-Net 的时序层上，输出可出帧序列的补丁模型。" },
         { id: "ks", title: "KSampler", cat: "sampler", x: 1090, y: 40,
@@ -1124,6 +1400,16 @@
             { name: "latent_image", type: "LATENT" }
           ],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "seed", kind: "整数", default: "42", desc: "固定 seed 只改提示词，可保持运镜大体一致。" },
+            { name: "steps", kind: "整数", default: "25", desc: "帧序列采样耗时按帧数放大，25 步是质量与速度的平衡。" },
+            { name: "cfg", kind: "浮点数", default: "7.0", desc: "画面抽搐时优先降 cfg 与检查负向词，而不是换采样器。" },
+            { name: "sampler_name", kind: "下拉选择", default: "dpmpp_2m", desc: "去噪的数学策略，影响速度与画风。",
+              options: [["dpmpp_2m", "2 阶多步方法，速度与质量兼顾，配 karras 最热门"], ["dpmpp_2m_sde", "在 dpmpp_2m 基础上加噪声方程，纹理更锐利"], ["euler", "最朴素稳定，通用首选，出图柔和"], ["euler_ancestral", "每步引入随机性，细节更奔放，复现性略差"]] },
+            { name: "scheduler", kind: "下拉选择", default: "karras", desc: "控制每一步噪声强度的时间表。",
+              options: [["karras", "步间过渡更平滑，细节更干净，最常用"], ["normal", "默认线性计划，通用"], ["simple", "简化日程，部分新模型表现更稳"], ["sgm_uniform", "SD3 与视频模型常用，少步采样收益明显"]] },
+            { name: "denoise", kind: "浮点数", default: "1.0", desc: "从纯噪声起步，整段帧序列一次采样完成。" }
+          ],
           brief: "一次采样出整段帧序列。",
           desc: "潜空间在帧维度上是批量，采样器感知不到区别，时序一致性由运动模块保证。" },
         { id: "dec", title: "VAE Decode", cat: "vae", x: 1370, y: 40,
@@ -1142,6 +1428,12 @@
             { name: "audio", type: "AUDIO" }
           ],
           outputs: [],
+          params: [
+            { name: "frame_rate", kind: "整数", default: "12", desc: "合成帧率；16 帧配 12fps 约 1.3 秒，可配合循环播放。" },
+            { name: "format", kind: "下拉选择", default: "video/h264-mp4", desc: "输出容器与编码格式。",
+              options: [["video/h264-mp4", "mp4 通用格式，兼容性最好"], ["video/h265-mp4", "压缩率更高，兼容性稍差"], ["image/gif", "GIF 动图，体积大且无音轨"]] },
+            { name: "crf", kind: "整数", default: "19", desc: "压缩质量；越小越清晰、文件越大，19 是高清档。" }
+          ],
           brief: "把图像帧合成为视频文件。",
           desc: "Video Helper Suite 的合成节点，支持 mp4 与 gif，直接落盘到 output。" }
       ],
@@ -1230,30 +1522,49 @@
           widgets: ["wan2.2_ti2v_5B_fp16.safetensors", "weight_dtype fp16"],
           inputs: [],
           outputs: [ { type: "MODEL" } ],
+          params: [
+            { name: "unet_name", kind: "下拉选择", default: "wan2.2_ti2v_5B_fp16.safetensors", desc: "models/diffusion_models 目录中的 5B 单模型，一个模型同时支持文生与图生视频。" },
+            { name: "weight_dtype", kind: "下拉选择", default: "fp16", desc: "加载精度；fp16 在质量与显存间平衡，显存紧张可换 fp8 量化版。",
+              options: [["fp16", "半精度，质量与速度平衡"], ["fp8_e4m3fn", "再省约一半显存，画质略降"], ["default", "按文件原始精度加载"]] }
+          ],
           brief: "加载视频扩散模型本体。",
           desc: "只输出 MODEL，视频模型不再捆绑 CLIP 与 VAE，需各自独立加载。" },
         { id: "clip", title: "Load CLIP", cat: "load", x: 30, y: 220,
           widgets: ["umt5_xxl_fp8_e4m3fn_scaled.safetensors", "type wan"],
           inputs: [],
           outputs: [ { type: "CLIP" } ],
+          params: [
+            { name: "clip_name", kind: "下拉选择", default: "umt5_xxl_fp8_e4m3fn_scaled.safetensors", desc: "UMT5 文本编码器的 fp8 量化版，中文提示词效果很好。" },
+            { name: "type", kind: "下拉选择", default: "wan", desc: "编码器用途类型，必须选 wan 让提示词按 Wan 模板处理。",
+              options: [["wan", "Wan 系专用模板"], ["wan_vision", "带视觉通路的 Wan 变体"]] }
+          ],
           brief: "加载 UMT5 文本编码器。",
           desc: "type 选 wan 使编码器按 Wan 的提示词模板工作。" },
         { id: "vae", title: "Load VAE", cat: "load", x: 30, y: 400,
           widgets: ["wan2.2_vae.safetensors"],
           inputs: [],
           outputs: [ { type: "VAE" } ],
+          params: [
+            { name: "vae_name", kind: "下拉选择", default: "wan2.2_vae.safetensors", desc: "Wan 2.2 专用 VAE，压缩率高于 2.1 版；与模型版本严格配套，混用报形状错误。" }
+          ],
           brief: "加载 Wan 2.2 专用 VAE。",
           desc: "它同时负责图像帧与视频潜空间的编解码，压缩规格与 2.1 不同不能混用。" },
         { id: "pos", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 380, y: 40,
           widgets: ["正向提示词"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "正向提示词", desc: "按主体、场景、动作、镜头四段式书写；推拉摇移等运动词汇响应明确，中文长句可直接使用。" }
+          ],
           brief: "正向视频描述。",
           desc: "写清主体、动作与镜头运动，视频模型对运动描述的响应远强于文生图。" },
         { id: "neg", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 380, y: 220,
           widgets: ["负向提示词"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "负向提示词", desc: "排除模糊、色调异常、字幕水印、画面抖动等视频瑕疵；沿用官方负向模板即可。" }
+          ],
           brief: "负向视频描述。",
           desc: "排除模糊、变形、字幕水印等常见视频瑕疵。" },
         { id: "latent", title: "Wan22ImageToVideoLatent", cat: "latent", x: 380, y: 400,
@@ -1264,18 +1575,30 @@
             { name: "vae", type: "VAE" }
           ],
           outputs: [ { type: "CONDITIONING" }, { type: "CONDITIONING" }, { type: "LATENT" } ],
+          params: [
+            { name: "width", kind: "整数", default: "704", desc: "视频画布宽度；704 x 1280 是 5B 的训练分辨率档，改尺寸尽量保持该面积量级。" },
+            { name: "height", kind: "整数", default: "1280", desc: "视频画布高度，竖幅视频的标准档位。" },
+            { name: "length", kind: "整数", default: "121", desc: "总帧数，24fps 下约 5 秒；显存不足先降它。" },
+            { name: "batch_size", kind: "整数", default: "1", desc: "视频生成显存消耗大，保持 1。" }
+          ],
           brief: "创建带时序的空视频潜空间。",
           desc: "5B 模板的标配节点：不接 start_image 时等价于空视频画布，同时承担宽高与帧数的设定。" },
         { id: "ms", title: "ModelSamplingSD3", cat: "model", x: 730, y: 40,
           widgets: ["shift 8.0"],
           inputs: [ { name: "model", type: "MODEL" } ],
           outputs: [ { type: "MODEL" } ],
+          params: [
+            { name: "shift", kind: "浮点数", default: "8.0", desc: "采样位移，把更多去噪步数分配给高噪声区；官方 5B 模板默认 8。" }
+          ],
           brief: "给模型加采样位移调度。",
           desc: "shift 值把噪声调度向高噪声区偏移，视频模型普遍需要较大 shift。" },
         { id: "cfg", title: "CFGNorm", cat: "model", x: 730, y: 220,
           widgets: ["strength 1.0"],
           inputs: [ { name: "model", type: "MODEL" } ],
           outputs: [ { type: "MODEL" } ],
+          params: [
+            { name: "strength", kind: "浮点数", default: "1.0", desc: "引导归一化强度，官方默认 1.0；关掉后高 cfg 的油炸感会立刻回来。" }
+          ],
           brief: "归一化引导强度。",
           desc: "官方模板配套节点，抑制高 cfg 下的过曝与过饱和，让引导更平稳。" },
         { id: "ks", title: "KSampler", cat: "sampler", x: 950, y: 220,
@@ -1287,6 +1610,16 @@
             { name: "latent_image", type: "LATENT" }
           ],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "seed", kind: "整数", default: "42", desc: "决定整段视频的内容与运镜；固定后换提示词是稳定的对比方法。" },
+            { name: "steps", kind: "整数", default: "30", desc: "uni_pc 下的收敛步数，20 步可用于快速预览。" },
+            { name: "cfg", kind: "浮点数", default: "6.0", desc: "配合 CFGNorm 使用，6 左右已足够听话。" },
+            { name: "sampler_name", kind: "下拉选择", default: "uni_pc", desc: "去噪的数学策略，影响速度与画风。",
+              options: [["uni_pc", "高阶求解器，低步数表现好"], ["dpmpp_2m", "2 阶多步方法，速度与质量兼顾，配 karras 最热门"], ["dpmpp_2m_sde", "在 dpmpp_2m 基础上加噪声方程，纹理更锐利"], ["euler", "最朴素稳定，通用首选，出图柔和"]] },
+            { name: "scheduler", kind: "下拉选择", default: "simple", desc: "控制每一步噪声强度的时间表。",
+              options: [["simple", "简化日程，部分新模型表现更稳"], ["karras", "步间过渡更平滑，细节更干净，最常用"], ["normal", "默认线性计划，通用"], ["sgm_uniform", "SD3 与视频模型常用，少步采样收益明显"]] },
+            { name: "denoise", kind: "浮点数", default: "1.0", desc: "从纯噪声完整去噪，保持 1.0。" }
+          ],
           brief: "在视频潜空间完成去噪。",
           desc: "潜空间形状是帧压缩后的时序张量，采样一次即得整段视频。" },
         { id: "dec", title: "VAE Decode", cat: "vae", x: 1250, y: 220,
@@ -1305,6 +1638,12 @@
             { name: "audio", type: "AUDIO" }
           ],
           outputs: [],
+          params: [
+            { name: "frame_rate", kind: "整数", default: "24", desc: "Wan 生成帧率即 24fps，按 24 合成不会变速。" },
+            { name: "format", kind: "下拉选择", default: "video/h264-mp4", desc: "输出容器与编码格式。",
+              options: [["video/h264-mp4", "mp4 通用格式，兼容性最好"], ["video/h265-mp4", "压缩率更高，兼容性稍差"], ["image/gif", "GIF 动图，体积大且无音轨"]] },
+            { name: "crf", kind: "整数", default: "19", desc: "压缩质量；越小越清晰、文件越大。" }
+          ],
           brief: "合成并保存视频。",
           desc: "24fps 是 Wan 默认帧率，5B 模型 121 帧约 5 秒。" }
       ],
@@ -1396,36 +1735,57 @@
           widgets: ["wan2.2_ti2v_5B_fp16.safetensors", "weight_dtype fp16"],
           inputs: [],
           outputs: [ { type: "MODEL" } ],
+          params: [
+            { name: "unet_name", kind: "下拉选择", default: "wan2.2_ti2v_5B_fp16.safetensors", desc: "与文生视频共用的 5B 权重；TI2V 意为文本与图像混合驱动，图生视频无需额外权重。" },
+            { name: "weight_dtype", kind: "下拉选择", default: "fp16", desc: "加载精度；fp16 配 8GB 级显存可跑，帧数与分辨率是显存两大开关。",
+              options: [["fp16", "半精度，质量与速度平衡"], ["fp8_e4m3fn", "再省约一半显存，画质略降"], ["default", "按文件原始精度加载"]] }
+          ],
           brief: "加载视频扩散模型。",
           desc: "与文生视频共用同一 5B 权重。" },
         { id: "clip", title: "Load CLIP", cat: "load", x: 30, y: 220,
           widgets: ["umt5_xxl_fp8_e4m3fn_scaled.safetensors", "type wan"],
           inputs: [],
           outputs: [ { type: "CLIP" } ],
+          params: [
+            { name: "clip_name", kind: "下拉选择", default: "umt5_xxl_fp8_e4m3fn_scaled.safetensors", desc: "UMT5 编码器把运动描述转成条件向量，中英文皆可。" },
+            { name: "type", kind: "下拉选择", default: "wan", desc: "编码器用途类型，保持 wan。" }
+          ],
           brief: "加载文本编码器。",
           desc: "type 选 wan。" },
         { id: "vae", title: "Load VAE", cat: "load", x: 30, y: 400,
           widgets: ["wan2.2_vae.safetensors"],
           inputs: [],
           outputs: [ { type: "VAE" } ],
+          params: [
+            { name: "vae_name", kind: "下拉选择", default: "wan2.2_vae.safetensors", desc: "本流程承担三重职责：编码首帧、构建潜空间、解码输出；与模型版本严格配套。" }
+          ],
           brief: "加载 Wan2.2 VAE。",
           desc: "本流程它有三重职责：编码首帧、构建潜空间、解码输出。" },
         { id: "pos", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 380, y: 40,
           widgets: ["正向提示词"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "正向提示词", desc: "描述首帧之后发生什么；想让画面基本不动就写轻微动作，想放大运动就写明位移方向与速度。" }
+          ],
           brief: "描述首帧之后的运动。",
           desc: "重点写会动什么、怎么动，静态外观交给首帧表达。" },
         { id: "neg", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 380, y: 220,
           widgets: ["负向提示词"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "负向提示词", desc: "沿用官方负向模板；首帧漂移主要靠 length 与 steps 控制，负向词帮助有限。" }
+          ],
           brief: "负向条件。",
           desc: "沿用官方负向模板即可。" },
         { id: "img", title: "Load Image", cat: "load", x: 380, y: 400,
           widgets: ["首帧图片"],
           inputs: [],
           outputs: [ { type: "IMAGE" } ],
+          params: [
+            { name: "image", kind: "下拉选择", default: "首帧图片", desc: "首帧决定整段视频的画风与主体；建议预先裁剪到输出比例，质量低的首帧会被忠实继承。" }
+          ],
           brief: "载入首帧图像。",
           desc: "分辨率不必精确等于输出尺寸，节点会按设定宽高缩放对齐。" },
         { id: "latent", title: "Wan22ImageToVideoLatent", cat: "latent", x: 730, y: 40,
@@ -1437,12 +1797,21 @@
             { name: "start_image", type: "IMAGE" }
           ],
           outputs: [ { type: "CONDITIONING" }, { type: "CONDITIONING" }, { type: "LATENT" } ],
+          params: [
+            { name: "width", kind: "整数", default: "704", desc: "输出宽度，首帧会被自动缩放到该尺寸。" },
+            { name: "height", kind: "整数", default: "1280", desc: "输出高度；与首帧比例不一致会拉伸变形。" },
+            { name: "length", kind: "整数", default: "121", desc: "总帧数；越长首帧约束越弱、显存越高。" },
+            { name: "batch_size", kind: "整数", default: "1", desc: "视频生成显存消耗大，保持 1。" }
+          ],
           brief: "把首帧编码进视频潜空间。",
           desc: "节点内部用 VAE 编码首帧并填入潜空间第一帧位，同时对条件做首帧相关标注。" },
         { id: "ms", title: "ModelSamplingSD3", cat: "model", x: 730, y: 320,
           widgets: ["shift 8.0"],
           inputs: [ { name: "model", type: "MODEL" } ],
           outputs: [ { type: "MODEL" } ],
+          params: [
+            { name: "shift", kind: "浮点数", default: "8.0", desc: "采样位移；帮助模型在首帧约束下规划整体运动轨迹，与文生视频同值即可。" }
+          ],
           brief: "采样位移补丁。",
           desc: "shift 8 与官方模板一致。" },
         { id: "ks", title: "KSampler", cat: "sampler", x: 1080, y: 100,
@@ -1454,6 +1823,16 @@
             { name: "latent_image", type: "LATENT" }
           ],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "seed", kind: "整数", default: "42", desc: "影响运动路径；同 seed 配小幅改提示词，是同一首帧探索多种运镜的方法。" },
+            { name: "steps", kind: "整数", default: "30", desc: "标准收敛步数，预览可用 20；提高 steps 也能缓解首帧漂移。" },
+            { name: "cfg", kind: "浮点数", default: "6.0", desc: "引导强度，运动幅度过大时降低。" },
+            { name: "sampler_name", kind: "下拉选择", default: "uni_pc", desc: "去噪的数学策略，影响速度与画风。",
+              options: [["uni_pc", "高阶求解器，低步数表现好"], ["dpmpp_2m", "2 阶多步方法，速度与质量兼顾，配 karras 最热门"], ["dpmpp_2m_sde", "在 dpmpp_2m 基础上加噪声方程，纹理更锐利"], ["euler", "最朴素稳定，通用首选，出图柔和"]] },
+            { name: "scheduler", kind: "下拉选择", default: "simple", desc: "控制每一步噪声强度的时间表。",
+              options: [["simple", "简化日程，部分新模型表现更稳"], ["karras", "步间过渡更平滑，细节更干净，最常用"], ["normal", "默认线性计划，通用"], ["sgm_uniform", "SD3 与视频模型常用，少步采样收益明显"]] },
+            { name: "denoise", kind: "浮点数", default: "1.0", desc: "首帧信息已写进潜空间而非噪声，1.0 不会抹掉首帧。" }
+          ],
           brief: "从首帧出发去噪整段视频。",
           desc: "denoise 1.0 并不抹掉首帧，因为首帧信息已写进潜空间而非仅作为起点噪声。" },
         { id: "dec", title: "VAE Decode", cat: "vae", x: 1360, y: 100,
@@ -1472,6 +1851,12 @@
             { name: "audio", type: "AUDIO" }
           ],
           outputs: [],
+          params: [
+            { name: "frame_rate", kind: "整数", default: "24", desc: "与模型生成帧率一致，24fps 合成不会变速。" },
+            { name: "format", kind: "下拉选择", default: "video/h264-mp4", desc: "输出容器与编码格式。",
+              options: [["video/h264-mp4", "mp4 通用格式，兼容性最好"], ["video/h265-mp4", "压缩率更高，兼容性稍差"], ["image/gif", "GIF 动图，体积大且无音轨"]] },
+            { name: "crf", kind: "整数", default: "19", desc: "压缩质量；121 帧约 5 秒的 mp4 体积适中。" }
+          ],
           brief: "合成保存视频。",
           desc: "24fps 合成，121 帧约 5 秒。" }
       ],
@@ -1563,6 +1948,11 @@
           widgets: ["video.mp4", "frame_load_cap 0", "select_every_nth 1"],
           inputs: [],
           outputs: [ { type: "IMAGE" }, { type: "INT" }, { type: "AUDIO" } ],
+          params: [
+            { name: "video", kind: "文本", default: "video.mp4", desc: "要读入的视频文件；长视频建议配合 frame_load_cap 分段处理。" },
+            { name: "frame_load_cap", kind: "整数", default: "0", desc: "读取帧数上限，0 表示全部读入；内存吃紧时用它分段。" },
+            { name: "select_every_nth", kind: "整数", default: "1", desc: "抽帧步长，1 为逐帧全取；调大可跳帧抽稀素材。" }
+          ],
           brief: "读入视频为帧序列。",
           desc: "Video Helper Suite 的加载节点，输出图像帧批量与音轨。" },
         { id: "r1", title: "RIFE VFI", cat: "image", x: 360, y: 40,
@@ -1572,6 +1962,10 @@
             { name: "frame2", type: "IMAGE" }
           ],
           outputs: [ { type: "IMAGE" } ],
+          params: [
+            { name: "ckpt_name", kind: "下拉选择", default: "rife49.pth", desc: "RIFE v4.9 权重，对快速运动与透明物体的鲁棒性优于旧版。" },
+            { name: "multiplier", kind: "整数", default: "2", desc: "插帧倍率，2 表示在每对相邻帧间合成 1 帧、帧数翻倍。" }
+          ],
           brief: "第一段 2 倍插帧。",
           desc: "在每对相邻帧之间合成中间帧，帧数翻倍。" },
         { id: "p0", title: "Preview Image", cat: "image", x: 360, y: 220,
@@ -1584,6 +1978,9 @@
           widgets: ["4x-UltraSharp.pth"],
           inputs: [],
           outputs: [ { type: "UPSCALE_MODEL" } ],
+          params: [
+            { name: "model_name", kind: "下拉选择", default: "4x-UltraSharp.pth", desc: "可选超分模型；放在插帧之后使用，不为被丢弃的帧浪费算力。" }
+          ],
           brief: "加载可选超分模型。",
           desc: "补帧后分辨率不变，放大环节在此挂载，不需要可整段移除。" },
         { id: "r2", title: "RIFE VFI", cat: "image", x: 660, y: 40,
@@ -1593,6 +1990,10 @@
             { name: "frame2", type: "IMAGE" }
           ],
           outputs: [ { type: "IMAGE" } ],
+          params: [
+            { name: "ckpt_name", kind: "下拉选择", default: "rife49.pth", desc: "第二段使用同一 RIFE 权重。" },
+            { name: "multiplier", kind: "整数", default: "2", desc: "第二段再翻倍累计 4 倍；两段串联比单段 multiplier 4 的运动估计更准。" }
+          ],
           brief: "第二段 2 倍插帧。",
           desc: "对已翻倍的序列再来一轮，累计 4 倍；帧多时耗时明显上升。" },
         { id: "p1", title: "Preview Image", cat: "image", x: 660, y: 220,
@@ -1617,6 +2018,12 @@
             { name: "audio", type: "AUDIO" }
           ],
           outputs: [],
+          params: [
+            { name: "frame_rate", kind: "整数", default: "24", desc: "必须按倍数同步放大（源 12fps 补 4 倍后应写 48fps），否则只是慢放。" },
+            { name: "format", kind: "下拉选择", default: "video/h264-mp4", desc: "输出容器与编码格式。",
+              options: [["video/h264-mp4", "mp4 通用格式，兼容性最好"], ["video/h265-mp4", "压缩率更高，兼容性稍差"], ["image/gif", "GIF 动图，体积大且无音轨"]] },
+            { name: "crf", kind: "整数", default: "19", desc: "输出压缩质量。" }
+          ],
           brief: "按新帧率合成视频。",
           desc: "帧率要按倍数同步放大，否则只是慢放而不是补帧。" }
       ],
@@ -1700,42 +2107,65 @@
           widgets: ["SD1.5 底模"],
           inputs: [],
           outputs: [ { type: "MODEL" }, { type: "CLIP" }, { type: "VAE" } ],
+          params: [
+            { name: "ckpt_name", kind: "下拉选择", default: "SD1.5 底模", desc: "高细节底模会与码块结构打架，输出更花；底模必须为 SD1.5 系。" }
+          ],
           brief: "加载底模三件套。",
           desc: "两个控制模型共用一个底模。" },
         { id: "qr", title: "Load Image", cat: "load", x: 30, y: 240,
           widgets: ["二维码图片"],
           inputs: [],
           outputs: [ { type: "IMAGE" } ],
+          params: [
+            { name: "image", kind: "下拉选择", default: "二维码图片", desc: "标准黑白二维码；容错等级选最高档给生成噪声留余地，尺寸与画布等比。" }
+          ],
           brief: "载入普通二维码。",
           desc: "任何二维码生成器做出的标准码即可，内容链接自定。" },
         { id: "cnQ", title: "Load ControlNet Model", cat: "load", x: 30, y: 440,
           widgets: ["control_v1p_sd15_qrcode_monster"],
           inputs: [],
           outputs: [ { type: "CONTROL_NET" } ],
+          params: [
+            { name: "control_net_name", kind: "下拉选择", default: "control_v1p_sd15_qrcode_monster", desc: "二维码专用控制模型，把码图结构转译为强构图信号，strength 可超过 1.0 使用。" }
+          ],
           brief: "载入二维码控制模型。",
           desc: "它的训练目标就是把黑白码图转译为画面结构。" },
         { id: "cnT", title: "Load ControlNet Model", cat: "load", x: 30, y: 640,
           widgets: ["control_v11f1p_sd15_tile"],
           inputs: [],
           outputs: [ { type: "CONTROL_NET" } ],
+          params: [
+            { name: "control_net_name", kind: "下拉选择", default: "control_v11f1p_sd15_tile", desc: "Tile 控制模型，后段让细节围绕码块结构收敛，压住噪声保住可扫性。" }
+          ],
           brief: "载入 Tile 控制模型。",
           desc: "后段用它压住散乱纹理，让码块轮廓在最终图里保持清晰。" },
         { id: "pos", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 380, y: 40,
           widgets: ["正向提示词"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "正向提示词", desc: "选明暗对比强、大色块的题材更容易保住可扫性；写光照与材质比写复杂场景有效。" }
+          ],
           brief: "描述想要的画面风格。",
           desc: "高对比、明暗分明的构图更容易保住可扫性。" },
         { id: "neg", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 380, y: 220,
           widgets: ["负向提示词"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "负向提示词", desc: "排除模糊、低对比、噪点，作用面集中在保持块面对比。" }
+          ],
           brief: "负向条件。",
           desc: "排除模糊与低对比词。" },
         { id: "latent", title: "Empty Latent Image", cat: "latent", x: 380, y: 400,
           widgets: ["768 x 768", "batch 1"],
           inputs: [],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "width", kind: "整数", default: "768", desc: "方形画布与码图 1 比 1 对齐，比例失衡会让码块拉伸、扫码失败率骤增。" },
+            { name: "height", kind: "整数", default: "768", desc: "画布高度，保持与宽度一致。" },
+            { name: "batch_size", kind: "整数", default: "1", desc: "艺术码必须逐张扫码验收，保持 1。" }
+          ],
           brief: "方形画布。",
           desc: "二维码是方形的，画布保持 1 比 1 对齐最稳。" },
         { id: "aQ", title: "Apply ControlNet", cat: "cond", x: 730, y: 40,
@@ -1747,6 +2177,11 @@
             { name: "image", type: "IMAGE" }
           ],
           outputs: [ { type: "CONDITIONING" }, { type: "CONDITIONING" } ],
+          params: [
+            { name: "strength", kind: "浮点数", default: "1.1", desc: "码结构强度，可超过 1.0 是该模型特性；码感不足优先升它。" },
+            { name: "start_percent", kind: "浮点数", default: "0.0", desc: "码的骨架必须从第一步开始立，保持 0。" },
+            { name: "end_percent", kind: "浮点数", default: "0.7", desc: "后三成步数放开结构，给画面留自由度。" }
+          ],
           brief: "二维码路注入，前段主导。",
           desc: "前 7 成采样由码图结构主导，后段放开让画面呼吸。" },
         { id: "aT", title: "Apply ControlNet", cat: "cond", x: 730, y: 280,
@@ -1758,6 +2193,11 @@
             { name: "image", type: "IMAGE" }
           ],
           outputs: [ { type: "CONDITIONING" }, { type: "CONDITIONING" } ],
+          params: [
+            { name: "strength", kind: "浮点数", default: "0.7", desc: "后段收敛强度，直接影响可扫性；画面太死板就降它。" },
+            { name: "start_percent", kind: "浮点数", default: "0.4", desc: "从第 4 成开始介入，与 QR 路形成 0.4 到 0.7 的过渡带。" },
+            { name: "end_percent", kind: "浮点数", default: "1.0", desc: "保持 1.0 全程接管到采样结束。" }
+          ],
           brief: "Tile 路注入，后段接管。",
           desc: "从 4 成开始介入，以原图结构为参照收敛细节。" },
         { id: "mix", title: "Conditioning (Combine)", cat: "cond", x: 730, y: 620,
@@ -1778,6 +2218,16 @@
             { name: "latent_image", type: "LATENT" }
           ],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "seed", kind: "整数", default: "42", desc: "同一参数不同 seed 的可扫性差异明显，需要多抽卡。" },
+            { name: "steps", kind: "整数", default: "30", desc: "双阶段引导需要足够步数执行。" },
+            { name: "cfg", kind: "浮点数", default: "7.5", desc: "略高的引导让风格更突出。" },
+            { name: "sampler_name", kind: "下拉选择", default: "dpmpp_2m", desc: "去噪的数学策略，影响速度与画风。",
+              options: [["dpmpp_2m", "2 阶多步方法，速度与质量兼顾，配 karras 最热门"], ["dpmpp_2m_sde", "在 dpmpp_2m 基础上加噪声方程，纹理更锐利"], ["euler", "最朴素稳定，通用首选，出图柔和"], ["euler_ancestral", "每步引入随机性，细节更奔放，复现性略差"]] },
+            { name: "scheduler", kind: "下拉选择", default: "karras", desc: "控制每一步噪声强度的时间表。",
+              options: [["karras", "步间过渡更平滑，细节更干净，最常用"], ["normal", "默认线性计划，通用"], ["simple", "简化日程，部分新模型表现更稳"], ["sgm_uniform", "SD3 与视频模型常用，少步采样收益明显"]] },
+            { name: "denoise", kind: "浮点数", default: "1.0", desc: "从纯噪声完整生成，保持 1.0。" }
+          ],
           brief: "双引导采样。",
           desc: "码结构先立骨，画面后长肉。" },
         { id: "dec", title: "VAE Decode", cat: "vae", x: 1370, y: 120,
@@ -1793,6 +2243,9 @@
           widgets: ["filename_prefix ComfyUI"],
           inputs: [ { name: "images", type: "IMAGE" } ],
           outputs: [],
+          params: [
+            { name: "filename_prefix", kind: "文本", default: "ComfyUI", desc: "只保存扫码成功的版本；命名带参数缩写便于复现。" }
+          ],
           brief: "保存成品。",
           desc: "只保存扫码成功的版本。" }
       ],
@@ -1891,12 +2344,19 @@
           widgets: ["SD1.5 底模"],
           inputs: [],
           outputs: [ { type: "MODEL" }, { type: "CLIP" }, { type: "VAE" } ],
+          params: [
+            { name: "ckpt_name", kind: "下拉选择", default: "SD1.5 底模", desc: "选场景纵深感强的底模，推近过程更耐看；三段采样共用同一底模保证画风一致。" }
+          ],
           brief: "加载底模三件套。",
           desc: "MODEL 被三个 KSampler 共用，保证三段画风一致。" },
         { id: "ctx", title: "ADE_StandardStaticContextOptions", cat: "util", x: 30, y: 460,
           widgets: ["context_length 16", "context_overlap 4"],
           inputs: [],
           outputs: [ { type: "CONTEXT_OPTIONS" } ],
+          params: [
+            { name: "context_length", kind: "整数", default: "16", desc: "每段窗口长度，24 帧序列会被切成两个窗口衔接。" },
+            { name: "context_overlap", kind: "整数", default: "4", desc: "窗口重叠帧数；帧数加到 32 以上时同步提高。" }
+          ],
           brief: "运动上下文配置。",
           desc: "每段 16 帧以内的序列按窗口处理。" },
         { id: "ad", title: "ADE_AnimateDiffLoaderGen1", cat: "model", x: 30, y: 240,
@@ -1906,24 +2366,39 @@
             { name: "context_options", type: "CONTEXT_OPTIONS" }
           ],
           outputs: [ { type: "MODEL" }, { type: "CONDITIONING" }, { type: "CONDITIONING" } ],
+          params: [
+            { name: "model_name", kind: "下拉选择", default: "mm_sd_v15_v2.ckpt", desc: "运动模块给每段内部提供连续微动；只要纯缩放效果可整段移除，结构不变。" }
+          ],
           brief: "注入运动模块。",
           desc: "补丁后的模型输出帧序列，三个 KSampler 共用。" },
         { id: "pos", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 430, y: 40,
           widgets: ["正向提示词（由远及近分层描述）"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "正向提示词（由远及近分层描述）", desc: "三段共用；推近感主要来自放大与重绘机制，提示词描述同一场景即可。" }
+          ],
           brief: "正向条件，三段共用。",
           desc: "推近的效果主要来自放大与重绘，提示词只需描述同一场景。" },
         { id: "neg", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 430, y: 220,
           widgets: ["负向提示词"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "负向提示词", desc: "抑制重复纹理与边缘生长畸形，三段共用保持观感统一。" }
+          ],
           brief: "负向条件。",
           desc: "抑制重复、模糊与边缘畸变。" },
         { id: "latent", title: "ADE_EmptyLatentImage", cat: "latent", x: 430, y: 400,
           widgets: ["width 512", "height 512", "length 24", "batch 1"],
           inputs: [],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "width", kind: "整数", default: "512", desc: "第一段画布宽度，两级 1.25 放大后到 800。" },
+            { name: "height", kind: "整数", default: "512", desc: "第一段画布高度，后续段帧数继承自放大后的潜空间。" },
+            { name: "length", kind: "整数", default: "24", desc: "每段帧数，24 帧约 2 秒。" },
+            { name: "batch_size", kind: "整数", default: "1", desc: "三段级联显存占用高，保持 1。" }
+          ],
           brief: "第一段的空视频画布。",
           desc: "512 起步，级联放大后分辨率逐段提高。" },
         { id: "ks1", title: "KSampler", cat: "sampler", x: 730, y: 40,
@@ -1935,12 +2410,23 @@
             { name: "latent_image", type: "LATENT" }
           ],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "seed", kind: "整数", default: "42", desc: "与后两段各自独立，段间连续性靠潜空间传递而非 seed。" },
+            { name: "steps", kind: "整数", default: "24", desc: "每段采样步数，三段总耗时约三倍单段。" },
+            { name: "cfg", kind: "浮点数", default: "7.0", desc: "提示词服从度，三段保持一致。" },
+            { name: "denoise", kind: "浮点数", default: "1.0", desc: "第一段从纯噪声生成远景，必须保持 1.0；构图居中留白给推近留空间。" }
+          ],
           brief: "第一段：从零生成远景。",
           desc: "denoise 1.0 完整生成，画面为全貌远景。" },
         { id: "up1", title: "LatentUpscaleBy", cat: "latent", x: 730, y: 330,
           widgets: ["upscale_method bilinear", "scale_by 1.25"],
           inputs: [ { name: "samples", type: "LATENT" } ],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "upscale_method", kind: "下拉选择", default: "bilinear", desc: "潜空间插值方式；bilinear 平滑，nearest-exact 更锐但易放大噪点。",
+              options: [["bilinear", "双线性，平滑常用"], ["nearest-exact", "最近邻，锐利但易放大噪点"], ["bicubic", "三次卷积，较锐利"]] },
+            { name: "scale_by", kind: "浮点数", default: "1.25", desc: "每级放大倍率，决定镜头推进步长；越大推进越猛也越容易跳变。" }
+          ],
           brief: "第一级潜空间放大。",
           desc: "在潜空间里直接放大并留下模糊，交给下一段重绘。" },
         { id: "ks2", title: "KSampler", cat: "sampler", x: 730, y: 600,
@@ -1952,12 +2438,22 @@
             { name: "latent_image", type: "LATENT" }
           ],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "seed", kind: "整数", default: "43", desc: "与第一段各自独立，段间连续性来自潜空间传递。" },
+            { name: "steps", kind: "整数", default: "24", desc: "中景段步数，与前后段一致便于控制耗时。" },
+            { name: "cfg", kind: "浮点数", default: "7.0", desc: "与三段共用条件保持一致。" },
+            { name: "denoise", kind: "浮点数", default: "0.55", desc: "中景重绘强度，推进感与稳定性的平衡点；低于 0.5 推进感弱，高于 0.7 容易整体换内容。" }
+          ],
           brief: "第二段：放大后重绘中景。",
           desc: "中等去噪保留大结构，长出中景细节。" },
         { id: "up2", title: "LatentUpscaleBy", cat: "latent", x: 1020, y: 40,
           widgets: ["upscale_method bilinear", "scale_by 1.25"],
           inputs: [ { name: "samples", type: "LATENT" } ],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "upscale_method", kind: "下拉选择", default: "bilinear", desc: "第二级放大与第一级同参数，两级累计约 1.56 倍。" },
+            { name: "scale_by", kind: "浮点数", default: "1.25", desc: "级数越多推得越深，但每级都累积轻微画质损失，三到四级是常见上限。" }
+          ],
           brief: "第二级放大。",
           desc: "继续放大，为近景段做准备。" },
         { id: "ks3", title: "KSampler", cat: "sampler", x: 1020, y: 220,
@@ -1969,6 +2465,12 @@
             { name: "latent_image", type: "LATENT" }
           ],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "seed", kind: "整数", default: "44", desc: "第三段独立种子，输出直接决定成片观感。" },
+            { name: "steps", kind: "整数", default: "24", desc: "近景段步数，与前两段一致。" },
+            { name: "cfg", kind: "浮点数", default: "7.0", desc: "与三段共用条件保持一致。" },
+            { name: "denoise", kind: "浮点数", default: "0.5", desc: "近景段略低于第二段，越接近镜头终点越要稳住结构。" }
+          ],
           brief: "第三段：重绘近景。",
           desc: "更低去噪稳住结构，补出近景纹理。" },
         { id: "dec", title: "VAE Decode", cat: "vae", x: 1020, y: 560,
@@ -1987,6 +2489,12 @@
             { name: "audio", type: "AUDIO" }
           ],
           outputs: [],
+          params: [
+            { name: "frame_rate", kind: "整数", default: "12", desc: "24 帧配 12fps 约 2 秒推进镜头，与 AnimateDiff 帧率习惯一致。" },
+            { name: "format", kind: "下拉选择", default: "video/h264-mp4", desc: "输出容器与编码格式。",
+              options: [["video/h264-mp4", "mp4 通用格式，兼容性最好"], ["video/h265-mp4", "压缩率更高，兼容性稍差"], ["image/gif", "GIF 动图，体积大且无音轨"]] },
+            { name: "crf", kind: "整数", default: "19", desc: "压缩质量，保证细节不被压毁。" }
+          ],
           brief: "合成整段缩放视频。",
           desc: "三段帧序列在潜空间已首尾相接，这里一次性输出。" }
       ],
@@ -2088,12 +2596,18 @@
           widgets: ["写实向通用底模（占位）"],
           inputs: [],
           outputs: [ { type: "MODEL" }, { type: "CLIP" }, { type: "VAE" } ],
+          params: [
+            { name: "ckpt_name", kind: "下拉选择", default: "写实向通用底模（占位）", desc: "选型优先审查训练授权与使用条款；底模审美上限决定整条管线上限，LoRA 只能修饰不能逆转。" }
+          ],
           brief: "加载底模。",
           desc: "底模决定基础画质与审美上限，选型时应审查其训练授权与使用条款。" },
         { id: "csl", title: "CLIP Set Last Layer", cat: "clip", x: 30, y: 240,
           widgets: ["stop_at_clip_layer -2"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CLIP" } ],
+          params: [
+            { name: "stop_at_clip_layer", kind: "整数", default: "-2", desc: "CLIP 截断层，-2 表示截掉最后 2 层编码；部分社区底模用 -2 贴合度明显提升。" }
+          ],
           brief: "调整文本编码深度。",
           desc: "裁掉最后一层编码层，常见于 SD1.5 生态，让提示词理解更贴近部分社区底模的训练方式。" },
         { id: "l1", title: "LoraLoader", cat: "model", x: 380, y: 40,
@@ -2103,6 +2617,11 @@
             { name: "clip", type: "CLIP" }
           ],
           outputs: [ { type: "MODEL" }, { type: "CLIP" } ],
+          params: [
+            { name: "lora_name", kind: "下拉选择", default: "主题风格 LoRA（占位）", desc: "第一级 LoRA 文件；本页不指向任何具体文件，仅演示注入结构。" },
+            { name: "strength_model", kind: "浮点数", default: "0.8", desc: "主题级模型端强度，内容倾向类常用 0.7 到 0.9。" },
+            { name: "strength_clip", kind: "浮点数", default: "0.8", desc: "文本端强度，与模型端同步，保证触发词响应一致。" }
+          ],
           brief: "第一级 LoRA 注入。",
           desc: "低秩适配器以旁路权重修改模型行为，文本端同步注入保持提示词与模型对齐。" },
         { id: "l2", title: "LoraLoader", cat: "model", x: 380, y: 220,
@@ -2112,24 +2631,40 @@
             { name: "clip", type: "CLIP" }
           ],
           outputs: [ { type: "MODEL" }, { type: "CLIP" } ],
+          params: [
+            { name: "lora_name", kind: "下拉选择", default: "质感辅助 LoRA（占位）", desc: "第二级 LoRA 串联在主题级之后，承担质感与风格辅助；作用面大的放前。" },
+            { name: "strength_model", kind: "浮点数", default: "0.5", desc: "串联强度逐级递减，两级总和过高会出现特征粘连与油炸纹理。" },
+            { name: "strength_clip", kind: "浮点数", default: "0.5", desc: "文本端强度随模型端同步递减。" }
+          ],
           brief: "第二级 LoRA 串联。",
           desc: "多个 LoRA 串联时强度要逐级递减，避免权重叠加导致画面崩坏。" },
         { id: "pos", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 680, y: 40,
           widgets: ["正向提示词（构图与质量描述）"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "正向提示词（构图与质量描述）", desc: "作用面是内容、构图与画质方向；本页不提供任何具体示例词，按主体、场景、构图、画质分层书写。" }
+          ],
           brief: "正向条件。",
           desc: "作用面是画面内容与画质方向；本页不提供任何具体示例词。" },
         { id: "neg", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 680, y: 220,
           widgets: ["负向提示词（质量与规避项）"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "负向提示词（质量与规避项）", desc: "作用面是排除项；维护一份稳定的基础集按需追加，负向过强会压制内容多样性。" }
+          ],
           brief: "负向条件。",
           desc: "作用面是排除项，对画质稳定性的贡献常被低估。" },
         { id: "latent", title: "Empty Latent Image", cat: "latent", x: 680, y: 400,
           widgets: ["512 x 768", "batch 1"],
           inputs: [],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "width", kind: "整数", default: "512", desc: "竖幅适合人物全身与半身，方幅适合特写，画布比例是最基础的构图控制。" },
+            { name: "height", kind: "整数", default: "768", desc: "画布高度，与景别规划配合。" },
+            { name: "batch_size", kind: "整数", default: "1", desc: "内容类工作流建议逐张审查，保持 1。" }
+          ],
           brief: "画布。",
           desc: "构图控制的第一层就在这里：画布比例决定人物景别。" },
         { id: "ks", title: "KSampler", cat: "sampler", x: 980, y: 150,
@@ -2141,6 +2676,16 @@
             { name: "latent_image", type: "LATENT" }
           ],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "seed", kind: "整数", default: "42", desc: "固定后便于横向对比不同 LoRA 强度组合。" },
+            { name: "steps", kind: "整数", default: "28", desc: "采样步数，28 步细节收敛充分。" },
+            { name: "cfg", kind: "浮点数", default: "7.0", desc: "引导强度，LoRA 多时建议下调防过饱和。" },
+            { name: "sampler_name", kind: "下拉选择", default: "dpmpp_2m", desc: "去噪的数学策略，影响速度与画风。",
+              options: [["dpmpp_2m", "2 阶多步方法，速度与质量兼顾，配 karras 最热门"], ["dpmpp_2m_sde", "在 dpmpp_2m 基础上加噪声方程，纹理更锐利"], ["euler", "最朴素稳定，通用首选，出图柔和"], ["euler_ancestral", "每步引入随机性，细节更奔放，复现性略差"]] },
+            { name: "scheduler", kind: "下拉选择", default: "karras", desc: "控制每一步噪声强度的时间表。",
+              options: [["karras", "步间过渡更平滑，细节更干净，最常用"], ["normal", "默认线性计划，通用"], ["simple", "简化日程，部分新模型表现更稳"], ["sgm_uniform", "SD3 与视频模型常用，少步采样收益明显"]] },
+            { name: "denoise", kind: "浮点数", default: "1.0", desc: "文生图场景保持 1.0，精修回路另按区域设置。" }
+          ],
           brief: "采样核心。",
           desc: "模型补丁与条件在此汇合；若需区域控制，条件在进入前就应完成分离与绑定。" },
         { id: "dec", title: "VAE Decode", cat: "vae", x: 1270, y: 150,
@@ -2156,6 +2701,9 @@
           widgets: ["filename_prefix ComfyUI"],
           inputs: [ { name: "images", type: "IMAGE" } ],
           outputs: [],
+          params: [
+            { name: "filename_prefix", kind: "文本", default: "ComfyUI", desc: "成人向内容的存储与传播是高责任环节，保存前完成合规自查。" }
+          ],
           brief: "输出。",
           desc: "成人向内容的存储与传播是高责任环节，请阅读本页须知。" }
       ],
@@ -2246,18 +2794,29 @@
           widgets: ["SD1.5 底模"],
           inputs: [],
           outputs: [ { type: "MODEL" }, { type: "CLIP" }, { type: "VAE" } ],
+          params: [
+            { name: "ckpt_name", kind: "下拉选择", default: "SD1.5 底模", desc: "倾向传统 A 路可换 inpainting 专用底模；B 路对底模没有特殊要求。" }
+          ],
           brief: "加载底模三件套。",
           desc: "MODEL 同时供两条支路：A 路直连，B 路先过 Differential Diffusion。" },
         { id: "img", title: "Load Image", cat: "load", x: 30, y: 240,
           widgets: ["原图"],
           inputs: [],
           outputs: [ { type: "IMAGE" } ],
+          params: [
+            { name: "image", kind: "下拉选择", default: "原图", desc: "两条支路共用同一原图，保证对比变量唯一；分辨率即工作分辨率，短边 512 到 768。" }
+          ],
           brief: "载入待重绘原图。",
           desc: "两条支路共用同一原图，保证对比变量唯一。" },
         { id: "msk", title: "Load Image (as Mask)", cat: "load", x: 30, y: 440,
           widgets: ["mask 图", "channel red"],
           inputs: [],
           outputs: [ { type: "MASK" } ],
+          params: [
+            { name: "image", kind: "下拉选择", default: "mask 图", desc: "遮罩图，白色区域为重绘目标；也可用遮罩编辑器手涂后导入，两路共用。" },
+            { name: "channel", kind: "下拉选择", default: "red", desc: "从哪个颜色通道读取遮罩强度，标准黑白图保持 red。",
+              options: [["red", "红色通道，标准黑白遮罩默认"], ["green", "绿色通道"], ["blue", "蓝色通道"], ["alpha", "透明度通道"]] }
+          ],
           brief: "从图片通道读取遮罩。",
           desc: "白色区域为重绘区。也可用遮罩编辑器手涂后导入。" },
         { id: "diff", title: "Differential Diffusion", cat: "model", x: 380, y: 40,
@@ -2270,18 +2829,28 @@
           widgets: ["expand 12", "tapered_corners true"],
           inputs: [ { name: "mask", type: "MASK" } ],
           outputs: [ { type: "MASK" } ],
+          params: [
+            { name: "expand", kind: "整数", default: "12", desc: "遮罩向外扩的像素数，盖住旧边缘光晕与白边的最小必要值。" },
+            { name: "tapered_corners", kind: "开关", default: "true", desc: "角部收缩更自然，保持 true。" }
+          ],
           brief: "遮罩外扩。",
           desc: "把重绘区向外扩几个像素，重绘结果能盖住旧边缘的光晕与白边。" },
         { id: "pos", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 380, y: 440,
           widgets: ["正向提示词"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "正向提示词", desc: "只描述遮罩内要长出的内容与风格；写太多周边描述反而稀释重绘区注意力。" }
+          ],
           brief: "描述重绘区内容。",
           desc: "只描述要长出来的东西，不需要复述整张图。" },
         { id: "neg", title: "CLIP Text Encode (Prompt)", cat: "cond", x: 380, y: 620,
           widgets: ["负向提示词"],
           inputs: [ { name: "clip", type: "CLIP" } ],
           outputs: [ { type: "CONDITIONING" } ],
+          params: [
+            { name: "text", kind: "多行文本", default: "负向提示词", desc: "两路共用；局部重绘的典型瑕疵是边界发糊与色彩突变，可针对性排除。" }
+          ],
           brief: "负向条件。",
           desc: "两路共用，排除重绘区常见瑕疵。" },
         { id: "encA", title: "VAE Encode (for Inpainting)", cat: "vae", x: 660, y: 240,
@@ -2292,6 +2861,9 @@
             { name: "mask", type: "MASK" }
           ],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "grow_mask_by", kind: "整数", default: "6", desc: "编码节点内部的遮罩外扩量，与 GrowMask 的外扩叠加生效。" }
+          ],
           brief: "A 路：传统重绘编码。",
           desc: "编码后把遮罩外区域模糊化处理，采样时未遮罩内容被强行保留。" },
         { id: "encB", title: "VAE Encode", cat: "vae", x: 660, y: 440,
@@ -2321,6 +2893,12 @@
             { name: "latent_image", type: "LATENT" }
           ],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "seed", kind: "整数", default: "42", desc: "两路使用相同 seed，差异全部来自机制而非随机性。" },
+            { name: "steps", kind: "整数", default: "25", desc: "两路相同步数保证对比公平。" },
+            { name: "cfg", kind: "浮点数", default: "7.0", desc: "提示词服从度，两路一致。" },
+            { name: "denoise", kind: "浮点数", default: "1.0", desc: "A 路遮罩外内容靠编码时的模糊锚定保留，保持 1.0。" }
+          ],
           brief: "A 路采样。",
           desc: "denoise 1.0 配传统重绘编码，遮罩外区域靠编码时的模糊锁定。" },
         { id: "ksB", title: "KSampler", cat: "sampler", x: 990, y: 400,
@@ -2332,6 +2910,12 @@
             { name: "latent_image", type: "LATENT" }
           ],
           outputs: [ { type: "LATENT" } ],
+          params: [
+            { name: "seed", kind: "整数", default: "42", desc: "与 A 路相同，便于并排对比。" },
+            { name: "steps", kind: "整数", default: "25", desc: "与 A 路相同步数。" },
+            { name: "cfg", kind: "浮点数", default: "7.0", desc: "提示词服从度，两路一致。" },
+            { name: "denoise", kind: "浮点数", default: "1.0", desc: "B 路遮罩外保持由噪声遮罩完成，1.0 不会波及未遮罩区域。" }
+          ],
           brief: "B 路采样。",
           desc: "遮罩外区域的保持由噪声遮罩与渐变噪声共同完成。" },
         { id: "decA", title: "VAE Decode", cat: "vae", x: 1280, y: 40,
@@ -2356,12 +2940,18 @@
           widgets: ["filename_prefix inpaint_A"],
           inputs: [ { name: "images", type: "IMAGE" } ],
           outputs: [],
+          params: [
+            { name: "filename_prefix", kind: "文本", default: "inpaint_A", desc: "A 路结果单独存档，建议文件名带 denoise 与 expand 参数形成可复现对照组。" }
+          ],
           brief: "保存 A 路结果。",
           desc: "前缀区分两条支路便于对比归档。" },
         { id: "svB", title: "Save Image", cat: "image", x: 1520, y: 400,
           widgets: ["filename_prefix inpaint_B"],
           inputs: [ { name: "images", type: "IMAGE" } ],
           outputs: [],
+          params: [
+            { name: "filename_prefix", kind: "文本", default: "inpaint_B", desc: "B 路结果单独存档；大区域与颜色敏感场景优先选 B 路。" }
+          ],
           brief: "保存 B 路结果。",
           desc: "同一 seed 下两路的差异即两种机制的差异。" }
       ],
