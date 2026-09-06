@@ -177,6 +177,344 @@
         why: "排查问题的第一步是确认每个环节的输入到底是不是预期值。零成本的中间值检查手段，能省掉大量盲目猜测。",
         params: [],
         tips: "需要同时观察多个数值时，复制几个节点并排摆放并配好标签即可。"
+      },
+      {
+        name: "Power Prompt - Simple (rgthree)", cat: "cond",
+        brief: "无 LoRA 解析的精简版提示词节点，最适合承载负面提示词。",
+        desc: "它就是 Power Prompt 的简化版：保留文本原点与条件编码能力，但去掉了内嵌 LoRA 标记的解析。负面提示词本身不支持 LoRA 写法，用这个精简版承载负面词，面板更干净、行为更可预期。接 CLIP 后直接输出条件编码，不接则把文本原样传出。",
+        inputs: [
+          { name: "clip", type: "CLIP", from: "可选，Checkpoint 加载器", desc: "接入后节点直接完成条件编码" }
+        ],
+        outputs: [
+          { type: "STRING", to: "典型下游：CLIP Text Encode 等文本输入", desc: "提示词文本本身" },
+          { type: "CONDITIONING", to: "典型下游：采样节点", desc: "接入 CLIP 后输出的条件编码" }
+        ],
+        why: "正面用带 LoRA 解析的完整版、负面用精简版，是最常见的搭配。一个节点同时完成文本与编码，画布省一个环节。",
+        params: [
+          { name: "prompt", kind: "文本", default: "空", desc: "提示词正文，支持权重写法；负面词建议从少量高频词开始。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "SDXL Power Prompt - Positive (rgthree)", cat: "cond",
+        brief: "SDXL 专用的双文本提示词节点，拆分全局与局部两路文本。",
+        desc: "SDXL 的文本编码分全局（text_g）与局部（text_l）两路，标准 CLIP Text Encode 节点并不区分。这个节点把两路文本作为独立输入，并补齐了 SDXL 编码所需的分辨率与美学评分等选项。接 MODEL 后同样能解析提示词里内嵌的 LoRA 标记，一次输出条件、模型、编码器与两段原文。",
+        inputs: [
+          { name: "clip", type: "CLIP", from: "典型上游：SDXL Checkpoint 加载器", desc: "SDXL 文本编码器" },
+          { name: "model", type: "MODEL", from: "可选，SDXL Checkpoint 加载器", desc: "接入后解析提示词里内嵌的 LoRA 标记" }
+        ],
+        outputs: [
+          { type: "CONDITIONING", to: "典型下游：采样节点", desc: "SDXL 正面条件编码" },
+          { type: "MODEL", to: "典型下游：采样节点", desc: "应用内嵌 LoRA 后的模型" },
+          { type: "CLIP", to: "典型下游：其他编码节点", desc: "编码器" },
+          { type: "STRING", to: "典型下游：文本类节点", desc: "全局与局部两段文本的展开输出" }
+        ],
+        why: "从 WebUI 迁移的 SDXL 提示词习惯可以原样保留，双文本与内嵌 LoRA 都收进一个节点，省去一串辅助节点。",
+        params: [
+          { name: "text_g", kind: "文本", default: "空", desc: "全局提示词，描述整体画面与风格。" },
+          { name: "text_l", kind: "文本", default: "空", desc: "局部提示词，补充主体细节；通常与全局写一样的内容即可。" },
+          { name: "width", kind: "整数", default: "1024", desc: "编码用的目标宽度，影响 SDXL 的位置编码，与实际出图分辨率保持一致即可。" },
+          { name: "height", kind: "整数", default: "1024", desc: "编码用的目标高度。" },
+          { name: "ascore", kind: "浮点数", default: "6.0", desc: "SDXL 美学评分标签，多数模型填 4 到 7 之间，不确定时保持默认。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "SDXL Power Prompt - Simple / Negative (rgthree)", cat: "cond",
+        brief: "SDXL 负面提示词专用节点，不带 LoRA 解析。",
+        desc: "与 SDXL Power Prompt 正面版类似，但去掉了 LoRA 支持，专为 SDXL 负面提示词或不含 LoRA 的正面提示词设计。保留双文本输入与 SDXL 编码所需的其余选项，负面提示词本来就写不了 LoRA 标记，用它最合适。",
+        inputs: [
+          { name: "clip", type: "CLIP", from: "典型上游：SDXL Checkpoint 加载器", desc: "SDXL 文本编码器" }
+        ],
+        outputs: [
+          { type: "CONDITIONING", to: "典型下游：采样节点负面输入", desc: "SDXL 条件编码" },
+          { type: "STRING", to: "典型下游：文本类节点", desc: "全局与局部两段文本的展开输出" }
+        ],
+        why: "SDXL 的负面提示词同样需要正确的双路编码。用对应的精简版节点，正负两侧结构对称、职责清晰。",
+        params: [
+          { name: "text_g", kind: "文本", default: "空", desc: "全局负面提示词。" },
+          { name: "text_l", kind: "文本", default: "空", desc: "局部负面提示词，通常与全局一致。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Context Big (rgthree)", cat: "util",
+        brief: "大容量版 Context，额外打包步数 CFG 采样器种子等设置。",
+        desc: "Context Big 在 Context 打包模型、编码器、条件、潜空间的基础上，又加入了步数、精修分界步、CFG、采样器、调度器、种子、图像等更多条目。它与普通 Context 互相兼容：Big 打包的上下文可以接进普通 Context 的管线继续传递。做复杂多阶段流程时，一条上下文线几乎能携带全部状态。",
+        inputs: [
+          { name: "base_context", type: "CONTEXT", from: "可选，另一个 Context 节点", desc: "在此基础之上覆盖部分内容" },
+          { name: "model", type: "MODEL", from: "可选，Checkpoint 加载器", desc: "扩散模型" },
+          { name: "clip", type: "CLIP", from: "可选，Checkpoint 加载器", desc: "文本编码器" },
+          { name: "vae", type: "VAE", from: "可选，VAE 加载器", desc: "潜空间编解码器" },
+          { name: "positive", type: "CONDITIONING", from: "可选，正面条件编码", desc: "正面条件" },
+          { name: "negative", type: "CONDITIONING", from: "可选，负面条件编码", desc: "负面条件" },
+          { name: "latent", type: "LATENT", from: "可选，空潜空间或采样节点", desc: "潜空间数据" }
+        ],
+        outputs: [
+          { type: "CONTEXT", to: "典型下游：Context 系列节点", desc: "打包后的上下文对象" },
+          { type: "MODEL", to: "典型下游：采样节点", desc: "展开输出的模型" },
+          { type: "CONDITIONING", to: "典型下游：采样节点", desc: "展开输出的正负条件" },
+          { type: "LATENT", to: "典型下游：采样节点", desc: "展开输出的潜空间" },
+          { type: "INT", to: "典型下游：各类参数输入", desc: "步数、CFG、种子等数值的展开输出" }
+        ],
+        why: "普通 Context 装不下的采样参数，Big 版全部装得下。大型流程的参数集中管理就靠它。",
+        params: [],
+        tips: ""
+      },
+      {
+        name: "Context Switch (rgthree)", cat: "util",
+        brief: "多条上下文线之间自动切换，取第一条非空者。",
+        desc: "它接收多个 Context 输入，运行时从上到下检查，把第一条非空的上下文继续向后传。配合静音操作可以自由切换整条流程：把某个 Context 静音，它就变为空，Switch 自动落到下一路。与 Any Switch 的区别是它切换的是整套打包上下文，模型条件潜空间一起换。",
+        inputs: [
+          { name: "ctx_1", type: "CONTEXT", from: "典型上游：多个 Context 节点", desc: "继续连线会自动追加更多输入" }
+        ],
+        outputs: [
+          { type: "CONTEXT", to: "典型下游：Context 系列节点或采样节点", desc: "第一条非空上下文" },
+          { type: "MODEL", to: "典型下游：采样节点", desc: "选中上下文里的模型" },
+          { type: "CONDITIONING", to: "典型下游：采样节点", desc: "选中上下文里的正负条件" },
+          { type: "LATENT", to: "典型下游：采样节点", desc: "选中上下文里的潜空间" }
+        ],
+        why: "多方案并存的大型工作流，靠它实现整套上下文的一键切换，被静音的一路完全不会执行，不浪费算力。",
+        params: [],
+        tips: ""
+      },
+      {
+        name: "Context Switch Big (rgthree)", cat: "util",
+        brief: "大容量版的 Context Switch，切换整套 Big 上下文。",
+        desc: "行为与 Context Switch 完全一致，只是输入输出换成携带更多条目的 Big 上下文。在多阶段 SDXL 或多方案切换流程里，它与 Context Big 搭配使用，切换时步数、CFG、采样器等设置也一并换过去。",
+        inputs: [
+          { name: "ctx_1", type: "CONTEXT", from: "典型上游：多个 Context Big 节点", desc: "第一条非空者生效" }
+        ],
+        outputs: [
+          { type: "CONTEXT", to: "典型下游：Context Big 系列节点", desc: "选中的大容量上下文" },
+          { type: "MODEL", to: "典型下游：采样节点", desc: "展开输出的模型" },
+          { type: "CONDITIONING", to: "典型下游：采样节点", desc: "展开输出的正负条件" },
+          { type: "LATENT", to: "典型下游：采样节点", desc: "展开输出的潜空间" }
+        ],
+        why: "上下文携带的条目越多，整体切换的价值越大。Big 版 Switch 让采样参数也纳入一键切换。",
+        params: [],
+        tips: ""
+      },
+      {
+        name: "Context Merge (rgthree)", cat: "util",
+        brief: "把多条上下文合并成一条，后者覆盖前者。",
+        desc: "它接收多个 Context 输入，从上到下依次合并：非空的条目覆盖前面已有的值，空条目保持不变。典型用法是一条主上下文加一条覆盖上下文，例如只替换模型或只替换负面条件，其余内容原样继承。相当于对打包数据做局部修改，而不用重接散线。",
+        inputs: [
+          { name: "ctx_1", type: "CONTEXT", from: "典型上游：主 Context 节点", desc: "被覆盖的基础上下文" },
+          { name: "ctx_2", type: "CONTEXT", from: "可选，覆盖用 Context 节点", desc: "其中非空的部分会覆盖基础上下文" }
+        ],
+        outputs: [
+          { type: "CONTEXT", to: "典型下游：Context 系列节点或采样节点", desc: "合并后的上下文" },
+          { type: "MODEL", to: "典型下游：采样节点", desc: "展开输出的模型" },
+          { type: "CONDITIONING", to: "典型下游：采样节点", desc: "展开输出的正负条件" },
+          { type: "LATENT", to: "典型下游：采样节点", desc: "展开输出的潜空间" }
+        ],
+        why: "想替换打包上下文里的某一项时，Merge 是最干净的做法：新建一条只填该条的 Context 接上来即可，其余不动。",
+        params: [],
+        tips: ""
+      },
+      {
+        name: "Context Merge Big (rgthree)", cat: "util",
+        brief: "大容量版的 Context Merge，合并更多条目的上下文。",
+        desc: "与 Context Merge 行为一致，处理的是 Big 上下文：从上到下依次合并多条 Big 上下文，后到的非空条目覆盖先前的。在大型流程里做局部替换，例如只换采样器设置或只换种子，都用它完成。",
+        inputs: [
+          { name: "ctx_1", type: "CONTEXT", from: "典型上游：主 Context Big 节点", desc: "被覆盖的基础上下文" },
+          { name: "ctx_2", type: "CONTEXT", from: "可选，覆盖用 Context Big 节点", desc: "非空条目覆盖基础上下文" }
+        ],
+        outputs: [
+          { type: "CONTEXT", to: "典型下游：Context Big 系列节点", desc: "合并后的上下文" },
+          { type: "MODEL", to: "典型下游：采样节点", desc: "展开输出的模型" },
+          { type: "CONDITIONING", to: "典型下游：采样节点", desc: "展开输出的正负条件" },
+          { type: "LATENT", to: "典型下游：采样节点", desc: "展开输出的潜空间" }
+        ],
+        why: "Big 上下文条目多，局部替换的需求也更多。Merge Big 让这些替换保持一条线的简洁形态。",
+        params: [],
+        tips: ""
+      },
+      {
+        name: "Display Int (rgthree)", cat: "util",
+        brief: "把整数值直接显示在节点上，专用于数字观察。",
+        desc: "它是 Display Any 的整数专版：接入一个 INT 值，节点画面上直接把数字显示出来。查看当前种子、步数、批量数或任何整数中间值时，比打开控制台日志直观得多。显示不影响数据，也没有输出。",
+        inputs: [
+          { name: "int", type: "INT", from: "典型上游：种子或任意整数输出", desc: "要显示的整数值" }
+        ],
+        outputs: [],
+        why: "整数是工作流里最常被检查的数据类型。一个零成本的数字监视器，能让种子与参数类问题一眼看清。",
+        params: [],
+        tips: ""
+      },
+      {
+        name: "Image Inset Crop (rgthree)", cat: "image",
+        brief: "按像素或百分比从边缘向内裁剪图像。",
+        desc: "该节点对输入图像做四边内缩裁剪：可以选择以像素或百分比作为度量，分别设置上下左右要裁掉的数量。做放大前的边缘清理、去除水印边框，或为局部重绘准备精确的输入区域时非常顺手。输出裁剪后的图像与实际尺寸。",
+        inputs: [
+          { name: "image", type: "IMAGE", from: "典型上游：任意图像来源", desc: "待裁剪的图像" }
+        ],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：放大、重绘或保存节点", desc: "裁剪后的图像" },
+          { type: "INT", to: "典型下游：尺寸相关输入", desc: "裁剪后的宽度与高度" }
+        ],
+        why: "裁剪是最常用的图像预处理之一。用节点完成可以保留在流程里、随种子与参数一起复现，不必借助外部软件。",
+        params: [
+          { name: "measurement", kind: "下拉选择", default: "pixels", desc: "度量单位，pixels 为像素值，percentage 为相对边长的百分比。" },
+          { name: "left", kind: "整数", default: "0", desc: "左边缘裁剪量；top、right、bottom 分别控制其余三边。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Image or Latent Size (rgthree)", cat: "util",
+        brief: "读取图像或潜空间的宽高，潜空间自动乘 8。",
+        desc: "把图像、遮罩或潜空间接进来，节点输出它的宽度与高度。输入是潜空间时自动按 8 倍换算成像素尺寸，不需要自己心算。做条件缩放、按比例重绘或校验分辨率是否合规时，这个读数节点很好用。",
+        inputs: [
+          { name: "source", type: "*", from: "典型上游：图像、遮罩或潜空间", desc: "任意这三种类型，节点自动识别" }
+        ],
+        outputs: [
+          { type: "INT", to: "典型下游：缩放节点或空潜空间的宽高输入", desc: "宽度（像素）" },
+          { type: "INT", to: "典型下游：缩放节点或空潜空间的宽高输入", desc: "高度（像素）" }
+        ],
+        why: "分辨率在多阶段流程里一路传递，中途读一次数就能确认没有偏离预期，避免越放越糊或尺寸对不齐。",
+        params: [],
+        tips: ""
+      },
+      {
+        name: "Image Resize (rgthree)", cat: "image",
+        brief: "按像素或百分比缩放图像，支持裁齐与补边两种填充。",
+        desc: "该节点把图像缩放到目标尺寸：度量可选像素或百分比，宽高填 0 表示按另一边等比推算。填充方式有三档，crop 是放大到盖住目标再中心裁掉多余，pad 是等比缩到放得下再补空白，contain 是等比缩放、允许有一边小于目标。输出图像与实际宽高。",
+        inputs: [
+          { name: "image", type: "IMAGE", from: "典型上游：任意图像来源", desc: "待缩放的图像" }
+        ],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：图生图、条件编码或保存", desc: "缩放后的图像" },
+          { type: "INT", to: "典型下游：尺寸相关输入", desc: "缩放后的宽度与高度" }
+        ],
+        why: "图生图对输入尺寸敏感，比例不对会出现重复肢体。一个行为明确的缩放节点是预处理的标准配置。",
+        params: [
+          { name: "measurement", kind: "下拉选择", default: "pixels", desc: "度量单位，pixels 或 percentage。" },
+          { name: "width", kind: "整数", default: "0", desc: "目标宽度，填 0 表示按高度等比推算。" },
+          { name: "height", kind: "整数", default: "0", desc: "目标高度，填 0 表示按宽度等比推算。" },
+          { name: "fit", kind: "下拉选择", default: "crop", desc: "填充方式，crop 裁齐、pad 补边、contain 允许不满。" },
+          { name: "method", kind: "下拉选择", default: "lanczos", desc: "插值算法，lanczos 细节保留较好，nearest-exact 适合像素风。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "KSampler Config (rgthree)", cat: "util",
+        brief: "集中设置采样参数并把它们拆成多条连线分发。",
+        desc: "它把总步数、精修分界步、CFG、采样器与调度器放在一个面板里配置，输出五条独立的连线。这样一处修改就能同时喂给多个采样节点，SDXL 基础加精修的两段式采样尤其适合：分界步由同一个节点统一下发，两段永远对齐。",
+        inputs: [],
+        outputs: [
+          { type: "INT", to: "典型下游：采样节点的 steps 输入", desc: "总步数" },
+          { type: "INT", to: "典型下游：采样节点的结束步输入", desc: "精修分界步" },
+          { type: "FLOAT", to: "典型下游：采样节点的 cfg 输入", desc: "提示词服从度" },
+          { type: "COMBO", to: "典型下游：采样节点的采样器输入", desc: "采样器名称" },
+          { type: "COMBO", to: "典型下游：采样节点的调度器输入", desc: "调度器名称" }
+        ],
+        why: "多个采样节点共享一套参数时，散落在各自面板里迟早改漏。参数原点化让一处修改全局生效。",
+        params: [
+          { name: "steps_total", kind: "整数", default: "30", desc: "采样总步数。" },
+          { name: "refiner_step", kind: "整数", default: "24", desc: "基础模型切换到精修模型的分界步，SDXL 两段式常用总步数的八成。" },
+          { name: "cfg", kind: "浮点数", default: "8.0", desc: "提示词服从度。" },
+          { name: "sampler_name", kind: "下拉选择", default: "euler", desc: "去噪算法。" },
+          { name: "scheduler", kind: "下拉选择", default: "normal", desc: "步数调度方式。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "SDXL Empty Latent Image (rgthree)", cat: "latent",
+        brief: "SDXL 专用空潜空间，预设分辨率并输出编码用宽高。",
+        desc: "它按 SDXL 的标准出图比例提供一组分辨率预设，选中即生成对应空潜空间，不用手填宽高。额外输出按缩放系数放大后的宽高，专门用于接 SDXL 提示词节点做条件编码时的位置参考，保证编码与实际出图尺寸一致。",
+        inputs: [],
+        outputs: [
+          { type: "LATENT", to: "典型下游：采样节点的潜空间输入", desc: "指定分辨率的空潜空间" },
+          { type: "INT", to: "典型下游：SDXL 条件编码节点", desc: "编码用的宽度与高度" }
+        ],
+        why: "SDXL 对出图分辨率与编码分辨率的一致性比较敏感。这个节点把两件事一次做对，省去手动换算。",
+        params: [
+          { name: "dimensions", kind: "下拉选择", default: "1024 x 1024（方形）", desc: "SDXL 常用分辨率预设，从超宽到竖版共九档，都是百万像素级。" },
+          { name: "clip_scale", kind: "浮点数", default: "2.0", desc: "编码宽高相对出图宽高的缩放系数，SDXL 保持 2 即可。" },
+          { name: "batch_size", kind: "整数", default: "1", desc: "批量张数。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Power Primitive (rgthree)", cat: "util",
+        brief: "一个节点输出四种基本类型，可自动转换接入的数据。",
+        desc: "它可以在字符串、整数、浮点、布尔四种类型之间切换输出。不接输入时它就是对应类型的数值原点；接入任意数据时它会尝试把输入转换成所选类型再输出。做参数原点、类型转换或给只有特定类型输入的节点喂值都很方便。",
+        inputs: [
+          { name: "value", type: "*", from: "可选，任意数据", desc: "接入后会被转换成所选输出类型" }
+        ],
+        outputs: [
+          { type: "*", to: "典型下游：任意同类型输入", desc: "所选类型的基本值" }
+        ],
+        why: "工作流里到处是整数开关、布尔开关和小数权重。一个可变型的原点节点比一堆专用转换节点清爽得多。",
+        params: [
+          { name: "type", kind: "下拉选择", default: "STRING", desc: "输出类型，可在 STRING、INT、FLOAT、BOOLEAN 之间切换，右键菜单也能快速切换。" },
+          { name: "value", kind: "数值", default: "随类型而定", desc: "作为原点时填写的值。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Power Puter (rgthree)", cat: "util",
+        brief: "多行代码求值节点，把任意计算结果变成连线数据。",
+        desc: "它是 rgthree 里最强悍的通用工具：在节点里写多行简单代码，把接入的任意数据做计算、拼接、取形状甚至读取其他节点的控件值，最后按所选类型输出。典型用法包括两个数相加、取图像的宽度、拼提示词、或枚举某个 LoRA 列表节点的启用条目。会用它的用户几乎不再需要专用计算节点。",
+        inputs: [
+          { name: "a", type: "*", from: "可选，任意数据", desc: "代码中以 a 引用的第一个输入，继续连线为 b、c" }
+        ],
+        outputs: [
+          { type: "*", to: "典型下游：任意同类型输入", desc: "代码求值结果，类型按所选输出" }
+        ],
+        why: "流程里总有标准节点覆盖不到的小计算。给它一个出口，就不用为此专门造子流程或装新包。",
+        params: [
+          { name: "code", kind: "多行文本", default: "a", desc: "求值代码，可以使用输入变量与常用运算，最后一行的值作为输出。" },
+          { name: "output_type", kind: "下拉选择", default: "STRING", desc: "输出类型，可选 INT、FLOAT、STRING、BOOLEAN。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Lora Loader Stack (rgthree)", cat: "model",
+        brief: "四槽位串联式 LoRA 加载器，官方已标记弃用。",
+        desc: "旧版的列表式 LoRA 加载器：一个节点串联四个 LoRA 槽位，每个槽位独立选择文件与强度，None 表示跳过。功能与 Power Lora Loader 重叠且界面更占空间，官方已在文档中标记弃用，推荐改用 Power Lora Loader。老工作流里还会经常遇到它，认识即可。",
+        inputs: [
+          { name: "model", type: "MODEL", from: "典型上游：Checkpoint 加载器", desc: "基础模型" },
+          { name: "clip", type: "CLIP", from: "典型上游：同一加载器", desc: "文本编码器" }
+        ],
+        outputs: [
+          { type: "MODEL", to: "典型下游：采样节点", desc: "依次叠加四个 LoRA 后的模型" },
+          { type: "CLIP", to: "典型下游：条件编码节点", desc: "应用文本侧权重后的编码器" }
+        ],
+        why: "它是理解 rgthree LoRA 加载演进的一环：新工作流请直接用 Power Lora Loader，旧工作流读到它不必惊讶。",
+        params: [
+          { name: "lora_01", kind: "下拉选择", default: "None", desc: "第 1 个 LoRA 文件，None 跳过；共四组，名为 lora_01 到 lora_04。" },
+          { name: "strength_01", kind: "浮点数", default: "1.0", desc: "第 1 个 LoRA 的强度，模型侧与文本侧共用。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Fast Bypasser (rgthree)", cat: "util",
+        brief: "面板式旁路开关，一键旁路或恢复所连节点。",
+        desc: "它与 Fast Muter 是一对孪生面板：每接到它一路输入，面板上多一个按钮，点击即把对应节点切到旁路或恢复。旁路与静音的区别是旁路节点会把输入直通到输出，流程仍能跑通，只是跳过该环节的处理。适合临时跳过放大器、修复器这类可选环节。",
+        inputs: [
+          { name: "node", type: "*", from: "典型上游：需要被旁路的任意节点", desc: "每接一路都会生成一个对应按钮" }
+        ],
+        outputs: [],
+        why: "对比某环节有没有价值，最快的办法就是旁路跑一次。面板化之后这个对比动作只需一次点击。",
+        params: [],
+        tips: ""
+      },
+      {
+        name: "Fast Groups Muter (rgthree)", cat: "util",
+        brief: "自动收集画布分组，逐组一键静音或恢复。",
+        desc: "它不需要连线：节点会自动找出当前工作流里的所有分组（Group），每个分组生成一个开关，点击即整组静音或恢复。社区发布的多分支工作流几乎都靠它做流程切换，例如高清修复分支、放大分支、局部重绘分支各占一组，想要哪路开哪路。属性面板还支持按颜色或标题过滤分组、限定最多只有一个开关打开等。",
+        inputs: [],
+        outputs: [],
+        why: "分组是画布管理的基本单元，但没有原生的一键组级开关。这个节点补上了，是复杂工作流导航的核心工具。",
+        params: [
+          { name: "matchColors", kind: "文本", default: "空", desc: "按分组颜色过滤，只显示匹配的分组，可用颜色名或十六进制码，逗号分隔。" },
+          { name: "matchTitle", kind: "文本", default: "空", desc: "按分组标题过滤，支持普通文字或正则。" },
+          { name: "sort", kind: "下拉选择", default: "position", desc: "开关排序方式，可按位置、字母序或自定义字母表。" },
+          { name: "toggleRestriction", kind: "下拉选择", default: "无限制", desc: "限制同时打开的开关数量，可选最多一个或始终一个。" }
+        ],
+        tips: ""
       }
     ]
   });
@@ -4103,6 +4441,561 @@
             options: [["None", "按系统列出的顺序"], ["Alphabetical (ASC)", "按文件名升序"], ["Numerical (ASC)", "按文件名中的数字升序"], ["Datetime (ASC)", "按修改时间从旧到新"]] }
         ],
         tips: "把模式切到单张模式可以固定读取某一张，便于调试完再放开批量。"
+      },
+      {
+        name: "Global Sampler (Inspire)", cat: "sampler",
+        brief: "执行前统一改写全画布的采样器与调度器控件，无需拉线。",
+        desc: "它和全局种子是同一套思路：不参与采样，而是在每次执行前把面板上选好的采样器与调度器，统一写入工作流里所有带同名控件的采样节点。想整体换一套采样方案时，改这一个节点即可，不用逐个采样器去翻。",
+        inputs: [],
+        outputs: [],
+        why: "多采样器协作的流程里，采样器与调度器改漏一个，对比结果就失真。全局登记把这类遗漏彻底消灭。",
+        params: [
+          { name: "sampler_name", kind: "下拉选择", default: "euler", desc: "要统一应用的采样器。" },
+          { name: "scheduler", kind: "下拉选择", default: "normal", desc: "要统一应用的调度器。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Seed Explorer (Inspire)", cat: "sampler",
+        brief: "在已有种子之上叠加多个变化种子，探索图像变体。",
+        desc: "它读取一个潜空间并为其生成初始噪声：以 seed_prompt 里列出的种子与强度逐条叠加变化噪声，得到既与原图相关又有差异的变体。典型用法是接在采样流程前，把喜欢的图微调出好几版：固定主体不变，用小强度变化种子改姿势或表情。支持线性插值与球面插值两种混合方式。",
+        inputs: [
+          { name: "latent", type: "LATENT", from: "典型上游：空潜空间或上游采样结果", desc: "要生成噪声的潜空间" },
+          { name: "model", type: "MODEL", from: "可选，模型链路", desc: "用于校正潜空间通道的模型" }
+        ],
+        outputs: [
+          { type: "NOISE_IMAGE", to: "典型下游：支持噪声输入的采样节点", desc: "叠加变化后的噪声图像" }
+        ],
+        why: "种子探索是出好图后精修的第一步。手动改种子只能整体重随，Explorer 能在保留构图的前提下按强度受控地变化。",
+        params: [
+          { name: "seed_prompt", kind: "多行文本", default: "空", desc: "变化种子清单，每行一条，格式为种子加冒号加强度，例如 12345:0.3。" },
+          { name: "enable_additional", kind: "开关", default: "开", desc: "是否额外叠加一个附加种子与强度，作为总体的二次微调。" },
+          { name: "additional_seed", kind: "整数", default: "0", desc: "附加变化的种子值。" },
+          { name: "additional_strength", kind: "浮点数", default: "0.0", desc: "附加变化的强度，0 到 1，越大偏离越多。" },
+          { name: "noise_mode", kind: "下拉选择", default: "GPU(=A1111)", desc: "噪声生成设备，与 A1111 对齐时选 GPU 档。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Prompt Builder (Inspire)", cat: "cond",
+        brief: "带分类预设的提示词整理节点，输出普通文本。",
+        desc: "它本质上是一个文本输出节点，额外提供了按类别组织的预设下拉，帮你把常用的质量词、风格词、主体描述按分类整理，拼接出结构化提示词后整体输出字符串。对维护多套提示词模板的用户来说，它像一个轻量的提示词管理器。",
+        inputs: [],
+        outputs: [
+          { type: "STRING", to: "典型下游：条件编码或打包节点", desc: "整理好的提示词文本" }
+        ],
+        why: "提示词越写越长后，维护成本骤增。按类别预设来组织，比在一大段文本里翻找要可持续得多。",
+        params: [
+          { name: "category", kind: "下拉选择", default: "第一个分类", desc: "预设的分类条目，选择后把对应词条插入文本。" },
+          { name: "preset", kind: "下拉选择", default: "#PRESET", desc: "具体预设项。" },
+          { name: "text", kind: "多行文本", default: "空", desc: "提示词正文，预设插入的词条会拼进这里。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Prompt Extractor (Inspire)", cat: "util",
+        brief: "从图片内嵌的工作流信息里提取正负提示词。",
+        desc: "选择一张由 ComfyUI 生成并带完整工作流信息的图片，节点会解析其中的节点输入，把指定的正面与负面提示词控件内容提取出来输出字符串。想复现别人作品里写得很长的提示词时，不用逐张截图手抄，直接提取即可。节点上还会列出图片里所有文本控件的清单供核对。",
+        inputs: [],
+        outputs: [
+          { type: "STRING", to: "典型下游：条件编码或提示词处理", desc: "提取出的正面提示词" },
+          { type: "STRING", to: "典型下游：条件编码或提示词处理", desc: "提取出的负面提示词" }
+        ],
+        why: "复刻别人的图，提示词是第一道门槛。自动化提取把十分钟的手工活变成一次下拉选择。",
+        params: [
+          { name: "image", kind: "下拉选择", default: "输入目录中的文件", desc: "要解析的图片，支持直接上传。" },
+          { name: "positive_id", kind: "文本", default: "空", desc: "正面提示词所在的控件标识，格式为节点编号.控件名，可从 info 列表里复制。" },
+          { name: "negative_id", kind: "文本", default: "空", desc: "负面提示词的控件标识，格式同上。" },
+          { name: "info", kind: "多行文本", default: "空", desc: "解析结果展示区，自动列出图片内全部文本控件，只读。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Wildcard Encode (Inspire)", cat: "cond",
+        brief: "通配符与 LoRA 标记一并处理的条件编码节点。",
+        desc: "它把通配符填充、LoRA 内嵌解析与文本编码合并成一步：wildcard_text 里的通配符按种子随机填充，填充结果里的 LoRA 标记自动加载到模型上，最后输出编码好的条件。权重解释方式支持 A1111、compel 等多种风格，迁移用户可以沿用旧习惯。需要同时安装 Impact Pack。",
+        inputs: [
+          { name: "model", type: "MODEL", from: "典型上游：Checkpoint 加载器", desc: "用于挂载文本中 LoRA 标记的模型" },
+          { name: "clip", type: "CLIP", from: "典型上游：Checkpoint 加载器", desc: "文本编码器" }
+        ],
+        outputs: [
+          { type: "MODEL", to: "典型下游：采样节点", desc: "应用内嵌 LoRA 后的模型" },
+          { type: "CLIP", to: "典型下游：其他编码节点", desc: "编码器" },
+          { type: "CONDITIONING", to: "典型下游：采样节点", desc: "通配符填充并编码后的条件" },
+          { type: "STRING", to: "典型下游：Show Info 等观察节点", desc: "实际填充后的文本" }
+        ],
+        why: "批量跑通配符组合时，填充、加载 LoRA、编码三步合一意味着画布少三四个节点，也杜绝了中间状态不同步。",
+        params: [
+          { name: "wildcard_text", kind: "多行文本", default: "空", desc: "含通配符标记的提示词，运行时按词表随机填充。" },
+          { name: "mode", kind: "下拉选择", default: "populate", desc: "populate 每次重新填充；fixed 锁定当前文本手动编辑；reproduce 先锁一次再恢复填充。" },
+          { name: "token_normalization", kind: "下拉选择", default: "none", desc: "权重令牌归一化方式，对齐 A1111 结果时选 length+mean。" },
+          { name: "weight_interpretation", kind: "下拉选择", default: "comfy++", desc: "权重解释方式，A1111 档可还原 WebUI 的权重写法。" },
+          { name: "seed", kind: "整数", default: "0", desc: "通配符填充用的种子，固定可复现组合。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Make Basic Pipe (Inspire)", cat: "load",
+        brief: "一步加载底模并完成正负编码，打包成基础管线。",
+        desc: "它把选底模、跳层、通配符填充、LoRA 解析、正负编码全部收进一个节点，输出 Impact Pack 体系的基础管线对象（模型、编码器、VAE、正负条件的打包）。它是区域提示词与 SEGS 系列流程的标准起点。需要同时安装 Impact Pack。",
+        inputs: [
+          { name: "vae_opt", type: "VAE", from: "可选，VAE 加载器", desc: "覆盖底模内置 VAE" }
+        ],
+        outputs: [
+          { type: "BASIC_PIPE", to: "典型下游：区域提示词或 Impact 采样节点", desc: "打包完成的基础管线" },
+          { type: "STRING", to: "典型下游：缓存类节点", desc: "缓存键，用于共享加载结果" }
+        ],
+        why: "区域重绘类流程头部的十几个节点被它折叠成一步，且与 Impact 生态完全互通。",
+        params: [
+          { name: "ckpt_name", kind: "下拉选择", default: "第一个底模文件", desc: "底模文件。" },
+          { name: "positive_wildcard_text", kind: "多行文本", default: "空", desc: "正面提示词，支持通配符与 LoRA 标记。" },
+          { name: "negative_wildcard_text", kind: "多行文本", default: "空", desc: "负面提示词，支持通配符与 LoRA 标记。" },
+          { name: "stop_at_clip_layer", kind: "整数", default: "-2", desc: "CLIP 跳层。" },
+          { name: "weight_interpretation", kind: "下拉选择", default: "comfy++", desc: "权重解释方式，可选 A1111 等风格。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Load Prompts From Dir (Inspire)", cat: "load",
+        brief: "读取提示词目录，把成套正负词打包成列表。",
+        desc: "它读取指定目录下的一批提示词文件（每个文件包含正面与负面两段文本），打包成一个压缩提示词列表输出，同时给出数量与剩余数量。配合解包节点可以逐套喂给采样流程，实现按批切换提示词主题的自动化生产。",
+        inputs: [],
+        outputs: [
+          { type: "ZIPPED_PROMPT", to: "典型下游：解包或绑定节点", desc: "打包好的提示词集合" },
+          { type: "INT", to: "典型下游：逻辑判断节点", desc: "本次读取的套数与剩余套数" }
+        ],
+        why: "成体系的批量出图需要成体系的提示词供给。目录级读取让提示词管理与图片目录一样可控。",
+        params: [
+          { name: "prompt_dir", kind: "下拉选择", default: "第一个目录", desc: "提示词目录，需放在 ComfyUI 的 inspire_prompts 文件夹下。" },
+          { name: "load_cap", kind: "整数", default: "0", desc: "单次最多读取几套，0 表示全部。" },
+          { name: "start_index", kind: "整数", default: "0", desc: "起始读取位置，-1 表示从最后一条开始。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Bind [ImageList, PromptList] (Inspire)", cat: "util",
+        brief: "把图像列表与提示词列表一一对齐，逐条绑定。",
+        desc: "它接收一组图像与一组打包提示词，按顺序一一配对：第 N 张图配第 N 套提示词，输出对齐后的图像、正面、负面与标签列表。提示词不够时用默认正负词补齐。批量给图集换装、换风格时，它是保证图与词不错位的关键环节。",
+        inputs: [
+          { name: "images", type: "IMAGE", from: "典型上游：图像列表来源", desc: "待处理的图像集合" },
+          { name: "zipped_prompts", type: "ZIPPED_PROMPT", from: "典型上游：Load Prompts From Dir", desc: "成套提示词" },
+          { name: "default_positive", type: "STRING", from: "典型上游：正面文本", desc: "配对不足时的兜底正面词" },
+          { name: "default_negative", type: "STRING", from: "典型上游：负面文本", desc: "配对不足时的兜底负面词" }
+        ],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：图生图流程", desc: "对齐后的图像列表" },
+          { type: "STRING", to: "典型下游：条件编码", desc: "逐张对应的正负提示词与标签" }
+        ],
+        why: "批量处理最容易出错的就是图与词错位。绑定节点从机制上杜绝了这种错位。",
+        params: [],
+        tips: ""
+      },
+      {
+        name: "Zip Prompt (Inspire)", cat: "util",
+        brief: "把正负提示词打包成一个可连线的组合对象。",
+        desc: "它把正面、负面两段文本（可选再加一个名称）压缩成一个打包提示词对象，让两条文本线变成一条。多个 Zip 的输出可以在打包节点里继续汇合。它是提示词目录、批量绑定这一整套流程的基础数据结构。",
+        inputs: [
+          { name: "positive", type: "STRING", from: "典型上游：正面提示词来源", desc: "正面文本" },
+          { name: "negative", type: "STRING", from: "典型上游：负面提示词来源", desc: "负面文本" },
+          { name: "name_opt", type: "STRING", from: "可选，文本标签", desc: "给这套提示词起的名字，便于识别" }
+        ],
+        outputs: [
+          { type: "ZIPPED_PROMPT", to: "典型下游：解包、绑定或收集节点", desc: "打包后的提示词对象" }
+        ],
+        why: "打包之后提示词在画布上只占一条线，跨分支传递与批量收集都干净利落。",
+        params: [],
+        tips: ""
+      },
+      {
+        name: "Unzip Prompt (Inspire)", cat: "util",
+        brief: "把打包提示词拆回正负文本与名称。",
+        desc: "它是 Zip Prompt 的逆操作：接收打包提示词对象，还原出正面、负面与名称三路输出。从目录批量读入的提示词在进入常规编码流程前，都要经过它拆包。",
+        inputs: [
+          { name: "zipped_prompt", type: "ZIPPED_PROMPT", from: "典型上游：打包提示词来源", desc: "待拆包的提示词对象" }
+        ],
+        outputs: [
+          { type: "STRING", to: "典型下游：条件编码", desc: "正面提示词" },
+          { type: "STRING", to: "典型下游：条件编码", desc: "负面提示词" },
+          { type: "STRING", to: "典型下游：文件命名或记录", desc: "提示词名称" }
+        ],
+        why: "打包与拆包成对出现，让提示词既能以一条线流动，又不失去在常规节点里使用的能力。",
+        params: [],
+        tips: ""
+      },
+      {
+        name: "Change Image Batch Size (Inspire)", cat: "image",
+        brief: "把图像批量调整为指定张数，不足补齐多余裁掉。",
+        desc: "输入一批图像与目标批量数，节点输出恰好该数量的批次：不够时重复末尾图像补齐，超出时截断。在不同批量约定的节点之间衔接时（例如单张结果要进批量处理节点），它是简单可靠的调平工具。",
+        inputs: [
+          { name: "image", type: "IMAGE", from: "典型上游：任意图像来源", desc: "待调整的图像批次" }
+        ],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：批量处理节点", desc: "调整数量后的图像批次" }
+        ],
+        why: "批量数不匹配是批量流程报错的常见原因。一个调平节点能省掉大量排查时间。",
+        params: [
+          { name: "batch_size", kind: "整数", default: "1", desc: "目标批量张数。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Change Latent Batch Size (Inspire)", cat: "latent",
+        brief: "把潜空间批量调整为指定数量。",
+        desc: "与图像版对应的潜空间版本：输入潜空间批次与目标数量，输出恰好该数量的潜空间，不足补齐、超出截断。常用于把单张采样的结果接进需要批量的二次采样流程。",
+        inputs: [
+          { name: "latent", type: "LATENT", from: "典型上游：采样或编码节点", desc: "待调整的潜空间批次" }
+        ],
+        outputs: [
+          { type: "LATENT", to: "典型下游：采样或解码节点", desc: "调整数量后的潜空间" }
+        ],
+        why: "潜空间阶段调平比解码成图后再调省算力得多，接力采样流程里很常用。",
+        params: [
+          { name: "batch_size", kind: "整数", default: "1", desc: "目标批量数量。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Image Batch Splitter (Inspire)", cat: "image",
+        brief: "把图像批次按数量拆成多个独立输出。",
+        desc: "输入一批图像并设置拆分数量，节点会按顺序把批次拆成相应数量的独立图像输出，输出接口随拆分数自动增加。批量出图后想对每张走不同分支（例如分别放大、分别换背景）时，它是起点。",
+        inputs: [
+          { name: "images", type: "IMAGE", from: "典型上游：批量图像来源", desc: "待拆分的图像批次" }
+        ],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：各自的分支流程", desc: "拆出的第 1 张及后续各张" }
+        ],
+        why: "批量是一把双刃剑：省时但难分支。拆分节点把批量结果还原成可单独处理的个体，两全其美。",
+        params: [
+          { name: "split_count", kind: "整数", default: "4", desc: "拆成几张，0 表示按批次全部拆开。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Latent Batch Splitter (Inspire)", cat: "latent",
+        brief: "把潜空间批次按数量拆成多个独立输出。",
+        desc: "潜空间版的批次拆分：按设定数量把潜空间批次拆成独立输出，省去先解码再拆的算力。接力采样、分别精修的流程里常用。",
+        inputs: [
+          { name: "latent", type: "LATENT", from: "典型上游：采样节点", desc: "待拆分的潜空间批次" }
+        ],
+        outputs: [
+          { type: "LATENT", to: "典型下游：各自的采样或解码分支", desc: "拆出的各份潜空间" }
+        ],
+        why: "在潜空间阶段就分道扬镳，是批量精修流程里最省算力的组织方式。",
+        params: [
+          { name: "split_count", kind: "整数", default: "4", desc: "拆成几份，0 表示全部拆开。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Load Image (Inspire)", cat: "load",
+        brief: "增强版加载图像，支持从 base64 数据直接载入。",
+        desc: "它兼容标准 Load Image 的上传用法，额外增加 base64 图像数据输入，可以从 API 调用或程序生成的图像数据直接进流程。输出图像与透明通道转成的遮罩，带透明背景的 PNG 会自动得到对应遮罩，抠图流程可以直接用。",
+        inputs: [],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：预处理或图生图编码", desc: "载入的图像" },
+          { type: "MASK", to: "典型下游：遮罩类节点", desc: "透明通道生成的遮罩，无透明时为空遮罩" }
+        ],
+        why: "透明图转遮罩是抠图与局部重绘的第一步，内置支持免掉一道专门转换。",
+        params: [
+          { name: "image", kind: "下拉选择", default: "输入目录中的文件", desc: "要加载的图片，支持画布上传。" },
+          { name: "image_data", kind: "文本", default: "空", desc: "base64 编码的图像数据，填写后优先于文件加载。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Concat Conditionings with Multiplier (Inspire)", cat: "cond",
+        brief: "按各自权重拼接多条条件，接口随连线自动增加。",
+        desc: "它把多条条件串联成一条：第一路为必需，之后每接一路都会出现一个对应的权重输入，拼接时按权重缩放。给画面叠加多个风格条件并分别控制浓度时，它比多次相加更直接，也是风格混合工作流的常客。",
+        inputs: [
+          { name: "conditioning1", type: "CONDITIONING", from: "典型上游：第一条条件编码", desc: "基准条件，权重为 1" },
+          { name: "multiplier1", type: "FLOAT", from: "节点面板设置", desc: "第二路条件的权重，继续连线会出现更多路" }
+        ],
+        outputs: [
+          { type: "CONDITIONING", to: "典型下游：采样节点", desc: "加权拼接后的条件" }
+        ],
+        why: "多风格叠加要的不是平均混合而是各自定量。逐路权重让它做到配比清晰、随时可调。",
+        params: [],
+        tips: ""
+      },
+      {
+        name: "Conditioning Upscale (Inspire)", cat: "cond",
+        brief: "把条件里的注意力图按倍数放大，跨分辨率复用条件。",
+        desc: "条件内部记录着与分辨率相关的注意力排布。该节点按倍数把条件放大，使在低分辨率下准备好的条件（例如局部重绘区域）可以直接用于放大后的二次采样，不必重新编码与重画区域。",
+        inputs: [
+          { name: "conditioning", type: "CONDITIONING", from: "典型上游：条件编码节点", desc: "待放大的条件" }
+        ],
+        outputs: [
+          { type: "CONDITIONING", to: "典型下游：放大后二次采样的采样节点", desc: "放大后的条件" }
+        ],
+        why: "放大流程里条件与分辨率脱节会产生错位伪影。一个倍数节点让条件跟着图一起变大。",
+        params: [
+          { name: "scalar", kind: "整数", default: "2", desc: "放大倍数，与上游放大倍数保持一致。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Conditioning Stretch (Inspire)", cat: "cond",
+        brief: "把条件从原分辨率拉伸到新分辨率，处理比例变化。",
+        desc: "与放大不同，它把条件从一组原始分辨率拉伸到一组新分辨率，宽高可以各自独立指定，用于比例发生变化的重绘流程（例如横改竖）。配合区域遮罩使用时，能让旧条件在新画幅里继续各就各位。",
+        inputs: [
+          { name: "conditioning", type: "CONDITIONING", from: "典型上游：条件编码节点", desc: "待拉伸的条件" }
+        ],
+        outputs: [
+          { type: "CONDITIONING", to: "典型下游：新分辨率下的采样节点", desc: "拉伸后的条件" }
+        ],
+        why: "跨比例复用条件是很多重绘流程的隐形难题。Stretch 把它变成填四个数字的小事。",
+        params: [
+          { name: "resolutionX", kind: "整数", default: "512", desc: "条件原来的宽度。" },
+          { name: "resolutionY", kind: "整数", default: "512", desc: "条件原来的高度。" },
+          { name: "newWidth", kind: "整数", default: "512", desc: "目标宽度。" },
+          { name: "newHeight", kind: "整数", default: "512", desc: "目标高度。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "CLIPTextEncodeWithWeight (Inspire)", cat: "cond",
+        brief: "带整体权重与偏移的文本编码节点。",
+        desc: "它在标准文本编码的基础上增加两个参数：strength 把整条条件乘以一个系数，add_weight 在整条条件上加一个偏移。想给某段提示词整体加强或减弱而不必逐词写括号时，它是最省事的手段。",
+        inputs: [
+          { name: "clip", type: "CLIP", from: "典型上游：Checkpoint 加载器", desc: "文本编码器" }
+        ],
+        outputs: [
+          { type: "CONDITIONING", to: "典型下游：采样节点", desc: "加权后的条件" }
+        ],
+        why: "整体权重是调风格浓度最粗粒度也最常用的旋钮，把它前移到编码环节，下游不用再挂条件加权节点。",
+        params: [
+          { name: "text", kind: "多行文本", default: "空", desc: "提示词正文。" },
+          { name: "strength", kind: "浮点数", default: "1.0", desc: "整体强度系数。" },
+          { name: "add_weight", kind: "浮点数", default: "0.0", desc: "整体偏移量，正数增强、负数减弱。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Remove ControlNet (Inspire)", cat: "cond",
+        brief: "剥除条件里携带的 ControlNet 信息。",
+        desc: "条件对象在经过 ControlNet 应用后会携带控制信息继续向后传递。该节点把这些信息剥掉，输出干净的条件。典型场景是基础采样阶段带 ControlNet 出图，放大阶段想摆脱原构图约束，就在放大条件的上游接一个它。",
+        inputs: [
+          { name: "conditioning", type: "CONDITIONING", from: "典型上游：应用过 ControlNet 的条件", desc: "待剥除的条件" }
+        ],
+        outputs: [
+          { type: "CONDITIONING", to: "典型下游：后续采样节点", desc: "不含 ControlNet 的干净条件" }
+        ],
+        why: "ControlNet 想关就关是流程灵活性的重要一环。与其重接编码，不如在条件线上做一个开关式剥除。",
+        params: [],
+        tips: ""
+      },
+      {
+        name: "Make LoRA Block Weight", cat: "model",
+        brief: "把 LoRA 块权重配置先做成数据包，与实际加载分离。",
+        desc: "它读取 LoRA 文件并按块权重向量生成一个待应用的块权重数据包，而不直接改模型。块向量的写法与 LoraLoaderBlockWeight 一致，支持预设与 R、U、A、B 等特殊记号。先 Make 再 Apply 的两段式，让同一份块权重配方可以分别应用到多个模型，或在应用前先用 XY 扫描确定向量。",
+        inputs: [
+          { name: "model", type: "MODEL", from: "可选，模型链路", desc: "提供块结构的模型" },
+          { name: "clip", type: "CLIP", from: "可选，同一链路", desc: "配套编码器" }
+        ],
+        outputs: [
+          { type: "LBW_MODEL", to: "典型下游：Apply LoRA Block Weight", desc: "待应用的块权重数据包" },
+          { type: "STRING", to: "典型下游：记录或扫描节点", desc: "填充后的块向量文本" }
+        ],
+        why: "配方与应用分离是块权重工作流的进阶形态，扫描向量与切换模型从此互不干扰。",
+        params: [
+          { name: "lora_name", kind: "下拉选择", default: "第一个 LoRA 文件", desc: "要按块加载的 LoRA。" },
+          { name: "preset", kind: "下拉选择", default: "Preset", desc: "块权重预设。" },
+          { name: "block_vector", kind: "多行文本", default: "1,0,0,...", desc: "逐块权重向量，与直接加载节点同格式。" },
+          { name: "inverse", kind: "开关", default: "关", desc: "开启后每块权重取反。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Apply LoRA Block Weight", cat: "model",
+        brief: "把块权重数据包实际施加到模型上。",
+        desc: "它接收模型、编码器与一个块权重数据包，按包内向量完成块级加权，输出应用后的模型与编码器。总强度在应用时才决定，因此同一份数据包可以用不同总强度跑多次对比。",
+        inputs: [
+          { name: "model", type: "MODEL", from: "典型上游：Checkpoint 加载器", desc: "目标模型" },
+          { name: "clip", type: "CLIP", from: "典型上游：同一加载器", desc: "目标编码器" },
+          { name: "lbw_model", type: "LBW_MODEL", from: "典型上游：Make LoRA Block Weight", desc: "块权重数据包" }
+        ],
+        outputs: [
+          { type: "MODEL", to: "典型下游：采样节点", desc: "应用块权重后的模型" },
+          { type: "CLIP", to: "典型下游：条件编码节点", desc: "应用文本侧权重后的编码器" }
+        ],
+        why: "与 Make 配对完成配方与应用的解耦，总强度等参数留在应用端随时调整。",
+        params: [
+          { name: "strength_model", kind: "浮点数", default: "1.0", desc: "模型侧总强度。" },
+          { name: "strength_clip", kind: "浮点数", default: "1.0", desc: "文本侧总强度。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "XY Input: LoRA Block Weight", cat: "util",
+        brief: "为 XY Plot 生成块权重扫描序列，双向对比 LoRA 各块作用。",
+        desc: "它把块权重扫描封装成 XY Plot 的两根轴：横轴是一组块向量，纵轴是效果对比方式（简单对比、差值或差值加热力图）。与效率节点的 XY Plot 搭配，一次运行即可看到 LoRA 每个块组合对画面的影响，还能输出热力图直观展示各块的激活区域。",
+        inputs: [],
+        outputs: [
+          { type: "XY", to: "典型下游：XY Plot 的 X 与 Y 输入", desc: "横轴向量序列与纵轴对比模式" }
+        ],
+        why: "块权重手动逐个试几乎不可行，网格扫描配合热力图是理解 LoRA 内部行为最直观的途径。",
+        params: [
+          { name: "lora_name", kind: "下拉选择", default: "第一个 LoRA 文件", desc: "要扫描的 LoRA。" },
+          { name: "block_vectors", kind: "多行文本", default: "内置预设组合", desc: "横轴的向量清单，每行一个向量，支持斜杠分隔的目标与参考对。" },
+          { name: "xyplot_mode", kind: "下拉选择", default: "Simple", desc: "Simple 输出各向量成图；Diff 与 Diff+Heatmap 展示与参考向量的差异及热力图。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Shared Checkpoint Loader (Inspire)", cat: "load",
+        brief: "带缓存共享的底模加载器，多节点引用不重复加载。",
+        desc: "它是标准底模加载器的共享版：多个这样的节点只要缓存键相同，就共用同一份已加载的模型，不再各自占用显存。大型流程里底模、精修模分开引用，或多个分支都要同一底模时，它能明显降低显存与切换开销。",
+        inputs: [],
+        outputs: [
+          { type: "MODEL", to: "典型下游：采样或 LoRA 节点", desc: "共享加载的模型" },
+          { type: "CLIP", to: "典型下游：条件编码节点", desc: "编码器" },
+          { type: "VAE", to: "典型下游：解码节点", desc: "解码器" },
+          { type: "STRING", to: "典型下游：其他共享加载器", desc: "缓存键，相同的键共享同一份模型" }
+        ],
+        why: "显存是大模型流程的第一瓶颈。共享加载从机制上避免了同一模型被反复读入。",
+        params: [
+          { name: "ckpt_name", kind: "下拉选择", default: "第一个底模文件", desc: "底模文件。" },
+          { name: "key_opt", kind: "文本", default: "空", desc: "自定义缓存键，留空时用文件名当作键。" },
+          { name: "mode", kind: "下拉选择", default: "Auto", desc: "Auto 自动共享；Override Cache 强制重读；Read Only 只读缓存不写入。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Random Generator for List (Inspire)", cat: "util",
+        brief: "随列表逐项生成随机数，给批量流程配随机源。",
+        desc: "它跟随上游列表逐项执行，为每一项生成一个独立的随机整数输出，信号原样透传。批量处理图集时，让每张图获得不同的随机参数（例如不同的通配符种子）就靠它。",
+        inputs: [
+          { name: "signal", type: "*", from: "典型上游：列表来源", desc: "任意列表数据，决定随机数生成几组" }
+        ],
+        outputs: [
+          { type: "*", to: "典型下游：后续列表流程", desc: "透传的信号" },
+          { type: "INT", to: "典型下游：种子或数值输入", desc: "逐项变化的随机整数" }
+        ],
+        why: "批量的意义在于每张都不一样。逐项随机源让这一步不再依赖手工排种子。",
+        params: [
+          { name: "seed", kind: "整数", default: "0", desc: "随机数基数。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "List Counter (Inspire)", cat: "util",
+        brief: "随列表逐项输出序号，做批量计数与索引。",
+        desc: "跟随上游列表逐项执行，输出当前是第几项（加基数偏移）。配合索引切换节点可以把列表流程分支化，或给批量产物编号命名。",
+        inputs: [
+          { name: "signal", type: "*", from: "典型上游：列表来源", desc: "任意列表数据" }
+        ],
+        outputs: [
+          { type: "INT", to: "典型下游：索引切换或计数显示", desc: "当前项的序号" }
+        ],
+        why: "循环与批量流程里，知道自己走到第几步是一切条件逻辑的前提。",
+        params: [
+          { name: "base_value", kind: "整数", default: "0", desc: "序号起点偏移。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Float Range (Inspire)", cat: "util",
+        brief: "生成等差浮点数列表，供批量扫描使用。",
+        desc: "按起点、终点与步长生成一串浮点数作为一个列表输出，可限制最大数量并保证终点被包含。给批量流程喂一组递增的强度或权重（例如逐个尝试不同的重绘幅度）时，它是标准的序列发生器。",
+        inputs: [],
+        outputs: [
+          { type: "FLOAT", to: "典型下游：接受列表输入的参数", desc: "浮点数列表" }
+        ],
+        why: "参数扫描的本质是序列。有它之后，扫描范围与密度都变成三个数字的事。",
+        params: [
+          { name: "start", kind: "浮点数", default: "0.0", desc: "序列起点。" },
+          { name: "stop", kind: "浮点数", default: "1.0", desc: "序列终点。" },
+          { name: "step", kind: "浮点数", default: "0.01", desc: "步长。" },
+          { name: "limit", kind: "整数", default: "100", desc: "最多生成多少个，防止手滑撑爆流程。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Regional Prompt Simple (Inspire)", cat: "cond",
+        brief: "按遮罩给画面区域分配独立提示词与采样参数。",
+        desc: "它把一张遮罩、一组提示词与独立的 CFG、采样器配置打包成一个区域对象输出，多个区域对象交给采样节点后，画面上不同区域按各自提示词与参数引导。这是 Impact 体系区域化生成的标准入口之一，需要配合基础管线使用。",
+        inputs: [
+          { name: "basic_pipe", type: "BASIC_PIPE", from: "典型上游：Make Basic Pipe 或 Impact 管线", desc: "模型与编码器所在的管线" },
+          { name: "mask", type: "MASK", from: "典型上游：遮罩来源", desc: "该区域的遮罩" }
+        ],
+        outputs: [
+          { type: "REGIONAL_PROMPTS", to: "典型下游：Impact 区域采样节点", desc: "区域提示词对象" }
+        ],
+        why: "一张图里既要人物又要不同背景，逐区域提示词是最直接的表达方式，比全局词硬凑可控得多。",
+        params: [
+          { name: "cfg", kind: "浮点数", default: "8.0", desc: "该区域的提示词服从度，可与主区域不同。" },
+          { name: "sampler_name", kind: "下拉选择", default: "euler", desc: "该区域用的采样器。" },
+          { name: "wildcard_prompt", kind: "多行文本", default: "空", desc: "该区域的提示词，支持通配符。" },
+          { name: "sigma_factor", kind: "浮点数", default: "1.0", desc: "区域噪声强度系数，降低可弱化该区域的引导。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Regional Conditioning Simple (Inspire)", cat: "cond",
+        brief: "把提示词按遮罩设定为区域条件，轻量版区域化。",
+        desc: "它对指定遮罩区域做条件编码并附加区域遮罩，输出一条区域条件，直接接入普通采样节点即可生效。相比完整的区域提示词对象，它不改采样参数、更轻量，适合只想在画面某处追加或替换内容的场景。",
+        inputs: [
+          { name: "clip", type: "CLIP", from: "典型上游：Checkpoint 加载器", desc: "文本编码器" },
+          { name: "mask", type: "MASK", from: "典型上游：遮罩来源", desc: "目标区域遮罩" }
+        ],
+        outputs: [
+          { type: "CONDITIONING", to: "典型下游：采样节点", desc: "限定在遮罩内的条件" }
+        ],
+        why: "多数局部需求其实不需要完整区域采样。轻量区域条件用一个节点解决问题，与标准流程完全兼容。",
+        params: [
+          { name: "prompt", kind: "多行文本", default: "空", desc: "该区域的提示词。" },
+          { name: "strength", kind: "浮点数", default: "1.0", desc: "区域条件强度。" },
+          { name: "set_cond_area", kind: "下拉选择", default: "default", desc: "default 按全图排布注意力，mask bounds 只在遮罩范围内排布。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Regional CFG (Inspire)", cat: "sampler",
+        brief: "把 CFG 引导限制在遮罩区域内，避免全局互相干扰。",
+        desc: "它修改模型，使负面条件的引导只在遮罩区域内生效，区域之外不受影响。多个区域可以叠加各自的条件约束，实现严格意义上的分区控制。做多人构图或主体与背景分区处理时，它能显著减少区域之间的相互污染。",
+        inputs: [
+          { name: "model", type: "MODEL", from: "典型上游：模型链路", desc: "待修改的模型" },
+          { name: "mask", type: "MASK", from: "典型上游：遮罩来源", desc: "生效区域遮罩" }
+        ],
+        outputs: [
+          { type: "MODEL", to: "典型下游：采样节点", desc: "带区域引导的模型" }
+        ],
+        why: "区域问题最深层的原因在引导阶段。在模型层面分区，比事后修补自然得多。",
+        params: [],
+        tips: ""
+      },
+      {
+        name: "Seed Logger (Inspire)", cat: "util",
+        brief: "把每次运行用到的种子记录在节点上备查。",
+        desc: "它接收种子值并把最近若干次执行用到的种子逐条记录在节点面板里，方便从喜欢的结果反查种子。配合全局种子节点使用，能看到每一轮实际写入的值，是复现好图的得力助手。",
+        inputs: [
+          { name: "seed", type: "INT", from: "典型上游：采样节点或全局种子", desc: "要记录的种子" }
+        ],
+        outputs: [],
+        why: "好图稍纵即逝，种子没记下来就要全部重跑。日志节点用最小的成本保住这份记录。",
+        params: [
+          { name: "limit", kind: "整数", default: "5", desc: "最多保留多少条记录。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Composite Noise (Inspire)", cat: "sampler",
+        brief: "把一处噪声合成到另一处，精细控制初始噪声分布。",
+        desc: "它把源噪声按位置合成到目标噪声上，支持中心、四角与自定义坐标等方式。配合种子探索流程，可以把某个区域换成另一种子的噪声，实现只重随画面局部的高级玩法。",
+        inputs: [
+          { name: "destination", type: "NOISE_IMAGE", from: "典型上游：Seed Explorer 等噪声来源", desc: "被合成的目标噪声" },
+          { name: "source", type: "NOISE_IMAGE", from: "典型上游：另一路噪声", desc: "提供局部噪声的来源" }
+        ],
+        outputs: [
+          { type: "NOISE_IMAGE", to: "典型下游：支持噪声输入的采样节点", desc: "合成后的噪声" }
+        ],
+        why: "噪声决定构图。能对噪声做局部手术，等于在生成之前就完成了局部重画的规划。",
+        params: [
+          { name: "mode", kind: "下拉选择", default: "center", desc: "合成位置，可选中心、四角或按坐标。" },
+          { name: "x", kind: "整数", default: "0", desc: "自定义坐标时的横向位置，步进 8。" },
+          { name: "y", kind: "整数", default: "0", desc: "自定义坐标时的纵向位置。" }
+        ],
+        tips: ""
       }
     ]
   });
@@ -4311,6 +5204,838 @@
         why: "简化流程隐藏了大量细节，出错时更需要观察手段。Show Anything 就是简化管线上的检视窗口。",
         params: [],
         tips: "排查提示词问题时把它接到文本链路末端，立刻能看到实际送入编码的内容。"
+      },
+      {
+        name: "Easy a1111Loader", cat: "load",
+        brief: "读取 A1111 网页版模型目录的一体化加载器。",
+        desc: "它在 Easy Full Loader 的能力上增加了对 A1111 部署方式的兼容：可以直接读取 WebUI 的模型目录结构，并附带 A1111 提示词风格开关，把 WebUI 的权重解释习惯带进 ComfyUI。从 WebUI 迁移、模型都还放在旧目录里的用户，用它最省事。",
+        inputs: [
+          { name: "optional_lora_stack", type: "LORA_STACK", from: "可选，Easy Lora Stack", desc: "叠加一串 LoRA 配方" },
+          { name: "optional_controlnet_stack", type: "CONTROL_NET_STACK", from: "可选，Easy ControlNet Stack", desc: "叠加 ControlNet 配置" }
+        ],
+        outputs: [
+          { type: "PIPE_LINE", to: "典型下游：Easy preSampling 或 Easy KSampler", desc: "承载全部初始配置的管线" },
+          { type: "MODEL", to: "典型下游：模型类节点", desc: "独立输出的模型" },
+          { type: "CONDITIONING", to: "典型下游：采样节点", desc: "独立输出的正负条件" },
+          { type: "LATENT", to: "典型下游：采样节点", desc: "独立输出的空潜空间" }
+        ],
+        why: "迁移用户最大的痛点是模型目录与提示词习惯不同。这个加载器把两件事一起解决。",
+        params: [
+          { name: "ckpt_name", kind: "下拉选择", default: "第一个底模文件", desc: "底模文件，可选列表来自 A1111 目录映射。" },
+          { name: "a1111_prompt_style", kind: "开关", default: "关", desc: "开启后按 A1111 的方式处理提示词权重，便于还原旧出图。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy Comfy Loader", cat: "load",
+        brief: "精简版一体化加载器，一个节点完成全部初始配置。",
+        desc: "Easy Full Loader 的标准变体：底模、VAE、跳层、内置 LoRA、正负提示词、分辨率与批量数都在一个面板里，输出打包管线。与 Full Loader 的差别在于更精简的选项组织，日常出图用它即可，需要额外模型注入时再选 Full Loader。",
+        inputs: [
+          { name: "optional_lora_stack", type: "LORA_STACK", from: "可选，Easy Lora Stack", desc: "叠加 LoRA 配方" },
+          { name: "optional_controlnet_stack", type: "CONTROL_NET_STACK", from: "可选，Easy ControlNet Stack", desc: "叠加 ControlNet 配置" }
+        ],
+        outputs: [
+          { type: "PIPE_LINE", to: "典型下游：Easy preSampling 或 Easy KSampler", desc: "打包管线" }
+        ],
+        why: "它是 Easy 流水线的默认起点，一个节点替代标准流程头部的五六个节点。",
+        params: [
+          { name: "ckpt_name", kind: "下拉选择", default: "第一个底模文件", desc: "底模文件。" },
+          { name: "vae_name", kind: "下拉选择", default: "Baked VAE", desc: "指定 VAE，Baked VAE 使用底模内置解码器。" },
+          { name: "clip_skip", kind: "整数", default: "-2", desc: "CLIP 跳层。" },
+          { name: "resolution", kind: "下拉选择", default: "512 x 512", desc: "内置分辨率预设。" },
+          { name: "batch_size", kind: "整数", default: "1", desc: "批量张数。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy Flux Loader", cat: "load",
+        brief: "面向 Flux 模型的一体化加载器。",
+        desc: "针对 Flux 架构的加载器：底模、VAE、LoRA、分辨率与正面提示词集中配置，输出管线与独立模型。Flux 采用引导蒸馏，不需要传统的 CFG 与负面词，所以面板里只有正面提示词。配套的 Easy KSampler 或采样类节点会按 Flux 的方式处理引导。",
+        inputs: [
+          { name: "model_override", type: "MODEL", from: "可选，外部模型加载节点", desc: "覆盖面板选择的底模" },
+          { name: "clip_override", type: "CLIP", from: "可选，外部编码器", desc: "覆盖默认编码器" },
+          { name: "vae_override", type: "VAE", from: "可选，外部 VAE", desc: "覆盖默认 VAE" },
+          { name: "optional_lora_stack", type: "LORA_STACK", from: "可选，Easy Lora Stack", desc: "叠加 LoRA 配方" }
+        ],
+        outputs: [
+          { type: "PIPE_LINE", to: "典型下游：Easy preSampling 系列或 Easy KSampler", desc: "打包管线" },
+          { type: "MODEL", to: "典型下游：模型类节点", desc: "独立输出的模型" },
+          { type: "VAE", to: "典型下游：解码节点", desc: "独立输出的 VAE" }
+        ],
+        why: "Flux 的加载组合比 SD 复杂（双编码器、引导嵌入）。专用加载器把这些细节封装掉，开箱即用。",
+        params: [
+          { name: "resolution", kind: "下拉选择", default: "1024 x 1024", desc: "Flux 原生分辨率档位，默认即百万像素。" },
+          { name: "positive", kind: "多行文本", default: "空", desc: "正面提示词，Flux 对自然语言描述响应更好。" },
+          { name: "lora_name", kind: "下拉选择", default: "None", desc: "内置单枚 LoRA。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy Lora Stack", cat: "model",
+        brief: "把多个 LoRA 打包成堆栈线，喂给加载器统一应用。",
+        desc: "它维护一张 LoRA 清单（最多十行），每行可选文件与强度，简单模式下模型与文本侧共用一个强度，进阶模式分开设置。输出一条 LoRA 堆栈线，接到 Easy 系加载器的堆栈输入上统一应用。多个堆栈串联即可叠加更多条目。",
+        inputs: [
+          { name: "optional_lora_stack", type: "LORA_STACK", from: "可选，另一个 Easy Lora Stack", desc: "叠加到前面的既有堆栈" }
+        ],
+        outputs: [
+          { type: "LORA_STACK", to: "典型下游：Easy 系加载器", desc: "打包好的 LoRA 堆栈" }
+        ],
+        why: "LoRA 配方做成一条线，换底模不换配方、换配方不换底模，两者解耦。",
+        params: [
+          { name: "toggle", kind: "开关", default: "开", desc: "总开关，关闭后整条堆栈失效。" },
+          { name: "num_loras", kind: "整数", default: "1", desc: "启用的 LoRA 行数，最多 10。" },
+          { name: "mode", kind: "下拉选择", default: "simple", desc: "simple 每行一个总强度；advanced 每行分开设置模型侧与文本侧强度。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy ControlNet Loader", cat: "load",
+        brief: "把单个 ControlNet 直接应用进 Easy 管线。",
+        desc: "它接收 Easy 管线与控制图像，选择 ControlNet 模型后把控制信息写进管线条件，输出更新后的管线与正负条件。自动按控制图分辨率处理输入，省去标准的预处理与高级应用两步。",
+        inputs: [
+          { name: "pipe", type: "PIPE_LINE", from: "典型上游：Easy 系加载器", desc: "上游管线" },
+          { name: "image", type: "IMAGE", from: "典型上游：控制图像", desc: "姿态图、深度图或线稿等控制图" }
+        ],
+        outputs: [
+          { type: "PIPE_LINE", to: "典型下游：后续 Easy 节点", desc: "已应用 ControlNet 的管线" },
+          { type: "CONDITIONING", to: "典型下游：采样节点", desc: "展开输出的正负条件" }
+        ],
+        why: "ControlNet 是最容易接错的环节之一。管线化之后接两个口就能用，错误率大幅下降。",
+        params: [
+          { name: "control_net_name", kind: "下拉选择", default: "第一个模型", desc: "ControlNet 模型文件。" },
+          { name: "strength", kind: "浮点数", default: "1.0", desc: "控制强度。" },
+          { name: "scale_soft_weights", kind: "浮点数", default: "1.0", desc: "软权重缩放，用于柔化控制影响。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy ControlNet Stack", cat: "load",
+        brief: "把最多三个 ControlNet 打包成一条堆栈线。",
+        desc: "它在面板里展开最多三行 ControlNet 配置，每行包含模型、控制图、强度与起止区间，输出一条堆栈线。配合加载器类节点的堆栈输入一次应用全套控制，避免在画布上串一长串 ControlNet 节点。",
+        inputs: [
+          { name: "optional_controlnet_stack", type: "CONTROL_NET_STACK", from: "可选，另一个堆栈节点", desc: "叠加到前面的既有堆栈" }
+        ],
+        outputs: [
+          { type: "CONTROL_NET_STACK", to: "典型下游：Easy 系加载器", desc: "打包好的 ControlNet 堆栈" }
+        ],
+        why: "多 ControlNet 叠加是精控构图的常规操作，堆栈化让配方整体可保存、可替换。",
+        params: [
+          { name: "num_controlnet", kind: "整数", default: "1", desc: "启用的 ControlNet 行数，最多 3。" },
+          { name: "controlnet_1", kind: "下拉选择", default: "None", desc: "第 1 行的模型；每行还有独立的强度与起止百分比。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy KSampler Custom", cat: "sampler",
+        brief: "执行自定义采样方案的采样端，支持引导器与自定义 sigma。",
+        desc: "它是 Easy KSampler 的自定义版：采样计划不再来自常规预采样，而是读管线里由 Easy preSampling Custom 写入的引导器、sigma 模型等高级设置。适合使用自定义采样器对象、把 CFG 引导替换成蒸馏引导（如 Flux 或 Turbo 类模型）的进阶流程。",
+        inputs: [
+          { name: "pipe", type: "PIPE_LINE", from: "典型上游：Easy preSampling Custom", desc: "含自定义采样方案的管线" },
+          { name: "model", type: "MODEL", from: "可选，外部模型", desc: "覆盖管线中的模型" }
+        ],
+        outputs: [
+          { type: "PIPE_LINE", to: "典型下游：精修或后处理节点", desc: "继续传递的管线" },
+          { type: "LATENT", to: "典型下游：解码或二次采样", desc: "采样结果潜空间与去噪中间结果" },
+          { type: "IMAGE", to: "典型下游：保存或预览节点", desc: "解码后的图像" }
+        ],
+        why: "新模型一代接一代，采样方式也在变。自定义采样端让 Easy 流水线能跟上这些变化。",
+        params: [
+          { name: "image_output", kind: "下拉选择", default: "None", desc: "成图处理方式，默认不输出图像只传管线。" },
+          { name: "save_prefix", kind: "文本", default: "ComfyUI", desc: "保存文件名前缀。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy KSampler Tiled", cat: "sampler",
+        brief: "分块解码版采样器，低显存出大图。",
+        desc: "它与 Easy KSampler 采样行为一致，但解码阶段改为分块进行：把潜空间切成小块分别解码再拼回，显存占用大幅下降。大分辨率出图或显存吃紧的显卡上，它是避免解码爆显存的标准手段。",
+        inputs: [
+          { name: "pipe", type: "PIPE_LINE", from: "典型上游：Easy preSampling", desc: "配置好的管线" },
+          { name: "model", type: "MODEL", from: "可选，外部模型", desc: "覆盖管线中的模型" }
+        ],
+        outputs: [
+          { type: "PIPE_LINE", to: "典型下游：后续 Easy 节点", desc: "继续传递的管线" },
+          { type: "IMAGE", to: "典型下游：保存或放大节点", desc: "分块解码出的图像" }
+        ],
+        why: "出大图的瓶颈常在解码而不在采样。分块解码用一点速度换数十倍的显存余量，非常划算。",
+        params: [
+          { name: "tile_size", kind: "整数", default: "512", desc: "分块尺寸，越小越省显存但越慢。" },
+          { name: "image_output", kind: "下拉选择", default: "Preview", desc: "成图处理方式。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy KSampler SDTurbo", cat: "sampler",
+        brief: "面向 SD Turbo 蒸馏模型的极速采样端。",
+        desc: "SD Turbo 类蒸馏模型一两步即可出图，但采样流程与传统 KSampler 不同。这个采样端按蒸馏模型的方式处理引导与步数，配合管线一步完成采样与解码，实现秒级出图。适合快速打草稿与实时预览场景。",
+        inputs: [
+          { name: "pipe", type: "PIPE_LINE", from: "典型上游：Easy preSampling SdTurbo", desc: "含 Turbo 采样设置的管线" },
+          { name: "model", type: "MODEL", from: "可选，外部模型", desc: "覆盖管线中的模型" }
+        ],
+        outputs: [
+          { type: "PIPE_LINE", to: "典型下游：后续 Easy 节点", desc: "继续传递的管线" },
+          { type: "IMAGE", to: "典型下游：预览或保存节点", desc: "极速采样得到的图像" }
+        ],
+        why: "打草稿要快，出成品要精。把 Turbo 极速通道纳入 Easy 体系，草稿与成品可以共用一套画布。",
+        params: [
+          { name: "image_output", kind: "下拉选择", default: "Preview", desc: "成图处理方式。" },
+          { name: "save_prefix", kind: "文本", default: "ComfyUI", desc: "保存文件名前缀。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy KSampler Inpainting", cat: "sampler",
+        brief: "内置重绘处理逻辑的采样端，遮罩重绘一步到位。",
+        desc: "它在采样时处理遮罩重绘所需的全部细节：按参数外扩遮罩、可选多种重绘策略（普通重绘模型条件、差分扩散、Fooocus Inpaint、BrushNet 等），把标准流程里五六个节点的工作收进一个。接上遮罩与管线即可输出重绘结果。",
+        inputs: [
+          { name: "pipe", type: "PIPE_LINE", from: "典型上游：Easy preSampling", desc: "配置好的管线" },
+          { name: "mask", type: "MASK", from: "典型上游：遮罩来源", desc: "重绘区域遮罩" },
+          { name: "model", type: "MODEL", from: "可选，外部模型", desc: "覆盖管线中的模型" }
+        ],
+        outputs: [
+          { type: "PIPE_LINE", to: "典型下游：后续 Easy 节点", desc: "继续传递的管线" },
+          { type: "IMAGE", to: "典型下游：保存或对比节点", desc: "重绘后的图像" },
+          { type: "VAE", to: "典型下游：解码或修边节点", desc: "管线中的 VAE" }
+        ],
+        why: "重绘的坑大多在遮罩与噪声处理上。策略内置后，选对模式比调对连线更重要。",
+        params: [
+          { name: "grow_mask_by", kind: "整数", default: "6", desc: "遮罩向外扩张的像素数，盖住边缘过渡带。" },
+          { name: "additional", kind: "下拉选择", default: "None", desc: "重绘策略，可选差分扩散、Fooocus Inpaint、BrushNet 等。" },
+          { name: "image_output", kind: "下拉选择", default: "Preview", desc: "成图处理方式。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy KSampler Downscale Unet", cat: "sampler",
+        brief: "采样中途缩放模型内部特征的省显存采样端。",
+        desc: "它在采样的指定区间内按系数缩小 UNet 内部特征再恢复，用可接受的画质代价换取大分辨率采样的可行性。缩放区间、系数与方式都可调，显存不够跑大图时，它是比分块采样更整体的方案。",
+        inputs: [
+          { name: "pipe", type: "PIPE_LINE", from: "典型上游：Easy preSampling", desc: "配置好的管线" },
+          { name: "model", type: "MODEL", from: "可选，外部模型", desc: "覆盖管线中的模型" }
+        ],
+        outputs: [
+          { type: "PIPE_LINE", to: "典型下游：后续 Easy 节点", desc: "继续传递的管线" },
+          { type: "IMAGE", to: "典型下游：保存或放大节点", desc: "采样得到的图像" }
+        ],
+        why: "大图采样爆显存是常态。在模型内部做缩放，等于给显卡装了一个可调的省电档。",
+        params: [
+          { name: "downscale_mode", kind: "下拉选择", default: "Auto", desc: "Auto 自动计算缩放，Custom 手动指定系数与区间。" },
+          { name: "downscale_factor", kind: "浮点数", default: "2.0", desc: "内部特征缩小倍数，越大越省显存、画质损失越大。" },
+          { name: "start_percent", kind: "浮点数", default: "0.0", desc: "缩放生效的起始进度。" },
+          { name: "end_percent", kind: "浮点数", default: "0.35", desc: "缩放生效的结束进度，后期恢复精细计算。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy UnSampler", cat: "sampler",
+        brief: "反向去噪，把成图拉回带噪声的潜空间。",
+        desc: "它执行与采样相反的过程：从给定潜空间出发按配置反向加噪若干步，输出带噪声的潜空间。配合噪声注入或种子探索流程，可以把一张成图转回中间状态再换个方向重新采样，实现图生图的变体生成。",
+        inputs: [
+          { name: "pipe", type: "PIPE_LINE", from: "可选，Easy 管线", desc: "提供模型与条件" },
+          { name: "optional_model", type: "MODEL", from: "可选，外部模型", desc: "直接提供模型" },
+          { name: "optional_positive", type: "CONDITIONING", from: "可选，条件来源", desc: "直接提供正面条件" },
+          { name: "optional_negative", type: "CONDITIONING", from: "可选，条件来源", desc: "直接提供负面条件" },
+          { name: "optional_latent", type: "LATENT", from: "可选，图像编码或采样结果", desc: "起点潜空间" }
+        ],
+        outputs: [
+          { type: "PIPE_LINE", to: "典型下游：后续 Easy 节点", desc: "继续传递的管线" },
+          { type: "LATENT", to: "典型下游：二次采样节点", desc: "反采样得到的带噪潜空间" }
+        ],
+        why: "想在成图基础上做受控变体，反采样是比低强度重绘更精准的路径。",
+        params: [
+          { name: "steps", kind: "整数", default: "20", desc: "反向步数总量。" },
+          { name: "end_at_step", kind: "整数", default: "0", desc: "反加噪到第几步为止，数值越小噪声越多。" },
+          { name: "cfg", kind: "浮点数", default: "1.0", desc: "反过程引导强度，通常保持 1。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy preSampling Custom", cat: "sampler",
+        brief: "为自定义采样端配置引导器与 sigma 模型的预采样。",
+        desc: "它把 Custom KSampler 体系的高级配置写进管线：引导器类型（含双 CFG、IP2P 等）、基础与负向 CFG、sigma 模型参数、自定义调度器等。交给 Easy KSampler Custom 执行后，可以跑蒸馏引导、IP2P 引导等标准 CFG 覆盖不到的采样方式。",
+        inputs: [
+          { name: "pipe", type: "PIPE_LINE", from: "典型上游：Easy 系加载器", desc: "上游管线" },
+          { name: "image_to_latent", type: "IMAGE", from: "可选，图像来源", desc: "接入后按图生图生成初始潜空间" },
+          { name: "latent", type: "LATENT", from: "可选，潜空间来源", desc: "直接指定初始潜空间" }
+        ],
+        outputs: [
+          { type: "PIPE_LINE", to: "典型下游：Easy KSampler Custom", desc: "附带自定义采样方案的管线" }
+        ],
+        why: "蒸馏类模型的引导逻辑与传统 CFG 不同。这个预采样让 Easy 流水线也能正确配置它们。",
+        params: [
+          { name: "guider", kind: "下拉选择", default: "Basic", desc: "引导器类型，可选 CFG、DualCFG、IP2P 组合等。" },
+          { name: "cfg", kind: "浮点数", default: "3.5", desc: "基础 CFG 值，Flux 类模型常用 3.5 上下。" },
+          { name: "sampler_name", kind: "下拉选择", default: "euler", desc: "采样算法，含扩展项 inversed_euler。" },
+          { name: "scheduler", kind: "下拉选择", default: "normal", desc: "调度器，含 alignYourSteps 等扩展项。" },
+          { name: "denoise", kind: "浮点数", default: "1.0", desc: "去噪强度。" },
+          { name: "seed", kind: "整数", default: "0", desc: "随机种子。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy preSampling Dynamic CFG", cat: "sampler",
+        brief: "带动态阈值 CFG 的预采样，抑制过曝与炸裂。",
+        desc: "它在常规采样配置之外引入动态阈值 CFG（Dynamic Thresholding）：高 CFG 时对引导幅度做截断与重缩放，让画面在 CFG 较高时也不易过饱和。面板提供阈值模式与 CFG 下限等参数，适合喜欢高 CFG 但苦于炸图的场景。",
+        inputs: [
+          { name: "pipe", type: "PIPE_LINE", from: "典型上游：Easy 系加载器", desc: "上游管线" },
+          { name: "image_to_latent", type: "IMAGE", from: "可选，图像来源", desc: "图生图初始潜空间" },
+          { name: "latent", type: "LATENT", from: "可选，潜空间来源", desc: "直接指定初始潜空间" }
+        ],
+        outputs: [
+          { type: "PIPE_LINE", to: "典型下游：Easy KSampler", desc: "附带动态 CFG 设置的管线" }
+        ],
+        why: "CFG 是最难调的参数之一。动态阈值把高 CFG 的副作用压下去，让提示词服从度与画质可以兼得。",
+        params: [
+          { name: "cfg", kind: "浮点数", default: "8.0", desc: "名义 CFG 值，可以被动态阈值拉高使用。" },
+          { name: "cfg_mode", kind: "下拉选择", default: "常数", desc: "动态阈值的截断模式，决定引导幅度如何被重缩放。" },
+          { name: "cfg_scale_min", kind: "浮点数", default: "3.5", desc: "CFG 下限，低于此值时按普通方式处理。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy preSampling Noise In", cat: "sampler",
+        brief: "带噪声注入系数的预采样，精修变体的标准配置。",
+        desc: "它在常规采样配置上增加噪声注入比例：把指定比例的新噪声混入初始潜空间。数值小是图生图变体的常用手段，比直接调去噪强度更可控；配合外部噪声种子输入，还能精确复现注入内容。",
+        inputs: [
+          { name: "pipe", type: "PIPE_LINE", from: "典型上游：Easy 系加载器", desc: "上游管线" },
+          { name: "optional_noise_seed", type: "INT", from: "可选，外部噪声种子", desc: "控制注入噪声的随机来源" },
+          { name: "optional_latent", type: "LATENT", from: "可选，潜空间来源", desc: "直接指定初始潜空间" }
+        ],
+        outputs: [
+          { type: "PIPE_LINE", to: "典型下游：Easy KSampler", desc: "附带噪声注入设置的管线" }
+        ],
+        why: "图生图变体的本质就是注入多少新噪声。把它做成独立参数，变体强度一目了然。",
+        params: [
+          { name: "factor", kind: "浮点数", default: "0.1", desc: "注入比例，0 到 1，越大偏离原图越多。" },
+          { name: "steps", kind: "整数", default: "20", desc: "采样总步数。" },
+          { name: "denoise", kind: "浮点数", default: "1.0", desc: "去噪强度，通常与注入系数配合调整。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy preSampling SD Turbo", cat: "sampler",
+        brief: "为 Turbo 蒸馏模型配置的一步采样预采样。",
+        desc: "它按 SD Turbo 的方式准备采样计划：极少步数、CFG 为 1、eta 与噪声系数按蒸馏模型调整，还带中途放大与锐化选项。交给 Easy KSampler SDTurbo 执行，即可一两步出图。",
+        inputs: [
+          { name: "pipe", type: "PIPE_LINE", from: "典型上游：Easy 系加载器", desc: "上游管线" },
+          { name: "image_to_latent", type: "IMAGE", from: "可选，图像来源", desc: "图生图初始潜空间" }
+        ],
+        outputs: [
+          { type: "PIPE_LINE", to: "典型下游：Easy KSampler SDTurbo", desc: "附带 Turbo 采样计划的管线" }
+        ],
+        why: "Turbo 模型用传统配置跑不出正确结果。专用预采样把步数与引导的非常规组合一次配好。",
+        params: [
+          { name: "steps", kind: "整数", default: "1", desc: "采样步数，Turbo 通常一到四步。" },
+          { name: "cfg", kind: "浮点数", default: "1.0", desc: "保持 1，蒸馏模型不使用传统 CFG。" },
+          { name: "upscale_ratio", kind: "浮点数", default: "2.0", desc: "中途放大的倍率，配合起止步实现先构图后细化。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy Hires Fix", cat: "image",
+        brief: "管线版高清修复，放大与低强度重绘一步完成。",
+        desc: "它对管线中的成图执行经典高清修复：先选放大模型或按比例放大，再用较低去噪强度二次采样补细节，输出放大后的图像与潜空间。放大方式覆盖百分比、目标宽高与长边三种，重绘步数与强度独立可控。接在 Easy KSampler 之后即插即用。",
+        inputs: [
+          { name: "pipe", type: "PIPE_LINE", from: "可选，Easy KSampler 输出的管线", desc: "待精修的管线" },
+          { name: "image", type: "IMAGE", from: "可选，外部图像", desc: "直接指定待修复图像" },
+          { name: "vae", type: "VAE", from: "可选，外部 VAE", desc: "覆盖管线中的 VAE" }
+        ],
+        outputs: [
+          { type: "PIPE_LINE", to: "典型下游：后续 Easy 节点", desc: "继续传递的管线" },
+          { type: "IMAGE", to: "典型下游：保存或对比节点", desc: "高清修复后的图像" },
+          { type: "LATENT", to: "典型下游：二次采样节点", desc: "修复过程的潜空间" }
+        ],
+        why: "高清修复是提升完成度的标配环节。管线化之后它不再需要一串放大加采样节点。",
+        params: [
+          { name: "model_name", kind: "下拉选择", default: "第一个放大模型", desc: "像素放大模型，放大前后均可用。" },
+          { name: "rescale", kind: "下拉选择", default: "by percentage", desc: "目标尺寸方式，按百分比、按宽高或按长边。" },
+          { name: "rescale_after_model", kind: "开关", default: "开", desc: "放大模型处理后是否再按比例二次缩放。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy preDetailerFix", cat: "image",
+        brief: "为修图流程准备检测与遮罩参数的预修图节点。",
+        desc: "它是 DetailerFix 的前置配置节点：设置检测框引导尺寸、最大尺寸、重绘步数与去噪强度、遮罩外扩与羽化等参数，输出配置好的管线交给修图采样执行。把参数准备与执行分离，方便与 Ultralytics、SAM 等检测管线组合出精细的自动修图流程。",
+        inputs: [
+          { name: "pipe", type: "PIPE_LINE", from: "典型上游：Easy 系加载器", desc: "上游管线" },
+          { name: "bbox_segm_pipe", type: "PIPE_LINE", from: "可选，检测器管线", desc: "目标检测配置" },
+          { name: "sam_pipe", type: "PIPE_LINE", from: "可选，SAM 管线", desc: "分割模型配置" },
+          { name: "optional_image", type: "IMAGE", from: "可选，外部图像", desc: "直接指定待修图像" }
+        ],
+        outputs: [
+          { type: "PIPE_LINE", to: "典型下游：Easy DetailerFix", desc: "携带修图参数的管线" }
+        ],
+        why: "自动修图的效果一半取决于检测与遮罩参数。前置出来单独调，比塞在一个大节点里清晰。",
+        params: [
+          { name: "guide_size", kind: "浮点数", default: "256", desc: "检测框小于该尺寸时按它放大后重绘。" },
+          { name: "max_size", kind: "浮点数", default: "768", desc: "重绘区域的最大边长。" },
+          { name: "denoise", kind: "浮点数", default: "0.5", desc: "修图去噪强度。" },
+          { name: "feather", kind: "整数", default: "5", desc: "遮罩边缘羽化像素。" },
+          { name: "cycle", kind: "整数", default: "1", desc: "修图循环次数，多轮可逐步加强效果。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy Prompt", cat: "cond",
+        brief: "带词条分类下拉的快速提示词组装节点。",
+        desc: "它在普通文本框之外提供一组分类下拉：镜头、主体、动作、服装、环境、背景等，点选即把对应词条追加进文本，输出字符串。相当于内置了一本可点选的提示词词典，不熟悉英文描述的新手也能快速组装出结构完整的提示词。",
+        inputs: [],
+        outputs: [
+          { type: "STRING", to: "典型下游：条件编码或 Easy 加载器", desc: "组装好的提示词" }
+        ],
+        why: "提示词写不出来往往是词穷。分类下拉把常见词条摆在手边，点选即可成句。",
+        params: [
+          { name: "text", kind: "多行文本", default: "空", desc: "提示词正文，下拉选择的词条会追加进来。" },
+          { name: "prefix", kind: "下拉选择", default: "不选择", desc: "画质类前缀词条。" },
+          { name: "subject", kind: "下拉选择", default: "不选择", desc: "主体类词条。" },
+          { name: "environment", kind: "下拉选择", default: "不选择", desc: "光照环境类词条。" },
+          { name: "background", kind: "下拉选择", default: "不选择", desc: "背景类词条。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy Wildcards Matrix", cat: "cond",
+        brief: "枚举通配符全部组合，按序输出成批提示词。",
+        desc: "与随机填充不同，它把文本里所有通配符的可能性按顺序系统性枚举：输出填充后的文本列表、组合总数与各位置的选择，配合输出上限可以只取前若干组。做提示词组合的全覆盖测试时，它比随机抽样更有说服力。",
+        inputs: [],
+        outputs: [
+          { type: "STRING", to: "典型下游：条件编码或批量流程", desc: "填充后的提示词列表" },
+          { type: "INT", to: "典型下游：逻辑节点", desc: "组合总数与各占位符的选择序号" }
+        ],
+        why: "随机跑一百次不如系统跑一遍。枚举模式让组合实验从碰运气变成查表。",
+        params: [
+          { name: "text", kind: "多行文本", default: "空", desc: "含通配符标记的提示词。" },
+          { name: "offset", kind: "整数", default: "0", desc: "从第几组组合开始输出，支持生成后变化。" },
+          { name: "output_limit", kind: "整数", default: "1", desc: "最多输出几组，-1 表示全部。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy Prompt Concat", cat: "util",
+        brief: "把两段提示词按分隔符拼接成一段。",
+        desc: "它接收两路文本与一个分隔符，输出拼接结果。输入兼容任意类型，会自动转成文本。把静态前缀与动态生成的词条组合成完整提示词时，它是流程里的小型胶水节点。",
+        inputs: [
+          { name: "prompt1", type: "STRING", from: "典型上游：第一段文本", desc: "前半段" },
+          { name: "prompt2", type: "STRING", from: "典型上游：第二段文本", desc: "后半段" },
+          { name: "separator", type: "STRING", from: "可选，文本", desc: "插入两段之间的分隔符" }
+        ],
+        outputs: [
+          { type: "STRING", to: "典型下游：条件编码", desc: "拼接后的文本" }
+        ],
+        why: "提示词流水线的最后一步几乎都是拼接。有了它，模板与变量就能各自维护。",
+        params: [],
+        tips: ""
+      },
+      {
+        name: "Easy Prompt Line", cat: "util",
+        brief: "把多行文本按行拆成列表，逐行进入流程。",
+        desc: "它把一段多行文本按换行拆成若干条，输出为列表，支持设置起始行、最大行数与是否剔除空行。每行一条提示词的批量跑法就靠它供词，配合逐项处理节点实现一行一次生成。",
+        inputs: [],
+        outputs: [
+          { type: "STRING", to: "典型下游：逐项处理或条件编码", desc: "按行拆出的提示词列表" },
+          { type: "COMBO", to: "典型下游：下拉类输入", desc: "同内容的下拉形式列表" }
+        ],
+        why: "Excel 里粘贴一列词进来就能自动逐行出图，这是最朴素也最实用的批量方式。",
+        params: [
+          { name: "prompt", kind: "多行文本", default: "text", desc: "待拆分的文本，每行一条。" },
+          { name: "start_index", kind: "整数", default: "0", desc: "从第几行开始。" },
+          { name: "max_rows", kind: "整数", default: "1000", desc: "最多取多少行。" },
+          { name: "remove_empty_lines", kind: "开关", default: "开", desc: "剔除空行。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy Prompt Replace", cat: "util",
+        brief: "对提示词做最多三组查找替换。",
+        desc: "它接收一段文本并提供三组查找与替换对，依次执行替换后输出。把模板里的占位词换成批次特定的词条，或统一修正某个错误拼写时，它是最直接的文本手术刀。",
+        inputs: [
+          { name: "prompt", type: "STRING", from: "典型上游：任意文本来源", desc: "待处理的提示词" }
+        ],
+        outputs: [
+          { type: "STRING", to: "典型下游：条件编码", desc: "替换后的文本" }
+        ],
+        why: "模板化提示词的核心操作就是替换。三组名额足够覆盖绝大多数批次差异。",
+        params: [
+          { name: "find1", kind: "文本", default: "空", desc: "第 1 组查找内容；共三组。" },
+          { name: "replace1", kind: "文本", default: "空", desc: "第 1 组替换内容，留空即删除查找词。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy Styles Selector", cat: "cond",
+        brief: "从风格库多选风格，自动套用正负提示词模板。",
+        desc: "它读取内置的 Fooocus 风格库（也可放入自定义风格文件），在节点上多选若干风格后，把风格的正面与负面模板套用到输入的提示词上输出。带占位符的风格会把原提示词填进指定位置。想系统尝试不同风格组合时，它比手抄风格词高效得多。",
+        inputs: [
+          { name: "positive", type: "STRING", from: "可选，正面提示词", desc: "被风格模板包裹的原始正面词" },
+          { name: "negative", type: "STRING", from: "可选，负面提示词", desc: "被风格模板包裹的原始负面词" }
+        ],
+        outputs: [
+          { type: "STRING", to: "典型下游：条件编码或 Easy 加载器", desc: "套用风格后的正面词" },
+          { type: "STRING", to: "典型下游：条件编码或 Easy 加载器", desc: "套用风格后的负面词" }
+        ],
+        why: "风格词模板又长又杂，手写容易漏。风格库多选让风格实验的成本降到几次点击。",
+        params: [
+          { name: "styles", kind: "下拉选择", default: "fooocus_styles", desc: "风格库文件，放入 styles 目录的 json 可扩展。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy Portrait Master", cat: "cond",
+        brief: "滑杆式人像提示词生成器，逐项捏出肖像描述。",
+        desc: "它把人像描述拆成镜头、性别年龄、国籍、体型、姿势、表情、脸型、发型、瞳色等十余组下拉与权重滑杆，逐项选择后自动拼成一段结构化的人像提示词输出。不需要记任何英文词汇，像捏人游戏一样调出想要的肖像。",
+        inputs: [],
+        outputs: [
+          { type: "STRING", to: "典型下游：条件编码或 Easy 加载器", desc: "生成的人像提示词" }
+        ],
+        why: "人像描述的词汇量要求在所有题材里最高。把它参数化之后，稳定产出可控人像不再依赖词库积累。",
+        params: [
+          { name: "shot", kind: "下拉选择", default: "-", desc: "镜头景别，如特写、半身、全身。" },
+          { name: "gender", kind: "下拉选择", default: "Woman", desc: "性别，配合 age 滑杆控制年龄。" },
+          { name: "age", kind: "整数", default: "30", desc: "年龄，18 到 90。" },
+          { name: "nationality_1", kind: "下拉选择", default: "Chinese", desc: "国籍或外貌倾向，可设两项并配混合权重。" },
+          { name: "facial_expression", kind: "下拉选择", default: "-", desc: "面部表情，配权重滑杆控制浓度。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy Pipe In", cat: "util",
+        brief: "把单项数据注入管线，替换其中的对应内容。",
+        desc: "它接收一条管线与若干可选的单项数据（模型、条件、潜空间、VAE、编码器、图像等），把接入的非空项写回管线对应位置后输出。相当于给管线做局部替换，是修整 Easy 流程中段数据的标准工具。",
+        inputs: [
+          { name: "pipe", type: "PIPE_LINE", from: "典型上游：Easy 流程中段", desc: "被修改的管线" },
+          { name: "model", type: "MODEL", from: "可选，外部模型", desc: "替换管线中的模型" },
+          { name: "pos", type: "CONDITIONING", from: "可选，条件来源", desc: "替换正面条件" },
+          { name: "neg", type: "CONDITIONING", from: "可选，条件来源", desc: "替换负面条件" },
+          { name: "latent", type: "LATENT", from: "可选，潜空间", desc: "替换潜空间" },
+          { name: "vae", type: "VAE", from: "可选，VAE", desc: "替换 VAE" },
+          { name: "clip", type: "CLIP", from: "可选，编码器", desc: "替换编码器" },
+          { name: "image", type: "IMAGE", from: "可选，图像", desc: "替换图像" }
+        ],
+        outputs: [
+          { type: "PIPE_LINE", to: "典型下游：后续 Easy 节点", desc: "更新后的管线" }
+        ],
+        why: "管线很方便，但中途换一项数据原本要拆包重装。Pipe In 让替换变成接一根线的事。",
+        params: [],
+        tips: ""
+      },
+      {
+        name: "Easy Pipe Out", cat: "util",
+        brief: "把管线整体拆包，输出全部单项数据。",
+        desc: "它把管线里的一切拆开：模型、正负条件、潜空间、VAE、编码器、图像与种子，全部作为独立输出。需要把 Easy 流程的中间产物交给非 Easy 节点处理时，它是出口。",
+        inputs: [
+          { name: "pipe", type: "PIPE_LINE", from: "典型上游：Easy 流程任意位置", desc: "待拆包的管线" }
+        ],
+        outputs: [
+          { type: "PIPE_LINE", to: "典型下游：后续 Easy 节点", desc: "原样透传的管线" },
+          { type: "MODEL", to: "典型下游：任意标准节点", desc: "拆出的模型" },
+          { type: "CONDITIONING", to: "典型下游：采样节点", desc: "拆出的正负条件" },
+          { type: "LATENT", to: "典型下游：采样或解码", desc: "拆出的潜空间" },
+          { type: "VAE", to: "典型下游：解码节点", desc: "拆出的 VAE" },
+          { type: "CLIP", to: "典型下游：编码节点", desc: "拆出的编码器" },
+          { type: "IMAGE", to: "典型下游：图像处理节点", desc: "拆出的图像" },
+          { type: "INT", to: "典型下游：种子输入", desc: "管线记录的种子" }
+        ],
+        why: "Easy 与非 Easy 生态之间需要一个转换接口，Pipe Out 就是那个出口，两条线互不妨碍。",
+        params: [],
+        tips: ""
+      },
+      {
+        name: "Easy Pipe Edit", cat: "util",
+        brief: "在管线内重新编辑提示词与条件，支持多种合并方式。",
+        desc: "它对管线中的正负条件做二次加工：可以替换提示词文本、指定权重解释方式，并选择新条件与旧条件的关系（替换、拼接、合并、平均或按时间段切换）。做分段提示词、负面词微调这类中段修改时，它一个节点顶一串条件操作。",
+        inputs: [
+          { name: "pipe", type: "PIPE_LINE", from: "典型上游：Easy 流程中段", desc: "待编辑的管线" },
+          { name: "model", type: "MODEL", from: "可选，外部模型", desc: "顺带替换模型" },
+          { name: "pos", type: "CONDITIONING", from: "可选，条件来源", desc: "顺带替换正面条件" },
+          { name: "neg", type: "CONDITIONING", from: "可选，条件来源", desc: "顺带替换负面条件" }
+        ],
+        outputs: [
+          { type: "PIPE_LINE", to: "典型下游：后续 Easy 节点", desc: "编辑后的管线" },
+          { type: "MODEL", to: "典型下游：标准节点", desc: "展开输出的模型" },
+          { type: "CONDITIONING", to: "典型下游：采样节点", desc: "编辑后的正负条件" }
+        ],
+        why: "条件编辑是流程中段最频繁的改动。把它收进一个节点并给出明确的合并语义，改动不再伤筋动骨。",
+        params: [
+          { name: "optional_positive", kind: "多行文本", default: "空", desc: "新的正面提示词，留空沿用原值。" },
+          { name: "conditioning_mode", kind: "下拉选择", default: "replace", desc: "与原条件的关系，可选替换、拼接、合并、平均、时间段。" },
+          { name: "a1111_prompt_style", kind: "开关", default: "关", desc: "按 A1111 风格处理提示词权重。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy XY Plot", cat: "sampler",
+        brief: "管线版 XY 对比图，横纵轴在下拉里直接选参数。",
+        desc: "它把 Easy 管线与 XY 扫描结合：横轴、纵轴各自从下拉里选一个参数（步数、CFG、采样器、去噪、种子、底模、LoRA 等），填入分号分隔的取值序列，运行后自动拼出标注参数的对比大图。对比 Easy 流程的参数组合，一张图就够。",
+        inputs: [
+          { name: "pipe", type: "PIPE_LINE", from: "典型上游：Easy 系加载器", desc: "提供基础配置的管线" }
+        ],
+        outputs: [
+          { type: "PIPE_LINE", to: "典型下游：Easy KSampler", desc: "扫描结束后传递的管线" }
+        ],
+        why: "Easy 流程节点少，参数都藏在管线里。这个节点把扫描能力原样带来，调参不用退回标准流程。",
+        params: [
+          { name: "grid_spacing", kind: "整数", default: "0", desc: "对比图小图间距像素。" },
+          { name: "x_axis", kind: "下拉选择", default: "None", desc: "横轴参数类型。" },
+          { name: "x_values", kind: "多行文本", default: "空", desc: "横轴取值序列，用分号分隔。" },
+          { name: "y_axis", kind: "下拉选择", default: "None", desc: "纵轴参数类型。" },
+          { name: "y_values", kind: "多行文本", default: "空", desc: "纵轴取值序列。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy Int", cat: "util",
+        brief: "整数原点节点，输出一个可连线的整数。",
+        desc: "输出一个整数值，可作为步数、种子、批量数等整数输入的原点。值支持每次生成后自动变化，配合对照实验很方便。",
+        inputs: [],
+        outputs: [
+          { type: "INT", to: "典型下游：任意整数输入", desc: "整数值" }
+        ],
+        why: "整数是流程里出现频率最高的基本类型。原点节点让它们可以像数据一样流转。",
+        params: [
+          { name: "value", kind: "整数", default: "0", desc: "整数值。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy Float", cat: "util",
+        brief: "浮点数原点节点，输出一个可连线的小数。",
+        desc: "输出一个保留三位的浮点数，可作为强度、系数等小数输入的原点。",
+        inputs: [],
+        outputs: [
+          { type: "FLOAT", to: "典型下游：任意浮点输入", desc: "浮点值" }
+        ],
+        why: "权重与强度类参数往往要在多个节点间共享一个值，浮点原点让它们同源同改。",
+        params: [
+          { name: "value", kind: "浮点数", default: "0", desc: "浮点值。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy Convert Anything", cat: "util",
+        brief: "任意类型转指定类型，流程里的万能转换头。",
+        desc: "接收任意类型数据，按下拉选择转换成字符串、整数、浮点或布尔输出。布尔开关接数值、整数接文本之类的不匹配场景，接一个它就能通。",
+        inputs: [
+          { name: "source", type: "*", from: "典型上游：任意数据", desc: "待转换的数据" }
+        ],
+        outputs: [
+          { type: "*", to: "典型下游：目标类型输入", desc: "转换后的值" }
+        ],
+        why: "类型不匹配是连线报错的大头。一个万能转换头能救急绝大多数场景。",
+        params: [
+          { name: "output_type", kind: "下拉选择", default: "string", desc: "目标类型，可选 string、int、float、boolean。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy If Else", cat: "util",
+        brief: "按布尔值二选一，惰性执行不跑多余分支。",
+        desc: "接收一个布尔值与两路任意数据，为真输出第一路，为假输出第二路。采用惰性求值：只计算被选中那一路的数据，未选中的分支完全不执行，做条件流程时不会浪费算力。",
+        inputs: [
+          { name: "boolean", type: "BOOLEAN", from: "典型上游：布尔开关", desc: "条件" },
+          { name: "on_true", type: "*", from: "可选，任意数据", desc: "为真时输出" },
+          { name: "on_false", type: "*", from: "可选，任意数据", desc: "为假时输出" }
+        ],
+        outputs: [
+          { type: "*", to: "典型下游：任意输入", desc: "选中的那一路数据" }
+        ],
+        why: "两个方案二选一是流程设计的日常。惰性求值保证了被放弃的方案零成本。",
+        params: [],
+        tips: ""
+      },
+      {
+        name: "Easy Simple Math", cat: "util",
+        brief: "用公式字符串做计算，输出整数浮点与布尔。",
+        desc: "在一个文本框里写公式（例如 a + b、pow(a, 2)、ceil(a / b)），节点代入可选输入 a、b、c 求值，同时输出整数、浮点与布尔三种形式。比拨算盘式的专用计算节点灵活得多。",
+        inputs: [
+          { name: "a", type: "*", from: "可选，任意数据", desc: "公式中的变量 a" },
+          { name: "b", type: "*", from: "可选，任意数据", desc: "公式中的变量 b" },
+          { name: "c", type: "*", from: "可选，任意数据", desc: "公式中的变量 c" }
+        ],
+        outputs: [
+          { type: "INT", to: "典型下游：整数输入", desc: "结果的整数形式" },
+          { type: "FLOAT", to: "典型下游：浮点输入", desc: "结果的浮点形式" },
+          { type: "BOOLEAN", to: "典型下游：布尔输入", desc: "结果是否非零" }
+        ],
+        why: "流程里的小计算五花八门。给一个能写公式的口子，就不再需要按运算符各备一个节点。",
+        params: [
+          { name: "value", kind: "文本", default: "空", desc: "计算公式，支持四则运算与常用函数。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy Anything Index Switch", cat: "util",
+        brief: "按序号从多路输入里选一路，任意类型通用。",
+        desc: "提供 index 序号与最多十路任意类型输入，输出 index 指定的那一路。采用惰性求值，未选中的输入不会被执行。配合序号发生器可以做轮流出图、批量分支轮换等逻辑。",
+        inputs: [
+          { name: "index", type: "INT", from: "典型上游：序号来源", desc: "选择第几路，从 0 开始" },
+          { name: "value0", type: "*", from: "可选，任意数据", desc: "第 0 路输入，最多可接十路" }
+        ],
+        outputs: [
+          { type: "*", to: "典型下游：任意输入", desc: "选中路的数据" }
+        ],
+        why: "超过两个选项时 If Else 就不够用了。序号开关把多路选择变成一个数字的事。",
+        params: [],
+        tips: ""
+      },
+      {
+        name: "Easy Seed", cat: "util",
+        brief: "种子原点节点，输出可分发的整型种子。",
+        desc: "输出一个种子值并附带每次生成后的变化策略（固定、随机、递增等），可以同时分发给多个需要种子的节点。它与 Easy Global Seed 的区别是走连线分发，控制范围是接线的部分而非全画布。",
+        inputs: [],
+        outputs: [
+          { type: "INT", to: "典型下游：各节点的种子输入", desc: "种子值" }
+        ],
+        why: "多节点需要同一种子时，一条种子线比手动对齐若干个控件可靠得多。",
+        params: [
+          { name: "seed", kind: "整数", default: "0", desc: "种子值，面板附有变化策略下拉。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy Seed List", cat: "util",
+        brief: "按规则批量生成种子列表，逐项供循环使用。",
+        desc: "按范围与方式（随机、递增、递减）一次生成一组种子，输出种子列表与总数，专门配合循环节点使用：循环每轮取一个种子，实现一轮一种子的批量探索。",
+        inputs: [],
+        outputs: [
+          { type: "INT", to: "典型下游：循环体内的种子输入", desc: "逐轮变化的种子" },
+          { type: "INT", to: "典型下游：循环控制", desc: "列表总数" }
+        ],
+        why: "批量试种的正确姿势是列表化。它与循环节点组合，把试种变成全自动流程。",
+        params: [
+          { name: "min_num", kind: "整数", default: "0", desc: "种子范围下限。" },
+          { name: "max_num", kind: "整数", default: "最大值", desc: "种子范围上限。" },
+          { name: "method", kind: "下拉选择", default: "random", desc: "生成方式，随机、递增或递减。" },
+          { name: "total", kind: "整数", default: "1", desc: "生成多少个种子。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy Clean GPU", cat: "util",
+        brief: "执行到此处时强制清理显存，再继续后续流程。",
+        desc: "数据原样穿过这个节点，但在执行时它会强制卸载模型并清理显存。放在大模型切换点之后（例如底模采样结束、进入放大模型之前），能显著降低峰值显存，让大流程在低显存显卡上跑通。",
+        inputs: [
+          { name: "anything", type: "*", from: "典型上游：模型切换前的任意数据", desc: "任意数据，原样透传" }
+        ],
+        outputs: [
+          { type: "*", to: "典型下游：后续流程", desc: "透传的数据" }
+        ],
+        why: "低显存跑大流程，清理时机比清理次数更重要。把它插在阶段交界处，成本几乎为零。",
+        params: [],
+        tips: ""
+      },
+      {
+        name: "Easy Image RemBg", cat: "image",
+        brief: "一键抠图去背景，输出前景图与遮罩。",
+        desc: "它内置多种去背景模型（RMBG 系列、Inspyrenet、BEN2），对输入图像自动分割主体并抠除背景，输出透明前景图与遮罩。可加纯色背景、细化前景边缘。做贴纸、换背景或为局部重绘准备遮罩时非常省事。",
+        inputs: [
+          { name: "images", type: "IMAGE", from: "典型上游：任意图像来源", desc: "待抠图的图像" }
+        ],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：合成或保存节点", desc: "去背景后的图像" },
+          { type: "MASK", to: "典型下游：遮罩类节点", desc: "主体遮罩" }
+        ],
+        why: "抠图是高频需求，模型自动分割的质量已经足够日常使用，省去手动描边的全部时间。",
+        params: [
+          { name: "rem_mode", kind: "下拉选择", default: "RMBG-1.4", desc: "去背景模型，不同模型对主体类型的适应性不同。" },
+          { name: "add_background", kind: "下拉选择", default: "none", desc: "抠图后是否垫纯色背景。" },
+          { name: "refine_foreground", kind: "开关", default: "关", desc: "细化前景边缘，发丝类细节更自然。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy Join Image Batch", cat: "image",
+        brief: "把多路图像合并成一个批次。",
+        desc: "它把接入的多路图像按顺序合并为一个批次输出，接口随连线自动增加。不同来源的图要一起批量处理（一起放大、一起存盘）时，它是汇合点。",
+        inputs: [
+          { name: "image1", type: "IMAGE", from: "典型上游：第一路图像", desc: "继续连线会自动追加更多输入" }
+        ],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：批量处理节点", desc: "合并后的图像批次" }
+        ],
+        why: "批处理入口只认一个批次。合并节点把散装图像整理成规范批次。",
+        params: [],
+        tips: ""
+      },
+      {
+        name: "Easy Image Chooser", cat: "image",
+        brief: "运行时暂停并在多张图里人工挑选一张。",
+        desc: "它接收多张图像并在执行到此处时暂停预览，由人工点击选定一张继续向下游传递。支持记住上次选择以便重跑。批量出图后靠人眼定稿的环节，用它可以留在画布内完成，不必导出到外部挑选再拖回来。",
+        inputs: [
+          { name: "images", type: "IMAGE", from: "典型上游：预览或批量来源", desc: "候选图像" }
+        ],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：精修或保存节点", desc: "人工选定的图像" }
+        ],
+        why: "全自动流程缺少的就是人工把关的接口。选择器把这一环补上，流程依然一气呵成。",
+        params: [
+          { name: "mode", kind: "下拉选择", default: "Always Pause", desc: "每次执行都暂停，或沿用上次选择直接通过。" },
+          { name: "preview_rescale", kind: "浮点数", default: "1.0", desc: "预览缩放比例，候选图过大时调小。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy XYInputs: Steps", cat: "util",
+        brief: "生成步数类参数序列，供 Easy XY Plot 做轴。",
+        desc: "它为 Easy XY Plot 提供一条步数类坐标轴：目标参数可选总步数、起始步、结束步，设置取值个数与首末值后输出参数序列。与 Easy XY Plot 搭配即可扫描不同步数下的成图效果。",
+        inputs: [],
+        outputs: [
+          { type: "X_Y", to: "典型下游：Easy XY Plot 的横轴或纵轴", desc: "步数参数序列" }
+        ],
+        why: "步数是最常扫的参数。序列节点让扫描范围与密度一次配好。",
+        params: [
+          { name: "target_parameter", kind: "下拉选择", default: "steps", desc: "扫描哪个步数参数。" },
+          { name: "batch_count", kind: "整数", default: "3", desc: "取值个数。" },
+          { name: "first_step", kind: "整数", default: "10", desc: "序列首值。" },
+          { name: "last_step", kind: "整数", default: "20", desc: "序列末值。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy XYInputs: PromptSR", cat: "util",
+        brief: "按查找替换生成提示词序列，供 Easy XY Plot 做轴。",
+        desc: "它为 Easy XY Plot 提供提示词查找替换轴：指定查找文本与若干替换项，每项生成一条变体。一次扫描即可对比不同触发词或风格词对画面的影响。",
+        inputs: [],
+        outputs: [
+          { type: "X_Y", to: "典型下游：Easy XY Plot", desc: "提示词变体序列" }
+        ],
+        why: "提示词效果只有摆在一起看才直观。查找替换机制把变体生成自动化。",
+        params: [
+          { name: "target_prompt", kind: "下拉选择", default: "positive", desc: "对正面或负面提示词做替换。" },
+          { name: "search_txt", kind: "文本", default: "空", desc: "要查找的文字片段。" },
+          { name: "replace_count", kind: "整数", default: "3", desc: "替换变体数量，替换项在面板里逐行填写。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy XYInputs: Seeds++ Batch", cat: "util",
+        brief: "生成种子批量轴，扫描相邻种子的构图差异。",
+        desc: "它为 Easy XY Plot 提供种子批量轴：设定数量后，网格中每个格子使用相邻的下一个种子。用来快速观察种子对构图的影响幅度，或筛选值得保留的种子。",
+        inputs: [],
+        outputs: [
+          { type: "X_Y", to: "典型下游：Easy XY Plot", desc: "种子批量序列" }
+        ],
+        why: "换种子的成本是一次点击，批量换种子的成本是一个节点。筛种子的第一步永远是横向看一圈。",
+        params: [
+          { name: "batch_count", kind: "整数", default: "3", desc: "本轴取多少个种子。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Easy XYInputs: Denoise", cat: "util",
+        brief: "生成去噪强度序列，供 Easy XY Plot 做轴。",
+        desc: "它为 Easy XY Plot 提供去噪强度轴：设置取值个数与首末强度，输出参数序列。扫描图生图的重绘幅度、或高清修复的细节强度时都用它。",
+        inputs: [],
+        outputs: [
+          { type: "X_Y", to: "典型下游：Easy XY Plot", desc: "去噪强度序列" }
+        ],
+        why: "去噪强度是最值得扫描的图生图参数，没有之一。序列化之后幅度对比一目了然。",
+        params: [
+          { name: "batch_count", kind: "整数", default: "3", desc: "取值个数。" },
+          { name: "first_denoise", kind: "浮点数", default: "0.2", desc: "序列首值。" },
+          { name: "last_denoise", kind: "浮点数", default: "0.8", desc: "序列末值。" }
+        ],
+        tips: ""
       }
     ]
   });
@@ -4524,6 +6249,474 @@
           { name: "replace_1", kind: "文本", default: "空", desc: "第 1 个替换内容；后续为 replace_2、replace_3 等，留空可得到去掉该词的对照样本。" }
         ],
         tips: "想对比某个词的有无，把替换项留空即可得到无该词的对照样本。"
+      },
+      {
+        name: "KSampler SDXL (Eff.)", cat: "sampler",
+        brief: "接收 SDXL 元组的两段式采样器，自动完成基础与精修切换。",
+        desc: "它配合 SDXL 专用加载器工作：输入一个包含基础与精修两组模型条件的元组，采样时先跑基础模型，到精修分界步后无缝切换精修模型，全程一次完成。支持实时预览方式与分块解码选项，输出元组、潜空间、VAE 与图像。",
+        inputs: [
+          { name: "sdxl_tuple", type: "SDXL_TUPLE", from: "典型上游：Eff. Loader SDXL", desc: "基础与精修模型条件的打包" },
+          { name: "latent_image", type: "LATENT", from: "典型上游：Eff. Loader SDXL", desc: "初始潜空间" },
+          { name: "optional_vae", type: "VAE", from: "可选，外部 VAE", desc: "覆盖元组中的解码器" },
+          { name: "script", type: "SCRIPT", from: "可选，脚本类节点", desc: "附加的脚本配置" }
+        ],
+        outputs: [
+          { type: "SDXL_TUPLE", to: "典型下游：后续 SDXL 采样", desc: "回传的元组" },
+          { type: "LATENT", to: "典型下游：放大或二次采样", desc: "采样结果潜空间" },
+          { type: "VAE", to: "典型下游：解码节点", desc: "解码器" },
+          { type: "IMAGE", to: "典型下游：保存或对比", desc: "采样并解码后的图像" }
+        ],
+        why: "SDXL 基础加精修两段式本要两台采样器接力。这个节点把它压成一台，分界步由 refine_at_step 一个参数决定。",
+        params: [
+          { name: "noise_seed", kind: "整数", default: "0", desc: "噪声种子，附带每次生成后的变化策略。" },
+          { name: "steps", kind: "整数", default: "20", desc: "两段合计的总步数。" },
+          { name: "refine_at_step", kind: "整数", default: "-1", desc: "切换精修模型的分界步，-1 表示不切换。" },
+          { name: "cfg", kind: "浮点数", default: "7.0", desc: "提示词服从度，SDXL 建议 4 到 7。" },
+          { name: "vae_decode", kind: "下拉选择", default: "true", desc: "解码方式，可选分块或只输出潜空间。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Eff. Loader SDXL", cat: "load",
+        brief: "SDXL 专用加载器，一次打包基础与精修两组模型条件。",
+        desc: "它同时选择基础底模与精修底模，各自设置跳层与美学评分，加上提示词、权重解释方式与分辨率，输出一个 SDXL 元组交给 KSampler SDXL (Eff.) 使用。提示词编码一次完成，基础与精修共用，权重解释支持 A1111 风格以便还原旧出图。",
+        inputs: [
+          { name: "lora_stack", type: "LORA_STACK", from: "可选，LoRA Stacker", desc: "LoRA 配方堆栈" },
+          { name: "cnet_stack", type: "CONTROL_NET_STACK", from: "可选，Control Net Stacker", desc: "ControlNet 堆栈" }
+        ],
+        outputs: [
+          { type: "SDXL_TUPLE", to: "典型下游：KSampler SDXL (Eff.)", desc: "基础与精修的模型条件元组" },
+          { type: "LATENT", to: "典型下游：KSampler SDXL (Eff.)", desc: "按分辨率生成的空潜空间" },
+          { type: "VAE", to: "典型下游：解码节点", desc: "解码器" },
+          { type: "DEPENDENCIES", to: "典型下游：其他效率节点", desc: "回传用的依赖数据" }
+        ],
+        why: "SDXL 两段式工作流的头部本要双份加载与编码。这个加载器一份搞定，且与 XY 扫描体系完全兼容。",
+        params: [
+          { name: "base_ckpt_name", kind: "下拉选择", default: "第一个底模文件", desc: "基础模型。" },
+          { name: "refiner_ckpt_name", kind: "下拉选择", default: "None", desc: "精修模型，None 表示只用基础模型。" },
+          { name: "positive_ascore", kind: "浮点数", default: "6.0", desc: "正面美学评分标签，SDXL 建议 4 到 7。" },
+          { name: "token_normalization", kind: "下拉选择", default: "none", desc: "权重令牌归一化，对齐 A1111 时选 length+mean。" },
+          { name: "weight_interpretation", kind: "下拉选择", default: "comfy", desc: "权重解释方式，A1111 档可还原 WebUI 写法。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Control Net Stacker", cat: "cond",
+        brief: "把单个 ControlNet 与控制图打包进堆栈线。",
+        desc: "它接收一个 ControlNet 模型、一张控制图与强度、起止区间，打包成堆栈追加到上游堆栈之后。多个堆栈节点串联即可叠加任意数量的控制条件，最后交给 Apply ControlNet Stack 或加载器统一应用。",
+        inputs: [
+          { name: "control_net", type: "CONTROL_NET", from: "典型上游：ControlNet 加载器", desc: "控制模型" },
+          { name: "image", type: "IMAGE", from: "典型上游：控制图像", desc: "姿态、深度或线稿图" },
+          { name: "cnet_stack", type: "CONTROL_NET_STACK", from: "可选，另一个堆栈节点", desc: "叠加到前面的既有堆栈" }
+        ],
+        outputs: [
+          { type: "CONTROL_NET_STACK", to: "典型下游：Apply ControlNet Stack 或加载器", desc: "追加后的堆栈" }
+        ],
+        why: "堆栈化让多 ControlNet 配方变成一条可插拔的线，整体替换与跨流程复用都很轻松。",
+        params: [
+          { name: "strength", kind: "浮点数", default: "1.0", desc: "该层控制强度。" },
+          { name: "start_percent", kind: "浮点数", default: "0.0", desc: "控制生效的起始进度。" },
+          { name: "end_percent", kind: "浮点数", default: "1.0", desc: "控制生效的结束进度。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Apply ControlNet Stack", cat: "cond",
+        brief: "把堆栈里的全部 ControlNet 一次性应用到条件上。",
+        desc: "它接收正负两条条件与一条堆栈，按顺序把堆栈里每个 ControlNet 应用完毕后输出。配方与应用分离，同一份堆栈可以喂给不同流程，堆栈为空时条件原样通过，方便做有无对照。",
+        inputs: [
+          { name: "positive", type: "CONDITIONING", from: "典型上游：条件编码", desc: "正面条件" },
+          { name: "negative", type: "CONDITIONING", from: "典型上游：条件编码", desc: "负面条件" },
+          { name: "cnet_stack", type: "CONTROL_NET_STACK", from: "可选，Control Net Stacker", desc: "要应用的堆栈" }
+        ],
+        outputs: [
+          { type: "CONDITIONING", to: "典型下游：采样节点正面输入", desc: "应用全部控制后的正面条件" },
+          { type: "CONDITIONING", to: "典型下游：采样节点负面输入", desc: "应用全部控制后的负面条件" }
+        ],
+        why: "应用端独立存在，意味着 ControlNet 配方可以像插件一样挂到任何流程分支上。",
+        params: [],
+        tips: ""
+      },
+      {
+        name: "XY Input: Seeds++ Batch", cat: "util",
+        brief: "生成种子批量序列，横向对比相邻种子。",
+        desc: "它为 XY Plot 提供一条种子轴：设定数量后，网格中每个格子依次用相邻的下一个种子。筛种子、观察构图对种子的敏感度，都从这里开始。",
+        inputs: [],
+        outputs: [
+          { type: "XY", to: "典型下游：XY Plot 的 X 或 Y 输入", desc: "种子批量序列" }
+        ],
+        why: "种子是唯一无法凭经验预测的参数，只能横着看。批量轴把看一圈的成本降到一次运行。",
+        params: [
+          { name: "batch_count", kind: "整数", default: "3", desc: "本轴取多少个种子，0 表示停用该轴。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "XY Input: Add/Return Noise", cat: "util",
+        brief: "扫描噪声注入与剩余噪声开关的组合。",
+        desc: "它为 XY Plot 提供一条开关轴，在加噪开关与剩余噪声返回开关之间二选一扫描，每格对比开与关的差异。排查分段采样接力是否正确、或噪声设置对结果的影响时很实用。",
+        inputs: [],
+        outputs: [
+          { type: "XY", to: "典型下游：XY Plot", desc: "开关状态序列" }
+        ],
+        why: "噪声类开关的影响肉眼可辨却难以预料。把它做成轴，两次运行就能看清规律。",
+        params: [
+          { name: "XY_type", kind: "下拉选择", default: "add_noise", desc: "扫描加噪开关还是剩余噪声返回开关。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "XY Input: CFG Scale", cat: "util",
+        brief: "生成 CFG 数值序列，扫描提示词服从度。",
+        desc: "它为 XY Plot 提供一条 CFG 轴：设定取值个数与首末值，输出等差序列。CFG 是画质与服从度的核心权衡，横向扫一遍是最快找到甜点的办法。",
+        inputs: [],
+        outputs: [
+          { type: "XY", to: "典型下游：XY Plot", desc: "CFG 序列" }
+        ],
+        why: "模型换一代，CFG 甜点就变一次。轴化扫描让这个常数永远有据可依。",
+        params: [
+          { name: "batch_count", kind: "整数", default: "3", desc: "取值个数，0 表示停用。" },
+          { name: "first_cfg", kind: "浮点数", default: "7.0", desc: "序列首值。" },
+          { name: "last_cfg", kind: "浮点数", default: "9.0", desc: "序列末值。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "XY Input: Sampler/Scheduler", cat: "util",
+        brief: "逐格切换采样器与调度器组合，一次比完全部候选。",
+        desc: "它为 XY Plot 提供采样器轴：目标可选只扫采样器、只扫调度器或两者成对扫描，面板展开若干行下拉逐行选择候选组合。比较 euler、dpmpp_2m 等算法在同一提示词下的差异，这是最直观的方式。",
+        inputs: [],
+        outputs: [
+          { type: "XY", to: "典型下游：XY Plot", desc: "采样器调度器序列" }
+        ],
+        why: "采样器好坏全凭口口相传，不如一张网格图有说服力。",
+        params: [
+          { name: "target_parameter", kind: "下拉选择", default: "sampler & scheduler", desc: "扫描对象，采样器、调度器或两者组合。" },
+          { name: "input_count", kind: "整数", default: "3", desc: "启用几行候选。" },
+          { name: "sampler_1", kind: "下拉选择", default: "None", desc: "第 1 行的采样器，None 跳过该行。" },
+          { name: "scheduler_1", kind: "下拉选择", default: "None", desc: "第 1 行的调度器。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "XY Input: Denoise", cat: "util",
+        brief: "生成去噪强度序列，扫描重绘幅度。",
+        desc: "它为 XY Plot 提供去噪强度轴：设定个数与首末值，输出等差序列。图生图的重绘幅度、高清修复的细节强度都靠它定标。",
+        inputs: [],
+        outputs: [
+          { type: "XY", to: "典型下游：XY Plot", desc: "去噪强度序列" }
+        ],
+        why: "重绘幅度差 0.1 可能就是能用与不能用之差，扫一遍立刻见分晓。",
+        params: [
+          { name: "batch_count", kind: "整数", default: "3", desc: "取值个数。" },
+          { name: "first_denoise", kind: "浮点数", default: "0.2", desc: "序列首值。" },
+          { name: "last_denoise", kind: "浮点数", default: "0.8", desc: "序列末值。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "XY Input: VAE", cat: "util",
+        brief: "逐格切换 VAE，对比解码器对色彩的影响。",
+        desc: "它为 XY Plot 提供一条 VAE 轴，两种模式：从下拉逐行选择 VAE 文件，或从目录批量读入一组 VAE。底模内置 VAE 发灰、发绿时，扫一遍外部 VAE 立见高下。",
+        inputs: [],
+        outputs: [
+          { type: "XY", to: "典型下游：XY Plot", desc: "VAE 序列" }
+        ],
+        why: "VAE 的色彩差异必须并排看才明显。这条轴专治发灰恐惧症。",
+        params: [
+          { name: "input_mode", kind: "下拉选择", default: "VAE Names", desc: "逐个指定或目录批量。" },
+          { name: "vae_count", kind: "整数", default: "3", desc: "启用几行 VAE。" },
+          { name: "vae_name_1", kind: "下拉选择", default: "None", desc: "第 1 行的 VAE 文件。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "XY Input: Aesthetic Score", cat: "util",
+        brief: "扫描 SDXL 美学评分标签的取值。",
+        desc: "它为 XY Plot 提供美学评分轴：分别可扫正面或负面的评分标签，设定个数与首末值。SDXL 系模型对评分标签敏感，扫描后常能找到更适合当前模型的美学分档。",
+        inputs: [],
+        outputs: [
+          { type: "XY", to: "典型下游：XY Plot", desc: "评分序列" }
+        ],
+        why: "评分标签是 SDXL 隐藏的画质旋钮。它的最佳值因模型而异，值得一扫。",
+        params: [
+          { name: "target_ascore", kind: "下拉选择", default: "positive", desc: "扫正面还是负面的评分。" },
+          { name: "batch_count", kind: "整数", default: "3", desc: "取值个数。" },
+          { name: "first_ascore", kind: "浮点数", default: "0.0", desc: "序列首值。" },
+          { name: "last_ascore", kind: "浮点数", default: "10.0", desc: "序列末值。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "XY Input: Refiner On/Off", cat: "util",
+        brief: "对比开启与关闭精修模型的成图差异。",
+        desc: "它为 XY Plot 提供一条两格的轴：一格在指定百分比处切换精修模型，一格完全不切换。想量化精修模型到底带来了什么，这两格并排一看便知。",
+        inputs: [],
+        outputs: [
+          { type: "XY", to: "典型下游：XY Plot", desc: "精修开关序列" }
+        ],
+        why: "精修模型不是免费的午餐。这条轴用最少的格子回答它值不值。",
+        params: [
+          { name: "refine_at_percent", kind: "浮点数", default: "0.80", desc: "切换精修的进度百分比。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "XY Input: Checkpoint", cat: "util",
+        brief: "逐格切换底模，可连同跳层与 VAE 一起扫。",
+        desc: "它为 XY Plot 提供底模轴：逐行指定底模，模式可选只换模型、连跳层一起换或连 VAE 一起换，也支持从目录批量读入。横评多个模型在同一提示词下的表现，一张图完成。",
+        inputs: [],
+        outputs: [
+          { type: "XY", to: "典型下游：XY Plot", desc: "底模序列" }
+        ],
+        why: "选模型靠横评。这条轴把换模型、换跳层、换 VAE 的全部组合纳入一次扫描。",
+        params: [
+          { name: "input_mode", kind: "下拉选择", default: "Ckpt Names", desc: "扫描模式，决定每格换哪些配置。" },
+          { name: "ckpt_count", kind: "整数", default: "3", desc: "启用几行底模。" },
+          { name: "ckpt_name_1", kind: "下拉选择", default: "None", desc: "第 1 行的底模文件。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "XY Input: Clip Skip", cat: "util",
+        brief: "生成跳层序列，扫描编码器截断位置。",
+        desc: "它为 XY Plot 提供跳层轴：针对基础或精修模型，设定个数与首末跳层值。动漫模型对跳层敏感，-1 到 -4 之间扫一遍即可确定最佳值。",
+        inputs: [],
+        outputs: [
+          { type: "XY", to: "典型下游：XY Plot", desc: "跳层序列" }
+        ],
+        why: "跳层影响风格浓度，凭感觉猜不如一次扫清。",
+        params: [
+          { name: "target_ckpt", kind: "下拉选择", default: "Base", desc: "作用于基础还是精修模型。" },
+          { name: "batch_count", kind: "整数", default: "3", desc: "取值个数。" },
+          { name: "first_clip_skip", kind: "整数", default: "-1", desc: "序列首值。" },
+          { name: "last_clip_skip", kind: "整数", default: "-3", desc: "序列末值。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "XY Input: LoRA", cat: "util",
+        brief: "逐格切换 LoRA 与强度，横评一批 LoRA 的效果。",
+        desc: "它为 XY Plot 提供 LoRA 轴：模式可选只列名称、带强度或从目录批量读入，每格加载指定 LoRA 并按设定强度应用。同一提示词下横评几十个 LoRA，一张网格图分出高下。",
+        inputs: [
+          { name: "lora_stack", type: "LORA_STACK", from: "可选，LoRA Stacker", desc: "每格共同叠加的基础堆栈" }
+        ],
+        outputs: [
+          { type: "XY", to: "典型下游：XY Plot", desc: "LoRA 序列" }
+        ],
+        why: "下载一时爽，筛选火葬场。批量横评是把收藏变成生产力的唯一路径。",
+        params: [
+          { name: "input_mode", kind: "下拉选择", default: "LoRA Names", desc: "只列名称、连强度一起指定或目录批量。" },
+          { name: "lora_count", kind: "整数", default: "3", desc: "启用几行。" },
+          { name: "model_strength", kind: "浮点数", default: "1.0", desc: "统一的模型侧强度（简单模式）。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "XY Input: LoRA Plot", cat: "util",
+        brief: "扫描单个 LoRA 的强度网格，纵横各扫一个权重。",
+        desc: "它为 XY Plot 同时生成两条轴：一条扫模型侧强度，一条扫文本侧强度（或范围插值），网格中每个格子对应一组权重组合。给新 LoRA 定强度，两张参数一交叉就找准位置。",
+        inputs: [
+          { name: "lora_stack", type: "LORA_STACK", from: "可选，LoRA Stacker", desc: "每格共同叠加的基础堆栈" }
+        ],
+        outputs: [
+          { type: "XY", to: "典型下游：XY Plot 的 X 与 Y 输入", desc: "两条强度轴" }
+        ],
+        why: "模型侧与文本侧强度是二维空间，单轴扫描会漏掉角落里的最优解。",
+        params: [
+          { name: "lora_name", kind: "下拉选择", default: "None", desc: "要扫描的 LoRA 文件。" },
+          { name: "first_decay", kind: "浮点数", default: "0", desc: "范围插值模式下的首末衰减设置。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "XY Input: LoRA Stacks", cat: "util",
+        brief: "把多条 LoRA 堆栈作为一轴，整体对比不同配方。",
+        desc: "它接收最多五条 LoRA 堆栈，每条堆栈作为网格中的一格。对比的不是单个 LoRA 而是整套配方：常用药方各存一个堆栈节点，接上来一次比个明白。",
+        inputs: [
+          { name: "lora_stack_1", type: "LORA_STACK", from: "可选，LoRA Stacker", desc: "第 1 条配方，最多五条" }
+        ],
+        outputs: [
+          { type: "XY", to: "典型下游：XY Plot", desc: "配方序列" }
+        ],
+        why: "配方的价值要靠对比证明。堆栈粒度的轴让整套配方的迭代有据可查。",
+        params: [],
+        tips: ""
+      },
+      {
+        name: "XY Input: Control Net", cat: "util",
+        brief: "扫描 ControlNet 强度或起止区间。",
+        desc: "它为 XY Plot 提供 ControlNet 轴，可分别扫强度、起始百分比或结束百分比：指定控制模型与控制图后，网格中每格按对应参数应用控制。给 ControlNet 定强度区间，一图搞定。",
+        inputs: [
+          { name: "control_net", type: "CONTROL_NET", from: "典型上游：ControlNet 加载器", desc: "控制模型" },
+          { name: "image", type: "IMAGE", from: "典型上游：控制图像", desc: "控制图" },
+          { name: "cnet_stack", type: "CONTROL_NET_STACK", from: "可选，堆栈", desc: "每格共同叠加的其他控制" }
+        ],
+        outputs: [
+          { type: "XY", to: "典型下游：XY Plot", desc: "控制参数序列" }
+        ],
+        why: "ControlNet 太强会锁死构图，太弱等于没挂。它的最佳区间只能扫出来。",
+        params: [
+          { name: "batch_count", kind: "整数", default: "3", desc: "取值个数。" },
+          { name: "first_strength", kind: "浮点数", default: "0.0", desc: "强度扫描的首值。" },
+          { name: "last_strength", kind: "浮点数", default: "1.0", desc: "强度扫描的末值。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "XY Input: Control Net Plot", cat: "util",
+        brief: "同时扫 ControlNet 强度与起始点，输出二维网格。",
+        desc: "它一次性提供两条轴：强度与起始百分比各扫一条，网格铺开参数平面。想精细刻画某个控制模型的行为曲线时，这是最完整的扫描方式。",
+        inputs: [
+          { name: "control_net", type: "CONTROL_NET", from: "典型上游：ControlNet 加载器", desc: "控制模型" },
+          { name: "image", type: "IMAGE", from: "典型上游：控制图像", desc: "控制图" }
+        ],
+        outputs: [
+          { type: "XY", to: "典型下游：XY Plot 的 X 与 Y 输入", desc: "两条控制参数轴" }
+        ],
+        why: "单轴只能看到一条线，二维网格才能看到面。调 ControlNet 参数平面就靠它。",
+        params: [
+          { name: "strength_count", kind: "整数", default: "3", desc: "强度轴取值个数。" },
+          { name: "start_percent", kind: "浮点数", default: "0.0", desc: "起始百分比轴参数。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "XY Input: Manual XY Entry", cat: "util",
+        brief: "用一行文本手写任意类型的扫描轴。",
+        desc: "它把全部轴类型收进一个下拉加一个文本框：选好类型后按语法用分号分隔直接写值，即可生成对应序列。面板数量受限时，或想快速试一组手写值，它比专用的轴节点更轻便。配合说明节点查看每种类型的语法。",
+        inputs: [],
+        outputs: [
+          { type: "XY", to: "典型下游：XY Plot", desc: "手写序列" }
+        ],
+        why: "一个节点覆盖所有轴类型，是效率节点 XY 体系里的瑞士军刀。",
+        params: [
+          { name: "plot_type", kind: "下拉选择", default: "Nothing", desc: "轴类型，覆盖种子、步数、CFG、采样器、去噪、VAE、提示词替换、底模、跳层、LoRA 等。" },
+          { name: "plot_value", kind: "多行文本", default: "空", desc: "按类型语法书写的取值，用分号分隔。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Manual XY Entry Info", cat: "util",
+        brief: "手写轴的语法速查面板，列出全部可用取值。",
+        desc: "它是一个纯说明节点：面板上列出每种手写轴的书写语法，以及当前环境里可用的采样器、调度器、VAE、底模与 LoRA 的完整名单。写 Manual XY Entry 时照着抄即可，避免拼写错误导致整轴失效。",
+        inputs: [],
+        outputs: [],
+        why: "手写语法记不住是常态。把语法与可选值常驻画布一角，写轴零查文档。",
+        params: [
+          { name: "notes", kind: "多行文本", default: "内置语法与名单", desc: "只读的速查内容，随环境自动生成。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Join XY Inputs of Same Type", cat: "util",
+        brief: "把两条同类型轴拼接成一条更长的轴。",
+        desc: "它接收两条类型相同的 XY 轴，把取值依序合并成一条输出。专用轴节点面板行数有限时，用两三个节点拼接即可突破上限；不同来源的同型序列也能借此汇合。",
+        inputs: [
+          { name: "XY_1", type: "XY", from: "典型上游：同类型轴节点", desc: "前半段序列" },
+          { name: "XY_2", type: "XY", from: "典型上游：同类型轴节点", desc: "后半段序列" }
+        ],
+        outputs: [
+          { type: "XY", to: "典型下游：XY Plot", desc: "合并后的序列" }
+        ],
+        why: "轴长度不该被面板行数锁死。拼接节点让扫描规模按需扩展。",
+        params: [],
+        tips: ""
+      },
+      {
+        name: "Image Overlay", cat: "image",
+        brief: "把一张图按偏移旋转透明度叠加到另一张上。",
+        desc: "它接收底图与叠加图，支持叠加图自动缩放适配、按倍数或按目标尺寸缩放，再配合位移、旋转与透明度完成合成，可选遮罩限制叠加区域。做水印、标签、拼贴与蒙版合成时，一个节点完成全部几何变换。",
+        inputs: [
+          { name: "base_image", type: "IMAGE", from: "典型上游：底图来源", desc: "底层图像" },
+          { name: "overlay_image", type: "IMAGE", from: "典型上游：叠加图来源", desc: "上层图像" },
+          { name: "optional_mask", type: "MASK", from: "可选，遮罩来源", desc: "限制叠加区域" }
+        ],
+        outputs: [
+          { type: "IMAGE", to: "典型下游：保存或继续合成", desc: "叠加后的图像" }
+        ],
+        why: "图像合成的几何参数琐碎而必要。把它们收进一个面板，拼贴工作从手工业变成流水线。",
+        params: [
+          { name: "overlay_resize", kind: "下拉选择", default: "None", desc: "叠加图缩放方式，适配底图、按倍数或按宽高。" },
+          { name: "x_offset", kind: "整数", default: "0", desc: "水平偏移像素。" },
+          { name: "y_offset", kind: "整数", default: "0", desc: "垂直偏移像素。" },
+          { name: "rotation", kind: "整数", default: "0", desc: "旋转角度，正负 180 度。" },
+          { name: "opacity", kind: "浮点数", default: "0", desc: "不透明度百分比，0 为全透。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Noise Control Script", cat: "sampler",
+        brief: "脚本化控制采样噪声来源与 CFG 去噪器，对齐 A1111 行为。",
+        desc: "它生成一段附加到采样器的噪声控制脚本：指定随机数来源（处理器、显卡或 NV 卡专属）、是否启用 CFG 去噪器修正、是否按种子注入附加噪声及权重。想复刻 A1111 的出图行为时，配合 A1111 风格的权重解释与提示词编码，能把两边结果拉到非常接近。",
+        inputs: [
+          { name: "script", type: "SCRIPT", from: "可选，另一个脚本节点", desc: "串联更多脚本" }
+        ],
+        outputs: [
+          { type: "SCRIPT", to: "典型下游：KSampler 系列或下一个脚本", desc: "噪声控制脚本" }
+        ],
+        why: "两边出图不一致的元凶多半是噪声。脚本把噪声行为的每个开关都摊开，迁移用户终于有了对齐手段。",
+        params: [
+          { name: "rng_source", kind: "下拉选择", default: "cpu", desc: "随机数来源，对齐 A1111 时选 gpu。" },
+          { name: "cfg_denoiser", kind: "开关", default: "关", desc: "启用 CFG 去噪器修正，向 A1111 对齐时开启。" },
+          { name: "add_seed_noise", kind: "开关", default: "关", desc: "按种子向采样过程注入附加噪声。" },
+          { name: "weight", kind: "浮点数", default: "0.015", desc: "附加噪声的权重。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "HighRes-Fix Script", cat: "sampler",
+        brief: "把高清修复打包成脚本，挂到采样器上自动执行。",
+        desc: "它生成一段高清修复脚本：可选潜空间放大、像素放大或两者兼做，指定放大模型与倍数、二次采样步数与去噪强度，还能换用另一个底模做精修、控制循环次数，并可选挂 ControlNet。脚本接进 KSampler 系列的 script 输入后，采样器会在正常采样后自动执行这套修复流程。",
+        inputs: [
+          { name: "script", type: "SCRIPT", from: "可选，另一个脚本节点", desc: "与其他脚本串联" }
+        ],
+        outputs: [
+          { type: "SCRIPT", to: "典型下游：KSampler 系列的 script 输入", desc: "高清修复脚本" }
+        ],
+        why: "高清修复本是一条支线流程。脚本化之后它变成采样器的一个附件，主线画布保持清爽，还能与其他脚本叠加。",
+        params: [
+          { name: "upscale_type", kind: "下拉选择", default: "latent", desc: "放大方式，潜空间、像素或两者。" },
+          { name: "upscale_by", kind: "浮点数", default: "1.25", desc: "放大倍数。" },
+          { name: "hires_steps", kind: "整数", default: "12", desc: "二次采样步数。" },
+          { name: "denoise", kind: "浮点数", default: "0.56", desc: "二次采样去噪强度。" },
+          { name: "hires_ckpt_name", kind: "下拉选择", default: "(use same)", desc: "精修用的底模，可换模型。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "Tiled Upscaler Script", cat: "sampler",
+        brief: "把分块放大采样打包成脚本，低显存跑超大图。",
+        desc: "它生成一段分块放大脚本：把潜空间切块逐块低强度重采样再拼回，实现数倍放大而显存只按块占用。可设定切块尺寸、铺块策略、重绘强度与步数，还能给每块挂 ControlNet 防止拼缝。接进采样器后自动执行，是老牌的超分方案。",
+        inputs: [
+          { name: "script", type: "SCRIPT", from: "可选，另一个脚本节点", desc: "与其他脚本串联" }
+        ],
+        outputs: [
+          { type: "SCRIPT", to: "典型下游：KSampler 系列的 script 输入", desc: "分块放大脚本" }
+        ],
+        why: "大图放大的显存矛盾靠分块化解。脚本形式让它与 XY 扫描、噪声控制自由组合，一次运行连扫带放大。",
+        params: [
+          { name: "upscale_by", kind: "浮点数", default: "1.25", desc: "目标放大倍数。" },
+          { name: "tile_size", kind: "整数", default: "512", desc: "切块尺寸，越小越省显存。" },
+          { name: "tiling_strategy", kind: "下拉选择", default: "random", desc: "铺块策略，随机、严格随机、补边、简单或关闭。" },
+          { name: "denoise", kind: "浮点数", default: "0.4", desc: "每块的重绘强度，过高会出现块间纹理冲突。" },
+          { name: "use_controlnet", kind: "开关", default: "关", desc: "开启后用分块 ControlNet 约束每块构图，减轻拼缝。" }
+        ],
+        tips: ""
+      },
+      {
+        name: "LoRA Stack to String converter", cat: "util",
+        brief: "把 LoRA 堆栈转换成 A1111 风格的内嵌标记文本。",
+        desc: "它读取一条 LoRA 堆栈，把其中每个条目转成 lora 标记格式的文本并合并输出，可直接贴进支持内嵌 LoRA 的提示词节点。把效率节点的 LoRA 配方迁移到 rgthree 的 Power Prompt 或其他 A1111 风格流程时，它是现成的桥。",
+        inputs: [
+          { name: "lora_stack", type: "LORA_STACK", from: "典型上游：LoRA Stacker", desc: "要转换的堆栈" }
+        ],
+        outputs: [
+          { type: "STRING", to: "典型下游：提示词文本输入", desc: "A1111 风格的 LoRA 标记串" }
+        ],
+        why: "不同包的 LoRA 表达方式互不相通。一个转换节点让配方跨生态流动，省去逐条手写。",
+        params: [],
+        tips: ""
       }
     ]
   });
