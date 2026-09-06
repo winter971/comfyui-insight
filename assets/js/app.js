@@ -548,6 +548,13 @@
     var idx = nodeIndex();
     var t = normName(title);
     if (!t) return null;
+    /* 别名层：工作流显示名 → 包内条目（来自 node-aliases.js） */
+    var AL = (D().nodeAliases) || {};
+    if (AL[t]) {
+      var ap = null;
+      pkgs().forEach(function (x) { if (x.id === AL[t].pkg) ap = x; });
+      if (ap) return { pkg: ap, node: AL[t].node ? { name: AL[t].node, brief: "" } : { name: ap.name, brief: "" } };
+    }
     if (idx[t]) return idx[t];
     var keys = Object.keys(idx);
     for (var i = 0; i < keys.length; i++) {
