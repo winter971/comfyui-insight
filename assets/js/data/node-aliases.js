@@ -20,6 +20,15 @@
     "ltxvaudiovaeloader": { pkg: "comfy-extras" },
     "ltxvaudiovaeloader": { pkg: "comfy-extras" },
     "emptyltxvlatentvideo": { pkg: "comfy-extras" },
-    "facerestoregpganwithmodel": { pkg: "comfy-extras" }
+    "facerestoregpganwithmodel": { pkg: "comfy-extras" },
+    "basicscheduler": { pkg: "core-nodes", node: "SamplerCustomAdvanced + 基础采样组件" },
+    "randomnoise": { pkg: "core-nodes", node: "SamplerCustomAdvanced + 基础采样组件" },
+    "cfgguider": { pkg: "core-nodes", node: "SamplerCustomAdvanced + 基础采样组件" },
+    "controlnetapplyadvanced": { pkg: "core-nodes", node: "ControlNet Loader / Apply ControlNet (Advanced)" },
+    "easycache": { pkg: "comfy-extras" },
+    "emptyhunyuanvideo15latent": { pkg: "comfy-extras" },
+    "ltxvemptylatentaudio": { pkg: "comfy-extras" },
+    "ltxvlatentupsampler": { pkg: "comfy-extras" },
+    "resizeimagemasknode": { pkg: "comfy-extras" }
   };
 })();
