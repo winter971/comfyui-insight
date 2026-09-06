@@ -1,0 +1,1 @@
+{"nodes":[{"id":"1","title":"WAS_PFN_Latent","type":"WAS_PFN_Latent","cat":"latent","x":935,"y":480,"inputs":[],"outputs":[{"name":"latents","type":"LATENT"},{"name":"previews","type":"IMAGE"}],"widgets":["1","512","512","0","0","0","0","99999999","2","8"],"brief":"WAS 套件文本/图像处理节点。（WAS_PFN_Latent）","desc":""}],"links":[]}

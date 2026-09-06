@@ -46,6 +46,7 @@
       + '<a class="entry-card ec-purple" href="#/arch"><span class="ec-num">01</span><div class="ec-ico">🏗️</div><h3>架构解析</h3><p>前后端如何分工、执行引擎如何跑一张图、节点系统怎么加载、以及开发自己的节点或用 API 接管 ComfyUI 是否可行。</p><div class="ec-meta">架构图 · 生命周期 · 扩展开发 · API 接管</div></a>'
       + '<a class="entry-card ec-cyan" href="#/nodes"><span class="ec-num">02</span><div class="ec-ico">🧩</div><h3>节点包全解</h3><p>以节点包为单位，逐一分析每个节点：干了什么、上下游是什么、为什么需要。附交互式节点图，点击节点即可查看说明。</p><div class="ec-meta">' + P.length + " 个节点包 · " + nodeCount + " 个节点详解</div></a>"
       + '<a class="entry-card ec-green" href="#/workflows"><span class="ec-num">03</span><div class="ec-ico">🕸️</div><h3>工作流图鉴</h3><p>从文生图到视频生成、从换脸到风格迁移：常见工作流的全量图解与逐节点分析，像官方界面一样可视化呈现。</p><div class="ec-meta">' + W.length + " 条工作流 · 覆盖图 / 视频 / 人物 / 风格</div></a>"
+      + '<a class="entry-card ec-orange" href="#/civitai"><span class="ec-num">04</span><div class="ec-ico">🌐</div><h3>真实工作流库</h3><p>从 Civitai 抓取并解析的真实社区工作流：每条都标注节点构成、需要安装的社区节点包、引用的模型文件与画布分辨率，可按底模 / 节点包 / 类别筛选。</p><div class="ec-meta">' + (D().civitaiWorkflows || []).length + " 条真实工作流 · 持续抓取更新</div></a>"
       + "</div>";
 
     html += '<div class="stats-bar">'
@@ -630,6 +631,16 @@
         $all("#wfFilters .filter-btn").forEach(function (x) { x.classList.toggle("active", x === b); });
         paintWfGrid();
       });
+      return;
+    }
+    if (parts[0] === "civitai" && parts[1]) {
+      app.innerHTML = window.PAGE_CIVITAI ? window.PAGE_CIVITAI.renderDetail(parts[1], parseInt(parts[2], 10) || 0) : "<div class=container>加载中…</div>";
+      if (window.PAGE_CIVITAI) window.PAGE_CIVITAI.mountDetail(parts[1], parseInt(parts[2], 10) || 0);
+      return;
+    }
+    if (parts[0] === "civitai") {
+      app.innerHTML = window.PAGE_CIVITAI ? window.PAGE_CIVITAI.render() : "<div class=container>加载中…</div>";
+      if (window.PAGE_CIVITAI) window.PAGE_CIVITAI.mount();
       return;
     }
     if (parts[0] === "about") { app.innerHTML = renderAbout(); return; }
