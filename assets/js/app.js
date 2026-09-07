@@ -317,7 +317,7 @@
 
     /* 交互式节点图 */
     html += '<div class="section"><div class="sec-head"><h2>工作流节点图</h2><span class="sec-en">INTERACTIVE GRAPH</span></div>'
-      + '<p class="sec-desc">拖拽平移 · 滚轮缩放 · <b>点击节点</b>查看它在整条流程中的职责，并高亮它的上下游连线；双击空白处复位视图。连线颜色 = 数据类型。</p>';
+      + '<p class="sec-desc">拖拽平移 · 滚轮缩放 · <b>点击阶段按钮</b>聚焦该环节并高亮数据进出连线，讲解直接显示在图下方；<b>点击节点</b>查看它在整条流程中的职责；双击空白处复位视图。连线颜色 = 数据类型。</p>';
     if (w.stages && w.stages.length) {
       html += '<div class="stage-chips" id="stageChips"><button class="stage-chip active" data-stage="-1">🌐 全部</button>';
       w.stages.forEach(function (s, i) {
@@ -326,6 +326,7 @@
       html += "</div>";
     }
     html += '<div id="wfGraph"></div>'
+      + '<div class="stage-inline" id="stagePanel"></div>'
       + '<div class="graph-legend"><span>连线颜色：</span>'
       + [["MODEL", "#8b5cf6"], ["CLIP", "#c9b34a"], ["VAE", "#d9534f"], ["LATENT", "#5faf5f"], ["IMAGE", "#3d8bd6"], ["CONDITIONING", "#e8a33d"], ["CONTROL_NET", "#a1887f"], ["VIDEO", "#d4618c"]]
         .map(function (x) { return '<span class="lg"><span class="sw" style="background:' + x[1] + '"></span>' + x[0] + "</span>"; }).join("")
@@ -414,7 +415,23 @@
     if (!w || !host || !window.ComfyGraph) return;
     var api = window.ComfyGraph.render(host, w.graph, {});
 
-    /* 阶段聚焦 */
+    /* 阶段聚焦：高亮阶段节点 + 数据进出连线，讲解就地显示在图下方 */
+    var nodeById2 = {};
+    (w.graph.nodes || []).forEach(function (n) { nodeById2[n.id] = n; });
+    var stagePanel = $("#stagePanel");
+    function showStagePanel(si) {
+      if (!stagePanel) return;
+      var s = w.stages[si];
+      if (!s) { stagePanel.innerHTML = ""; stagePanel.classList.remove("open"); return; }
+      stagePanel.innerHTML = '<div class="stage-item stage-inline-item"><h4><span class="stage-num">' + (si + 1) + "</span>" + esc(s.name)
+        + '<span class="st-nodes">'
+        + (s.nodes || []).map(function (nid) {
+            var n = nodeById2[nid];
+            return n ? '<span class="mini-tag mono" style="font-size:10.5px">' + esc(n.title) + "</span>" : "";
+          }).join("")
+        + '</span></h4><p>' + esc(s.desc) + "</p></div>";
+      stagePanel.classList.add("open");
+    }
     var chips = $("#stageChips");
     if (chips) {
       chips.addEventListener("click", function (e) {
@@ -422,10 +439,11 @@
         if (!b) return;
         $all(".stage-chip", chips).forEach(function (x) { x.classList.toggle("active", x === b); });
         var si = parseInt(b.getAttribute("data-stage"), 10);
-        if (si < 0 || !w.stages[si]) { api.highlight(null); return; }
+        if (si < 0 || !w.stages[si]) { api.highlight(null); showStagePanel(-1); return; }
         var ids = (w.stages[si].nodes || []).slice();
         /* 补上阶段间衔接节点的直接连线两端，保证高亮链路完整 */
-        api.highlight(ids);
+        api.highlight(ids, true);
+        showStagePanel(si);
       });
     }
 

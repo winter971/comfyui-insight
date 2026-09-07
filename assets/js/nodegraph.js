@@ -198,15 +198,18 @@
     });
     svg.appendChild(gNodes);
 
-    /* 高亮系统：keepIds 为要聚焦的节点 id 数组；null 表示清除 */
-    function setHighlight(keepIds) {
+    /* 高亮系统：keepIds 为要聚焦的节点 id 数组；null 表示清除。
+       withContext=true 时（阶段聚焦），进出聚焦节点的一端连线以 ctx 档保留，
+       展示数据如何流入/流出该阶段，而非一律压暗 */
+    function setHighlight(keepIds, withContext) {
       var keep = null;
       if (keepIds && keepIds.length) keep = {};
       if (keep) keepIds.forEach(function (id) { keep[id] = true; });
       linkEls.forEach(function (L) {
-        L.el.classList.remove("hl", "dim");
+        L.el.classList.remove("hl", "ctx", "dim");
         if (!keep) return;
         if (keep[L.from] && keep[L.to]) L.el.classList.add("hl");
+        else if (withContext && (keep[L.from] || keep[L.to])) L.el.classList.add("ctx");
         else L.el.classList.add("dim");
       });
       Object.keys(nodeEls).forEach(function (id) {
