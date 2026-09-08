@@ -771,16 +771,11 @@ table.data-table td .mono { font-size: 12.5px; }
 .stage-chip:hover { color: var(--text); border-color: var(--border-2); }
 .stage-chip.active { background: rgba(76,201,240,.16); border-color: rgba(76,201,240,.55); color: #7dd3fc; }
 
-/* 选中阶段后就地显示的讲解面板（图正下方，免来回滚动） */
-.stage-inline { margin-top: 12px; }
-.stage-inline:not(.open) { display: none; }
-.stage-inline-item {
-  background: var(--panel); border: 1px solid var(--border); border-left: 3px solid #4cc9f0;
-  border-radius: 10px; padding: 14px 18px !important; animation: stageIn .22s ease;
-}
-.stage-inline-item::before { display: none; }
-.stage-inline-item h4 { font-size: 15px; }
-.stage-inline-item p { margin-top: 8px; }
+/* 联动面板内：阶段时间线卡片可点击选中（选中态与图高亮双向联动） */
+#wfPanel .stage-line .stage-item { cursor: pointer; border-radius: 10px; transition: background .15s ease, box-shadow .15s ease; }
+#wfPanel .stage-line .stage-item:hover { background: rgba(124,92,255,.06); }
+#wfPanel .stage-line .stage-item.active { background: rgba(76,201,240,.07); box-shadow: inset 3px 0 0 #4cc9f0; }
+#wfPanel .stage-line .stage-item.active h4 { color: #7dd3fc; }
 @keyframes stageIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 
 /* 图例 */

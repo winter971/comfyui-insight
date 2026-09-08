@@ -359,7 +359,6 @@
         : '<div class="pb-none" style="padding:8px 0">该工作流暂无分步数据流讲解。</div>')
       + "</div>"
       + '<div class="wf-tabpane" data-pane="stage">'
-      + '<div class="stage-inline" id="stagePanel"></div>'
       + (w.stages && w.stages.length
         ? '<div class="stage-line">'
           + w.stages.map(function (s, i) {
@@ -473,19 +472,32 @@
     $all(".wf-tab", wfPanel).forEach(function (t) {
       t.addEventListener("click", function () { switchTab(t.getAttribute("data-tab")); });
     });
-    /* 阶段拆解 tab 里的阶段卡片：点击联动图高亮 */
+    /* 阶段拆解 tab：时间线卡片点击 ↔ 图高亮 双向联动；选中态直接标在卡片上 */
     var stageLine = wfPanel ? wfPanel.querySelector(".stage-line") : null;
+    var stageItems = wfPanel ? $all(".stage-line .stage-item", wfPanel) : [];
+    function markStageItem(si) {
+      stageItems.forEach(function (el) {
+        el.classList.toggle("active", parseInt(el.getAttribute("data-stage"), 10) === si);
+      });
+    }
+    /* 阶段选中统一入口：图上方 chips 与面板内时间线卡片共用 */
+    function selectStage(si, reveal) {
+      if (pbApi.isActive()) pbApi.exit();
+      syncChips(si);
+      markStageItem(si);
+      if (si < 0 || !w.stages[si]) { api.highlight(null); flowClear(); clearNodeCards(); return; }
+      flowClear();
+      clearNodeCards();
+      api.highlight((w.stages[si].nodes || []).slice(), true);
+      /* 从面板外（阶段 chips）触发时，切到阶段拆解 tab 并展开，让讲解可见 */
+      if (reveal) switchTab("stage", true);
+    }
     if (stageLine) stageLine.addEventListener("click", function (e) {
       var item = e.target.closest(".stage-item");
       if (!item) return;
       var idx = parseInt(item.getAttribute("data-stage"), 10);
       if (isNaN(idx) || !w.stages[idx]) return;
-      if (pbApi.isActive()) pbApi.exit();
-      flowClear();
-      clearNodeCards();
-      syncChips(idx);
-      api.highlight((w.stages[idx].nodes || []).slice(), true);
-      showStagePanel(idx);
+      selectStage(item.classList.contains("active") ? -1 : idx);  /* 再点一次取消聚焦 */
     });
 
     /* 逐节点分析卡 ↔ 图 双向联动标记 */
@@ -519,20 +531,6 @@
     (w.stages || []).forEach(function (s, si) {
       (s.nodes || []).forEach(function (nid) { if (stageOf[nid] === undefined) stageOf[nid] = si; });
     });
-    var stagePanel = $("#stagePanel");
-    function showStagePanel(si) {
-      if (!stagePanel) return;
-      var s = w.stages[si];
-      if (!s) { stagePanel.innerHTML = ""; stagePanel.classList.remove("open"); return; }
-      stagePanel.innerHTML = '<div class="stage-item stage-inline-item"><h4><span class="stage-num">' + (si + 1) + "</span>" + esc(s.name)
-        + '<span class="st-nodes">'
-        + (s.nodes || []).map(function (nid) {
-            var n = nodeById2[nid];
-            return n ? '<span class="mini-tag mono" style="font-size:10.5px">' + esc(n.title) + "</span>" : "";
-          }).join("")
-        + '</span></h4><p>' + esc(s.desc) + "</p></div>";
-      stagePanel.classList.add("open");
-    }
     var chips = $("#stageChips");
     function syncChips(si) {
       if (!chips) return;
@@ -544,14 +542,7 @@
       chips.addEventListener("click", function (e) {
         var b = e.target.closest(".stage-chip");
         if (!b) return;
-        if (pbApi.isActive()) pbApi.exit();
-        var si = parseInt(b.getAttribute("data-stage"), 10);
-        syncChips(si);
-        if (si < 0 || !w.stages[si]) { api.highlight(null); showStagePanel(-1); flowClear(); clearNodeCards(); return; }
-        var ids = (w.stages[si].nodes || []).slice();
-        /* 补上阶段间衔接节点的直接连线两端，保证高亮链路完整 */
-        api.highlight(ids, true);
-        showStagePanel(si);
+        selectStage(parseInt(b.getAttribute("data-stage"), 10), true);
       });
     }
 
@@ -598,7 +589,7 @@
         if (ids.length) {
           api.highlight(ids, true);
           var si = stageOf[ids[0]];
-          if (si !== undefined) { syncChips(si); showStagePanel(si); }
+          if (si !== undefined) { syncChips(si); markStageItem(si); }
         }
         if (pbSub) {
           var parts = ids.map(function (id) { return nodeById2[id] ? nodeById2[id].title : id; });
@@ -698,7 +689,7 @@
       var ins = (w.graph.links || []).filter(function (lk) { return lk.to === cur; });
       var outs = (w.graph.links || []).filter(function (lk) { return lk.from === cur; });
       var si = stageOf[cur];
-      if (si !== undefined) { syncChips(si); showStagePanel(si); }
+      if (si !== undefined) { syncChips(si); markStageItem(si); }
       var fi = flowOfNode[cur];
       flowMark(fi !== undefined ? fi : -1);
       markNodeCard(cur);
