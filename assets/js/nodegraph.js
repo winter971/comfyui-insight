@@ -184,7 +184,13 @@
       p.setAttribute("stroke", linkColor(graph, nmap, lk));
       if (lk.dashed) p.setAttribute("stroke-dasharray", "6 4");
       gLinks.appendChild(p);
-      linkEls.push({ el: p, from: lk.from, to: lk.to });
+      /* 流动层：叠加在同一路径上，CSS dashoffset 动画显示数据沿 from→to 流动 */
+      var f = document.createElementNS(svgNS, "path");
+      f.setAttribute("d", d);
+      f.setAttribute("class", "g-flow");
+      f.setAttribute("stroke", linkColor(graph, nmap, lk));
+      gLinks.appendChild(f);
+      linkEls.push({ el: p, flow: f, from: lk.from, to: lk.to });
     });
     svg.appendChild(gLinks);
 
@@ -226,6 +232,67 @@
       return set;
     }
 
+    /* 执行回放：按拓扑序（ComfyUI 真实执行顺序）逐节点点亮，
+       入边显示数据流入动画，已播连线保持流动，未到节点压暗 */
+    var pbActive = false, pbIdx = -1;
+    var pbSeq = (function () {
+      var indeg = {}, i;
+      graph.nodes.forEach(function (n) { indeg[n.id] = 0; });
+      linkEls.forEach(function (L) { if (indeg[L.to] !== undefined) indeg[L.to]++; });
+      var q = graph.nodes.filter(function (n) { return indeg[n.id] === 0; }).map(function (n) { return n.id; });
+      var seq = [];
+      while (q.length) {
+        var id = q.shift();
+        seq.push(id);
+        linkEls.forEach(function (L) {
+          if (L.from === id && indeg[L.to] !== undefined) {
+            indeg[L.to]--;
+            if (indeg[L.to] === 0) q.push(L.to);
+          }
+        });
+      }
+      /* 容错：特殊节点可能成环（如反馈回路），剩余的按声明顺序追加 */
+      graph.nodes.forEach(function (n) { if (seq.indexOf(n.id) < 0) seq.push(n.id); });
+      return seq;
+    })();
+    function pbApply(idx) {
+      pbIdx = idx;
+      var done = {}, k;
+      for (k = 0; k < idx; k++) done[pbSeq[k]] = true;
+      var cur = pbSeq[idx];
+      linkEls.forEach(function (L) {
+        L.el.classList.remove("play-pending", "play-in", "play-done");
+        L.flow.classList.remove("play-pending", "play-in", "play-done");
+        if (L.to === cur && done[L.from]) { L.el.classList.add("play-in"); L.flow.classList.add("play-in"); }
+        else if (done[L.from] && done[L.to]) { L.el.classList.add("play-done"); L.flow.classList.add("play-done"); }
+        else { L.el.classList.add("play-pending"); L.flow.classList.add("play-pending"); }
+      });
+      Object.keys(nodeEls).forEach(function (id) {
+        var el = nodeEls[id];
+        el.classList.remove("play-pending", "play-active", "play-done");
+        el.classList.add(id === cur ? "play-active" : (done[id] ? "play-done" : "play-pending"));
+      });
+    }
+    function pbEnter() {
+      pbActive = true;
+      linkEls.forEach(function (L) { L.el.classList.remove("hl", "ctx", "dim"); });
+      Object.keys(nodeEls).forEach(function (id) { nodeEls[id].classList.remove("dim", "selected"); });
+      pbApply(0);
+      if (opts.onPlaybackChange) opts.onPlaybackChange(true);
+    }
+    function pbExit() {
+      if (!pbActive) return;
+      pbActive = false; pbIdx = -1;
+      linkEls.forEach(function (L) {
+        L.el.classList.remove("play-pending", "play-in", "play-done");
+        L.flow.classList.remove("play-pending", "play-in", "play-done");
+      });
+      Object.keys(nodeEls).forEach(function (id) {
+        nodeEls[id].classList.remove("play-pending", "play-active", "play-done");
+      });
+      if (opts.onPlaybackChange) opts.onPlaybackChange(false);
+    }
+
     /* 工具栏 */
     var toolbar = document.createElement("div");
     toolbar.className = "graph-toolbar";
@@ -255,7 +322,7 @@
       showRichDetail(detail, node, function () {
         svg.querySelectorAll(".g-node.selected").forEach(function (el) { el.classList.remove("selected"); });
         setHighlight(null);
-      });
+      }, opts.notes);
     }
 
     /* 平移缩放 */
@@ -297,15 +364,18 @@
     });
     svg.addEventListener("pointerup", function () { panning = false; svg.classList.remove("panning"); });
 
-    /* 节点点击：高亮相邻链路 + 详情 */
+    /* 节点点击：高亮相邻链路 + 详情（回放中点击则先退出回放） */
     svg.addEventListener("click", function (e) {
       var g = e.target.closest(".g-node");
       if (!g) {
         detail.classList.remove("open");
+        pbExit();
         setHighlight(null);
         svg.querySelectorAll(".g-node.selected").forEach(function (el) { el.classList.remove("selected"); });
+        if (opts.onNodeClick) opts.onNodeClick(null);
         return;
       }
+      pbExit();
       var id = g.getAttribute("data-nid");
       var node = nmap[id];
       svg.querySelectorAll(".g-node.selected").forEach(function (el) { el.classList.remove("selected"); });
@@ -320,7 +390,17 @@
       fit();
     });
 
-    return { fit: fit, svg: svg, highlight: setHighlight, neighborsOf: neighborsOf };
+    return {
+      fit: fit, svg: svg, highlight: setHighlight, neighborsOf: neighborsOf,
+      playback: {
+        seq: pbSeq,
+        isActive: function () { return pbActive; },
+        index: function () { return pbIdx; },
+        enter: pbEnter,
+        apply: pbApply,
+        exit: pbExit
+      }
+    };
   }
 
   window.ComfyGraph = {
@@ -475,7 +555,7 @@
   }
 
   /* 富详情面板 HTML（工作流图点击节点时用） */
-  function showRichDetail(panel, node, closeCb) {
+  function showRichDetail(panel, node, closeCb, notes) {
     var help = window.WIDGET_HELP;
     var color = CAT_COLORS[node.cat] || "#647088";
     var html = '<span class="gd-close" title="关闭">✕</span>';
@@ -491,6 +571,9 @@
     /* 作用（默认展开） */
     html += '<div class="gd-role"><b style="color:#dfe4f2">作用：</b>' + esc2(node.brief || "") +
       (node.desc ? "<br>" + esc2(node.desc) : "") + "</div>";
+    /* 在本工作流中：site 层 nodeAnalysis[].detail 经调用方传入，比通用作用更贴合当前图 */
+    var wfNote = notes && notes[node.id];
+    if (wfNote) html += '<div class="gd-note"><b>📍 在本工作流中</b>' + esc2(wfNote) + "</div>";
 
     /* 输入 */
     var inputs = node.inputs || [];
