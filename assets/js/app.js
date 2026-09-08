@@ -1,9 +1,9 @@
-/* ============================================================
+﻿/* ============================================================
    ComfyUI 全景解析 — 主应用（hash 路由 + 渲染 + 搜索）
    ============================================================ */
 (function () {
   "use strict";
-  window.COMFY_APP_VER = "20260908g";  /* 运行时版本标记（排查缓存用） */
+  window.COMFY_APP_VER = "20260908h";  /* 运行时版本标记（排查缓存用） */
 
   var D = function () { return window.COMFY_DATA || {}; };
   function pkgs() { return (D().nodePackages || []).slice().sort(function (a, b) { return (a.official === b.official) ? 0 : (a.official ? -1 : 1); }); }
@@ -371,6 +371,7 @@
       + "</div>"
       + '<div class="wf-tabpane" data-pane="stage">'
       + stepBarHtml("stageBar")
+      + '<div class="pb-sub mono" id="stageSub"></div>'
       + (w.stages && w.stages.length
         ? '<div class="stage-line">'
           + w.stages.map(function (s, i) {
@@ -385,6 +386,7 @@
       + "</div>"
       + '<div class="wf-tabpane" data-pane="nodes">'
       + stepBarHtml("nodeBar")
+      + '<div class="pb-sub mono" id="nodeSub"></div>'
       + (w.nodeAnalysis && w.nodeAnalysis.length
         ? '<div class="node-list" id="nodeList">'
           + w.nodeAnalysis.map(function (a, i) {
@@ -449,6 +451,7 @@
     /* 执行回放 UI 状态 */
     var pbBar = $("#playBar"), pbBtn = $("#pbPlay"), pbPrev = $("#pbPrev"), pbNext = $("#pbNext"),
         pbReset = $("#pbReset"), pbClose = $("#pbClose"), pbSub = $("#pbSub");
+    var stageSub = $("#stageSub"), nodeSub = $("#nodeSub");
     var pbTimer = null, pbPlaying = false, pbStep = -1;
     function stopPbUi() {
       if (pbTimer) { clearInterval(pbTimer); pbTimer = null; }
@@ -466,7 +469,7 @@
       notes: wfNoteMap,
       onPlaybackChange: function (active) { if (!active) { stopPbUi(); panelClearAll(); } },
       onNodeClick: function (n) {
-        if (n && nodeById2[n.id]) focusNode(n.id, false);
+        if (n && nodeById2[n.id]) focusNode(n.id);
         else panelClearAll();  /* 点空白 / 关详情 = 全部取消聚焦 */
       }
     });
@@ -517,14 +520,35 @@
       var ni = nodeFocusId ? nodeOrder.indexOf(nodeFocusId) : -1;
       setPos("nodeBar", ni >= 0, nodeOrder.length, "节点", ni);
     }
-    function scrollFocus(el) {
-      if (!el) return;
-      try { el.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (e) { }
+    /* 三个 tab 顶部的"当前选中"卡：聚焦什么就地把内容显示在最开头，无需滚动列表 */
+    function renderStageSub(si) {
+      if (!stageSub) return;
+      if (si < 0 || !w.stages[si]) { stageSub.innerHTML = ""; return; }
+      var s = w.stages[si];
+      var parts = (s.nodes || []).map(function (nid) { return nodeById2[nid] ? nodeById2[nid].title : nid; });
+      stageSub.innerHTML = '<div class="pb-card"><div class="pb-head"><span class="pb-pos">第 ' + (si + 1) + " 阶段</span><b>" + esc(s.name) + "</b></div>"
+        + '<div class="pb-row"><span class="pb-k">📖 讲解</span><span class="pb-do-text">' + esc(s.desc) + "</span></div>"
+        + (parts.length ? '<div class="pb-row"><span class="pb-k">🎯 涉及节点</span><span>' + parts.map(function (t) { return '<span class="pb-d"><b>' + esc(t) + "</b></span>"; }).join("") + "</span></div>" : "")
+        + "</div>";
+    }
+    function renderNodeSub(nid) {
+      if (!nodeSub) return;
+      var n = nid ? nodeById2[nid] : null;
+      if (!n) { nodeSub.innerHTML = ""; return; }
+      var na = null;
+      (w.nodeAnalysis || []).forEach(function (a) { if (a.node === nid) na = a; });
+      nodeSub.innerHTML = '<div class="pb-card"><div class="pb-head"><span class="pb-pos">节点聚焦</span><b>' + esc(n.title) + "</b></div>"
+        + (na ? '<div class="pb-row"><span class="pb-k">📖 在本工作流中</span><span class="pb-do-text">' + esc(na.detail) + "</span></div>" : "")
+        + (n.brief ? '<div class="pb-row"><span class="pb-k">⚙ 通用职责</span><span class="pb-do-text">' + esc(n.brief) + "</span></div>" : "")
+        + (n.widgets && n.widgets.length ? '<div class="pb-row"><span class="pb-k">🎚 图中参数</span><span class="mono">' + n.widgets.map(esc).join(" · ") + "</span></div>" : "")
+        + "</div>";
     }
     function panelClearAll() {
       flowFocusIdx = -1; stageFocusIdx = -1; nodeFocusId = null;
       flowClear(); markStageItem(-1); syncChips(-1); markNodeCard(null);
       if (pbSub) pbSub.innerHTML = "";
+      renderStageSub(-1);
+      renderNodeSub(null);
       api.highlight(null);
       updateStepPos();
     }
@@ -546,10 +570,11 @@
       flowClear();
       markNodeCard(null);
       if (pbSub) pbSub.innerHTML = "";
+      renderNodeSub(null);
       if (stageFocusIdx < 0) api.highlight(null);
       else api.highlight((w.stages[si].nodes || []).slice(), true);
+      renderStageSub(stageFocusIdx);
       updateStepPos();
-      if (stageFocusIdx >= 0 && opts.scroll !== false) scrollFocus(stageItems[si]);
       /* 从面板外（阶段 chips）触发时，切到阶段拆解 tab 并展开，让讲解可见 */
       if (opts.reveal) switchTab("stage", true);
     }
@@ -569,7 +594,7 @@
         el.classList.toggle("active", el.getAttribute("data-nid") === id);
       });
     }
-    function focusNode(nid, scroll) {
+    function focusNode(nid) {
       if (!nid || !nodeById2[nid]) return;
       if (pbApi.isActive()) pbApi.exit();
       nodeFocusId = nodeOrder.indexOf(nid) >= 0 ? nid : null;
@@ -579,11 +604,14 @@
       markStageItem(-1);
       markNodeCard(nid);
       api.highlight(api.neighborsOf(nid));
+      if (pbSub) pbSub.innerHTML = "";
+      renderStageSub(-1);
+      renderNodeSub(nid);
       var card = null;
       if (nodeList) $all(".node-card", nodeList).forEach(function (el) {
         if (el.getAttribute("data-nid") === nid) card = el;
       });
-      if (card) { if (!card.open) card.open = true; if (scroll !== false) scrollFocus(card); }
+      if (card && !card.open) card.open = true;
       updateStepPos();
     }
     function nodeReset() {
@@ -591,6 +619,7 @@
       nodeFocusId = null;
       markNodeCard(null);
       api.highlight(null);
+      renderNodeSub(null);
       updateStepPos();
     }
     if (nodeList) {
@@ -656,14 +685,16 @@
       nodeFocusId = null;
       flowMark(idx);
       markNodeCard(null);
+      renderNodeSub(null);
       var ids = flowStepIds(idx);
       stageFocusIdx = -1;
       syncChips(-1);
       markStageItem(-1);
+      renderStageSub(-1);
       if (ids.length) {
         api.highlight(ids, true);
         var si = stageOf[ids[0]];
-        if (si !== undefined) { stageFocusIdx = si; syncChips(si); markStageItem(si); }
+        if (si !== undefined) { stageFocusIdx = si; syncChips(si); markStageItem(si); renderStageSub(si); }
       }
       if (pbSub) {
         var parts = ids.map(function (id) { return nodeById2[id] ? nodeById2[id].title : id; });
@@ -673,8 +704,6 @@
           + "</div>";
       }
       updateStepPos();
-      var el = flowList ? flowList.querySelector('.flow-step[data-fidx="' + idx + '"]') : null;
-      scrollFocus(el);
     }
     function flowReset() {
       if (pbApi.isActive()) pbApi.exit();
@@ -685,6 +714,8 @@
       markNodeCard(null);
       api.highlight(null);
       if (pbSub) pbSub.innerHTML = "";
+      renderStageSub(-1);
+      renderNodeSub(null);
       updateStepPos();
     }
     if (flowList) {
@@ -819,6 +850,8 @@
       flowFocusIdx = fi !== undefined ? fi : -1;
       nodeFocusId = nodeOrder.indexOf(cur) >= 0 ? cur : null;
       markNodeCard(cur);
+      renderStageSub(stageFocusIdx);
+      renderNodeSub(nodeFocusId);
       updateStepPos();
       if (pbSub) {
         var rule = n ? stateRulesFor(n.title || "") : null;
