@@ -3,6 +3,7 @@
    ============================================================ */
 (function () {
   "use strict";
+  window.COMFY_APP_VER = "20260908g";  /* 运行时版本标记（排查缓存用） */
 
   var D = function () { return window.COMFY_DATA || {}; };
   function pkgs() { return (D().nodePackages || []).slice().sort(function (a, b) { return (a.official === b.official) ? 0 : (a.official ? -1 : 1); }); }
@@ -22,6 +23,15 @@
   }
   function catDot(cat) { return '<span class="cat-dot cat-' + esc(cat) + '"></span>'; }
   function diffStars(n) { n = n || 1; var s = ""; for (var i = 1; i <= 5; i++) s += i <= n ? "★" : "☆"; return s; }
+  /* 面板三个 tab 通用的步进控制条：上一步 / 下一步 / 重置 + 当前聚焦位置 */
+  function stepBarHtml(id) {
+    return '<div class="wf-stepbar" id="' + id + '">'
+      + '<button class="wf-step-btn" data-dir="prev" title="上一步">◀ 上一步</button>'
+      + '<button class="wf-step-btn" data-dir="next" title="下一步">下一步 ▶</button>'
+      + '<button class="wf-step-btn wf-step-reset" data-dir="reset" title="清除当前聚焦">↺ 重置</button>'
+      + '<span class="wf-step-pos">未聚焦</span>'
+      + "</div>";
+  }
 
   /* ============ 首页 ============ */
   function renderHome() {
@@ -348,6 +358,7 @@
       + "</div>"
       + '<div class="wf-body" id="wfBody">'
       + '<div class="wf-tabpane active" data-pane="flow">'
+      + stepBarHtml("flowBar")
       + '<div class="pb-sub mono" id="pbSub"></div>'
       + (w.flow && w.flow.length
         ? '<div class="flow-inline-head"><h2>数据是怎么一步步流动的</h2><span class="sec-en">DATA FLOW</span><span class="flow-hint">👆 点击任意步骤，图上高亮该步的数据流动</span></div>'
@@ -359,6 +370,7 @@
         : '<div class="pb-none" style="padding:8px 0">该工作流暂无分步数据流讲解。</div>')
       + "</div>"
       + '<div class="wf-tabpane" data-pane="stage">'
+      + stepBarHtml("stageBar")
       + (w.stages && w.stages.length
         ? '<div class="stage-line">'
           + w.stages.map(function (s, i) {
@@ -372,12 +384,13 @@
         : "")
       + "</div>"
       + '<div class="wf-tabpane" data-pane="nodes">'
+      + stepBarHtml("nodeBar")
       + (w.nodeAnalysis && w.nodeAnalysis.length
         ? '<div class="node-list" id="nodeList">'
           + w.nodeAnalysis.map(function (a, i) {
               var n = nodeById[a.node] || { title: a.node, cat: "util" };
               var lk = lookupNode(n.title);
-              return '<details class="node-card" data-nid="' + esc(a.node) + '"' + (i === 0 ? " open" : "") + '><summary>'
+              return '<details class="node-card" data-nid="' + esc(a.node) + '"><summary>'
                 + catDot(n.cat) + '<span class="node-name">' + esc(n.title) + '</span><span class="node-brief">' + esc(n.brief || "") + '</span><span class="node-loc">📍 图中已高亮</span><span class="node-chevron">▶</span></summary>'
                 + '<div class="node-body"><div class="nb-row"><div class="nb-label">在本工作流中</div><div>' + esc(a.detail) + "</div></div>"
                 + (n.widgets && n.widgets.length ? '<div class="nb-row"><div class="nb-label">图中参数</div><div class="mono" style="font-size:12.5px;color:#a5b0c8">' + n.widgets.map(esc).join(" · ") + "</div></div>" : "")
@@ -451,10 +464,21 @@
     });
     var api = window.ComfyGraph.render(host, w.graph, {
       notes: wfNoteMap,
-      onPlaybackChange: function (active) { if (!active) stopPbUi(); },
-      onNodeClick: function (n) { markNodeCard(n ? n.id : null); }
+      onPlaybackChange: function (active) { if (!active) { stopPbUi(); panelClearAll(); } },
+      onNodeClick: function (n) {
+        if (n && nodeById2[n.id]) focusNode(n.id, false);
+        else panelClearAll();  /* 点空白 / 关详情 = 全部取消聚焦 */
+      }
     });
     var pbApi = api.playback;
+
+    /* 图内节点索引 + 阶段归属（面板联动与聚焦模型的基础） */
+    var nodeById2 = {};
+    (w.graph.nodes || []).forEach(function (n) { nodeById2[n.id] = n; });
+    var stageOf = {};
+    (w.stages || []).forEach(function (s, si) {
+      (s.nodes || []).forEach(function (nid) { if (stageOf[nid] === undefined) stageOf[nid] = si; });
+    });
 
     /* 联动面板：三块内容 tab 切换 + 可收起；图交互自动切到对应 tab */
     var wfPanel = $("#wfPanel"), wfCollapse = $("#wfCollapse");
@@ -472,25 +496,62 @@
     $all(".wf-tab", wfPanel).forEach(function (t) {
       t.addEventListener("click", function () { switchTab(t.getAttribute("data-tab")); });
     });
-    /* 阶段拆解 tab：时间线卡片点击 ↔ 图高亮 双向联动；选中态直接标在卡片上 */
+    /* ── 统一聚焦模型：三个 tab 都有"当前聚焦"，样式一致、可步进、可重置 ──
+       flowFocusIdx / stageFocusIdx / nodeFocusId 分别是三个 tab 的当前焦点 */
+    var flowFocusIdx = -1, stageFocusIdx = -1, nodeFocusId = null;
     var stageLine = wfPanel ? wfPanel.querySelector(".stage-line") : null;
     var stageItems = wfPanel ? $all(".stage-line .stage-item", wfPanel) : [];
+    var nodeOrder = [];
+    (w.nodeAnalysis || []).forEach(function (a) { if (a && a.node && nodeById2[a.node]) nodeOrder.push(a.node); });
+    function clampIdx(i, n) { return Math.max(0, Math.min(n - 1, i)); }
+    function posEl(barId) { var bar = $("#" + barId); return bar ? bar.querySelector(".wf-step-pos") : null; }
+    function setPos(barId, focused, total, unit, idx) {
+      var el = posEl(barId);
+      if (!el) return;
+      el.textContent = focused ? "第 " + (idx + 1) + " / " + total + " " + unit : "未聚焦";
+      el.classList.toggle("on", focused);
+    }
+    function updateStepPos() {
+      setPos("flowBar", flowFocusIdx >= 0, (w.flow || []).length, "步", flowFocusIdx);
+      setPos("stageBar", stageFocusIdx >= 0, (w.stages || []).length, "阶段", stageFocusIdx);
+      var ni = nodeFocusId ? nodeOrder.indexOf(nodeFocusId) : -1;
+      setPos("nodeBar", ni >= 0, nodeOrder.length, "节点", ni);
+    }
+    function scrollFocus(el) {
+      if (!el) return;
+      try { el.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (e) { }
+    }
+    function panelClearAll() {
+      flowFocusIdx = -1; stageFocusIdx = -1; nodeFocusId = null;
+      flowClear(); markStageItem(-1); syncChips(-1); markNodeCard(null);
+      if (pbSub) pbSub.innerHTML = "";
+      api.highlight(null);
+      updateStepPos();
+    }
+
+    /* —— 阶段拆解：时间线卡片 ↔ 图高亮 双向联动，选中态标在卡片上 —— */
     function markStageItem(si) {
       stageItems.forEach(function (el) {
         el.classList.toggle("active", parseInt(el.getAttribute("data-stage"), 10) === si);
       });
     }
-    /* 阶段选中统一入口：图上方 chips 与面板内时间线卡片共用 */
-    function selectStage(si, reveal) {
+    /* 阶段选中统一入口：图上方 chips、面板内时间线卡片、步进按钮共用 */
+    function selectStage(si, opts) {
+      opts = opts || {};
       if (pbApi.isActive()) pbApi.exit();
-      syncChips(si);
-      markStageItem(si);
-      if (si < 0 || !w.stages[si]) { api.highlight(null); flowClear(); clearNodeCards(); return; }
+      stageFocusIdx = (si >= 0 && w.stages[si]) ? si : -1;
+      flowFocusIdx = -1; nodeFocusId = null;
+      syncChips(stageFocusIdx);
+      markStageItem(stageFocusIdx);
       flowClear();
-      clearNodeCards();
-      api.highlight((w.stages[si].nodes || []).slice(), true);
+      markNodeCard(null);
+      if (pbSub) pbSub.innerHTML = "";
+      if (stageFocusIdx < 0) api.highlight(null);
+      else api.highlight((w.stages[si].nodes || []).slice(), true);
+      updateStepPos();
+      if (stageFocusIdx >= 0 && opts.scroll !== false) scrollFocus(stageItems[si]);
       /* 从面板外（阶段 chips）触发时，切到阶段拆解 tab 并展开，让讲解可见 */
-      if (reveal) switchTab("stage", true);
+      if (opts.reveal) switchTab("stage", true);
     }
     if (stageLine) stageLine.addEventListener("click", function (e) {
       var item = e.target.closest(".stage-item");
@@ -500,7 +561,7 @@
       selectStage(item.classList.contains("active") ? -1 : idx);  /* 再点一次取消聚焦 */
     });
 
-    /* 逐节点分析卡 ↔ 图 双向联动标记 */
+    /* —— 逐节点分析：卡片 ↔ 图 双向联动，聚焦卡自动展开并滚动到可见 —— */
     var nodeList = $("#nodeList");
     function markNodeCard(id) {
       if (!nodeList) return;
@@ -508,7 +569,30 @@
         el.classList.toggle("active", el.getAttribute("data-nid") === id);
       });
     }
-    function clearNodeCards() { markNodeCard(null); }
+    function focusNode(nid, scroll) {
+      if (!nid || !nodeById2[nid]) return;
+      if (pbApi.isActive()) pbApi.exit();
+      nodeFocusId = nodeOrder.indexOf(nid) >= 0 ? nid : null;
+      flowFocusIdx = -1; stageFocusIdx = -1;
+      flowClear();
+      syncChips(-1);
+      markStageItem(-1);
+      markNodeCard(nid);
+      api.highlight(api.neighborsOf(nid));
+      var card = null;
+      if (nodeList) $all(".node-card", nodeList).forEach(function (el) {
+        if (el.getAttribute("data-nid") === nid) card = el;
+      });
+      if (card) { if (!card.open) card.open = true; if (scroll !== false) scrollFocus(card); }
+      updateStepPos();
+    }
+    function nodeReset() {
+      if (pbApi.isActive()) pbApi.exit();
+      nodeFocusId = null;
+      markNodeCard(null);
+      api.highlight(null);
+      updateStepPos();
+    }
     if (nodeList) {
       nodeList.addEventListener("click", function (e) {
         var card = e.target.closest(".node-card");
@@ -516,21 +600,12 @@
         if (e.target.closest("a")) return;  /* 卡内链接正常跳转 */
         var id = card.getAttribute("data-nid");
         if (!id || !nodeById2[id]) return;
-        if (pbApi.isActive()) pbApi.exit();
-        flowClear();
-        markNodeCard(id);
-        api.highlight(api.neighborsOf(id));
-        syncChips(-1);
+        if (card.classList.contains("active")) { card.open = false; nodeReset(); return; }  /* 再点一次取消聚焦 */
+        focusNode(id);
       });
     }
 
-    /* 阶段聚焦：高亮阶段节点 + 数据进出连线，讲解就地显示在图下方 */
-    var nodeById2 = {};
-    (w.graph.nodes || []).forEach(function (n) { nodeById2[n.id] = n; });
-    var stageOf = {};
-    (w.stages || []).forEach(function (s, si) {
-      (s.nodes || []).forEach(function (nid) { if (stageOf[nid] === undefined) stageOf[nid] = si; });
-    });
+    /* 图上方阶段 chips：与面板内时间线联动 */
     var chips = $("#stageChips");
     function syncChips(si) {
       if (!chips) return;
@@ -542,7 +617,7 @@
       chips.addEventListener("click", function (e) {
         var b = e.target.closest(".stage-chip");
         if (!b) return;
-        selectStage(parseInt(b.getAttribute("data-stage"), 10), true);
+        selectStage(parseInt(b.getAttribute("data-stage"), 10), { reveal: true });
       });
     }
 
@@ -571,35 +646,83 @@
       });
     }
     function flowClear() { flowMark(-1); }
+    /* 聚焦第 idx 步：列表标记 + 图高亮 + 关联阶段联动 + 讲解卡（步进按钮与点击共用） */
+    function focusFlowStep(idx) {
+      var total = (w.flow || []).length;
+      if (!total) return;
+      idx = clampIdx(idx, total);
+      if (pbApi.isActive()) pbApi.exit();
+      flowFocusIdx = idx;
+      nodeFocusId = null;
+      flowMark(idx);
+      markNodeCard(null);
+      var ids = flowStepIds(idx);
+      stageFocusIdx = -1;
+      syncChips(-1);
+      markStageItem(-1);
+      if (ids.length) {
+        api.highlight(ids, true);
+        var si = stageOf[ids[0]];
+        if (si !== undefined) { stageFocusIdx = si; syncChips(si); markStageItem(si); }
+      }
+      if (pbSub) {
+        var parts = ids.map(function (id) { return nodeById2[id] ? nodeById2[id].title : id; });
+        pbSub.innerHTML = '<div class="pb-card"><div class="pb-head"><span class="pb-pos">第 ' + (idx + 1) + " 步</span><b>数据流讲解</b></div>"
+          + '<div class="pb-row"><span class="pb-k">📖 讲解</span><span class="pb-do-text">' + esc((w.flow || [])[idx]) + "</span></div>"
+          + (parts.length ? '<div class="pb-row"><span class="pb-k">🎯 涉及节点</span><span>' + parts.map(function (t) { return '<span class="pb-d"><b>' + esc(t) + "</b></span>"; }).join("") + "</span></div>" : "")
+          + "</div>";
+      }
+      updateStepPos();
+      var el = flowList ? flowList.querySelector('.flow-step[data-fidx="' + idx + '"]') : null;
+      scrollFocus(el);
+    }
+    function flowReset() {
+      if (pbApi.isActive()) pbApi.exit();
+      flowFocusIdx = -1; stageFocusIdx = -1;
+      flowClear();
+      syncChips(-1);
+      markStageItem(-1);
+      markNodeCard(null);
+      api.highlight(null);
+      if (pbSub) pbSub.innerHTML = "";
+      updateStepPos();
+    }
     if (flowList) {
       flowList.addEventListener("click", function (e) {
         var el = e.target.closest(".flow-step");
         if (!el) return;
         var idx = parseInt(el.getAttribute("data-fidx"), 10);
-        var alreadyActive = el.classList.contains("active");
-        if (pbApi.isActive()) pbApi.exit();
-        if (alreadyActive) {  /* 再点一次取消聚焦 */
-          flowClear();
-          api.highlight(null);
-          if (pbSub) pbSub.innerHTML = "";
-          return;
-        }
-        flowMark(idx);
-        var ids = flowStepIds(idx);
-        if (ids.length) {
-          api.highlight(ids, true);
-          var si = stageOf[ids[0]];
-          if (si !== undefined) { syncChips(si); markStageItem(si); }
-        }
-        if (pbSub) {
-          var parts = ids.map(function (id) { return nodeById2[id] ? nodeById2[id].title : id; });
-          pbSub.innerHTML = '<div class="pb-card"><div class="pb-head"><span class="pb-pos">第 ' + (idx + 1) + " 步</span><b>数据流讲解</b></div>"
-            + '<div class="pb-row"><span class="pb-k">📖 讲解</span><span class="pb-do-text">' + esc((w.flow || [])[idx]) + "</span></div>"
-            + (parts.length ? '<div class="pb-row"><span class="pb-k">🎯 涉及节点</span><span>' + parts.map(function (t) { return '<span class="pb-d"><b>' + esc(t) + "</b></span>"; }).join("") + "</span></div>" : "")
-            + "</div>";
-        }
+        if (el.classList.contains("active")) { flowReset(); return; }  /* 再点一次取消聚焦 */
+        focusFlowStep(idx);
       });
     }
+
+    /* —— 步进控制条：三个 tab 统一 上一步 / 下一步 / 重置 —— */
+    function wireStepBar(barId, fn) {
+      var bar = $("#" + barId);
+      if (!bar) return;
+      bar.addEventListener("click", function (e) {
+        var b = e.target.closest(".wf-step-btn");
+        if (!b) return;
+        fn(b.getAttribute("data-dir"));
+      });
+    }
+    wireStepBar("flowBar", function (dir) {
+      if (dir === "reset") return flowReset();
+      if (!(w.flow || []).length) return;
+      focusFlowStep(flowFocusIdx < 0 ? 0 : flowFocusIdx + (dir === "next" ? 1 : -1));
+    });
+    wireStepBar("stageBar", function (dir) {
+      if (dir === "reset") return selectStage(-1);
+      if (!(w.stages || []).length) return;
+      selectStage(stageFocusIdx < 0 ? 0 : stageFocusIdx + (dir === "next" ? 1 : -1));
+    });
+    wireStepBar("nodeBar", function (dir) {
+      if (dir === "reset") return nodeReset();
+      if (!nodeOrder.length) return;
+      var i = nodeFocusId ? nodeOrder.indexOf(nodeFocusId) : -1;
+      focusNode(nodeOrder[i < 0 ? 0 : clampIdx(i + (dir === "next" ? 1 : -1), nodeOrder.length)]);
+    });
 
     /* 执行回放：数据流卡片 —— 每一步展示输入数据(形态/状态/来源) → 加工 → 输出数据(形态/状态/去向) */
     var TYPE_SHAPE = {
@@ -690,9 +813,13 @@
       var outs = (w.graph.links || []).filter(function (lk) { return lk.from === cur; });
       var si = stageOf[cur];
       if (si !== undefined) { syncChips(si); markStageItem(si); }
+      stageFocusIdx = si !== undefined ? si : -1;
       var fi = flowOfNode[cur];
       flowMark(fi !== undefined ? fi : -1);
+      flowFocusIdx = fi !== undefined ? fi : -1;
+      nodeFocusId = nodeOrder.indexOf(cur) >= 0 ? cur : null;
       markNodeCard(cur);
+      updateStepPos();
       if (pbSub) {
         var rule = n ? stateRulesFor(n.title || "") : null;
         var inHtml = ins.length ? groupFlow(ins, "in", rule, n) : '<span class="pb-none">（源头节点，无输入）</span>';
@@ -764,11 +891,7 @@
       pbStart();
     });
     if (pbClose) pbClose.addEventListener("click", function () {
-     pbApi.exit();
-      syncChips(-1);
-      flowClear();
-      clearNodeCards();
-      if (pbSub) pbSub.innerHTML = "";
+      pbApi.exit();  /* 触发 onPlaybackChange → panelClearAll 统一清理面板聚焦 */
     });
 
     /* 源 JSON 加载 / 展示 / 下载 */

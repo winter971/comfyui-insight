@@ -822,6 +822,22 @@ table.data-table td .mono { font-size: 12.5px; }
 /* 面板内的 flow 区头不再需要分隔线 */
 .wf-tabpane .flow-inline-head { border-top: none; padding-top: 6px; margin-top: 4px; }
 
+/* 三个 tab 统一的步进控制条：上一步 / 下一步 / 重置 + 当前聚焦位置 */
+.wf-stepbar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 7px 12px; margin: 6px 0 12px;
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px;
+}
+.wf-step-btn {
+  background: var(--panel); border: 1px solid var(--border); color: var(--muted);
+  border-radius: 99px; padding: 4px 13px; font-size: 12px; cursor: pointer;
+  font-family: inherit; transition: all .15s;
+}
+.wf-step-btn:hover { color: var(--text); border-color: var(--accent); }
+.wf-step-reset:hover { border-color: rgba(217,83,79,.6); color: #f1a0a0; }
+.wf-step-pos { margin-left: auto; font-size: 11.5px; color: var(--faint); }
+.wf-step-pos.on { color: #7dd3fc; }
+
 /* 展开收起按钮条 */
 .bulk-bar { display: flex; gap: 8px; align-items: center; margin: 14px 0; flex-wrap: wrap; }
 .bulk-bar .spacer { flex: 1; }

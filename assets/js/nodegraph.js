@@ -322,6 +322,7 @@
       showRichDetail(detail, node, function () {
         svg.querySelectorAll(".g-node.selected").forEach(function (el) { el.classList.remove("selected"); });
         setHighlight(null);
+        if (opts.onNodeClick) opts.onNodeClick(null);  /* 关详情 = 取消面板侧聚焦 */
       }, opts.notes);
     }
 
