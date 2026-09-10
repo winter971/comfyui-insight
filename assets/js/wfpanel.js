@@ -750,13 +750,24 @@
         + '<text class="mc-t" x="' + (fx + 12) + '" y="' + (FORKY + 36) + '">' + escT(fs.name, 13) + "</text>"
         + '<text class="mc-d" x="' + (fx + 12) + '" y="' + (FORKY + 50) + '">' + escT(shortDesc(fs.desc), 18) + "</text>"
         + "</g>";
+      /* 合流箭头路由：支线块与合流阶段上下对齐（常态，块以锚点中心放置）时从块底直落，
+         未对齐时沿块边绕行——避免横向段穿过支线块内部（块底色近乎透明会露线） */
+      var outD;
+      if (ax >= fx && ax <= fx + NW) {
+        outD = "M " + ax + " " + (FORKY + FH + 2) + " L " + ax + " " + (mainY - 4);
+      } else if (ax > fx + NW) {
+        outD = "M " + (fx + NW + 2) + " " + fcy + " L " + ax + " " + fcy + " L " + ax + " " + (mainY - 4);
+      } else {
+        outD = "M " + (fx - 8) + " " + fcy + " L " + ax + " " + fcy + " L " + ax + " " + (mainY - 4);
+      }
       if (ak > 0) {
         var ox = PAD + (ak - 1) * (NW + GAP) + NW / 2; /* 从上一主线块顶部引出分叉 */
         edges += '<path class="mc-ef" d="M ' + ox + " " + (mainY - 4) + " L " + ox + " " + fcy + " L " + (fx - 8) + " " + fcy + '" marker-end="url(#' + uid + 'f)"/>';
+        edges += '<path class="mc-ef" d="' + outD + '" marker-end="url(#' + uid + 'f)"/>';
       } else {
-        edges += '<path class="mc-ef" d="M ' + ax + " " + (FORKY + FH + 2) + " L " + ax + " " + (mainY - 4) + '" marker-end="url(#' + uid + 'f)"/>';
+        /* ak=0：支线直接挂在首个主线块上方，块底直落即是入线兼合流线，只画一条 */
+        edges += '<path class="mc-ef" d="' + outD + '" marker-end="url(#' + uid + 'f)"/>';
       }
-      edges += '<path class="mc-ef" d="M ' + (fx + NW + 2) + " " + fcy + " L " + ax + " " + fcy + " L " + ax + " " + (mainY - 4) + '" marker-end="url(#' + uid + 'f)"/>';
     });
     return '<div class="cv-digest">'
       + '<div class="cv-digest-tabs"><button type="button" class="cv-digest-tab active" data-pane="flow">🧭 流程图</button><button type="button" class="cv-digest-tab" data-pane="text">📝 文字讲解</button></div>'
