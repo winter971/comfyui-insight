@@ -361,6 +361,18 @@ pre code { background: none; border: none; padding: 0; color: #cdd6f4; }
 }
 .graph-shell svg { display: block; width: 100%; height: auto; cursor: grab; }
 .graph-shell svg.panning { cursor: grabbing; }
+/* 画布高度用户可调：拖底部边条后 svg 填满容器高度（视野变大，配合缩放看大图更省平移） */
+.graph-shell.sized svg { height: 100%; }
+.graph-rsz {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 14px;
+  cursor: ns-resize; z-index: 7; touch-action: none;
+}
+.graph-rsz::after {
+  content: ""; position: absolute; left: 50%; top: 5px; transform: translateX(-50%);
+  width: 46px; height: 4px; border-radius: 2px;
+  background: var(--border-2); transition: background .15s, width .15s;
+}
+.graph-rsz:hover::after, .graph-rsz.active::after { background: var(--accent); width: 64px; }
 .graph-toolbar {
   position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; z-index: 5;
 }
@@ -372,10 +384,20 @@ pre code { background: none; border: none; padding: 0; color: #cdd6f4; }
 }
 .gt-btn:hover { color: var(--text); border-color: var(--accent); }
 .graph-hint {
-  position: absolute; left: 12px; bottom: 10px;
+  position: absolute; left: 12px; bottom: 22px;
   font-size: 11.5px; color: var(--faint); pointer-events: none;
 }
-.g-node { cursor: pointer; }
+.g-node { cursor: grab; }
+.g-node:active { cursor: grabbing; }
+svg.nodedragging .g-node { cursor: grabbing; }
+svg.nodedragging .g-node-body { stroke: #a78bfa; stroke-width: 1.5; }
+/* 节点一句话备注：节点正下方小字，深色描边光晕保证任何底色可读 */
+.g-node-note {
+  font-size: 11px; fill: #aab3c8; pointer-events: none;
+  paint-order: stroke; stroke: #0d0f15; stroke-width: 3px; stroke-linejoin: round;
+}
+svg.hide-notes .g-node-note { display: none; }
+.graph-toolbar .gt-toggle.on { color: #4cc9f0; border-color: rgba(76,201,240,.55); }
 .g-node:hover .g-node-body { stroke: #a78bfa; stroke-width: 1.5; }
 .g-node.selected .g-node-body { stroke: #a78bfa; stroke-width: 2; }
 .g-node-title { font-size: 12.5px; font-weight: 600; fill: #fff; pointer-events: none; }
@@ -383,15 +405,23 @@ pre code { background: none; border: none; padding: 0; color: #cdd6f4; }
 .g-widget-text { font-size: 11px; fill: #9aa3b8; pointer-events: none; }
 .g-link { fill: none; stroke-opacity: .85; stroke-width: 2; pointer-events: none; }
 
-/* 节点详情弹层 */
+/* 节点详情弹层（fixed：可拖到整页任意位置，头部为拖把） */
 .graph-detail {
-  position: absolute; right: 10px; top: 50px; width: 330px; max-height: calc(100% - 70px);
-  overflow-y: auto; z-index: 6;
+  position: fixed; right: 16px; top: 110px; width: 330px; max-height: calc(100vh - 140px);
+  overflow: hidden; display: none; flex-direction: column; z-index: 60;
   background: rgba(23,26,38,.97); border: 1px solid var(--border-2);
-  border-radius: 12px; padding: 16px; display: none;
+  border-radius: 12px; padding: 16px;
   box-shadow: 0 14px 40px rgba(0,0,0,.55);
 }
-.graph-detail.open { display: block; }
+.graph-detail.open { display: flex; }
+/* 内容滚动层：面板本体不滚，头部拖把、关闭按钮与缩放手柄常驻 */
+.graph-detail .gd-scroll { overflow-y: auto; flex: 1 1 auto; min-height: 0; scrollbar-width: thin; }
+.graph-detail .gd-scroll::-webkit-scrollbar { width: 6px; }
+.graph-detail .gd-scroll::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
+.graph-detail.dragging { user-select: none; }
+.graph-detail .gd-head { cursor: grab; user-select: none; touch-action: none; }
+.graph-detail.dragging .gd-head { cursor: grabbing; }
+.graph-detail .gd-head::before { content: "⠿"; color: var(--faint); font-size: 13px; opacity: .8; }
 .graph-detail h4 { font-family: Consolas, monospace; font-size: 14px; margin-bottom: 4px; color: #e2e8f0; }
 .graph-detail .gd-cat { font-size: 11px; margin-bottom: 10px; }
 .graph-detail .gd-brief { font-size: 12.5px; color: #cdd6f4; margin-bottom: 10px; }
@@ -876,7 +906,18 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
 .node-card summary { transition: background .15s; }
 
 /* 详情面板动画 */
-.graph-detail { animation: fadeUp .2s ease both; }
+/* 详情卡入场只用 opacity：带 transform 的动画会让拖动起点坐标偏移（闪跳），也会把 fixed 变成相对内容定位 */
+@keyframes cvFade { from { opacity: 0; } to { opacity: 1; } }
+.graph-detail { animation: cvFade .2s ease both; }
+.graph-detail.resizing { user-select: none; }
+/* 左下角缩放手柄：左右调宽 · 上下调高 */
+.graph-detail .gd-rsz { position: absolute; left: 0; bottom: 0; width: 20px; height: 20px; cursor: nesw-resize; touch-action: none; z-index: 3; }
+.graph-detail .gd-rsz::after {
+  content: ""; position: absolute; left: 5px; bottom: 5px; width: 9px; height: 9px;
+  border-left: 2px solid var(--faint); border-bottom: 2px solid var(--faint);
+  border-bottom-left-radius: 7px; opacity: .55; transition: opacity .15s, border-color .15s;
+}
+.graph-detail .gd-rsz:hover::after, .graph-detail.resizing .gd-rsz::after { opacity: 1; border-color: var(--accent); }
 
 /* ============================================================
    交互升级 v3：节点真实结构 + 深度详情
@@ -1016,6 +1057,68 @@ a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visibl
 .cv-loading { text-align: center; color: var(--faint); font-size: 13px; padding: 60px 0; }
 .cv-variant-bar { max-height: 130px; overflow-y: auto; padding-right: 4px; }
 .cv-ai-badge { display: inline-block; font-size: 10.5px; font-weight: 700; color: #7c5cff; border: 1px solid rgba(124,92,255,.5); border-radius: 6px; padding: 1px 7px; margin-right: 8px; vertical-align: 2px; letter-spacing: 1px; }
+/* ===== AI 精读摘要排版：分段 / 折叠 / 节点名高亮（第三、四部分共用，wfpanel.digest 产出） ===== */
+.cv-ai-para { display: block; margin: 0 0 10px; }
+.cv-ai-para:last-child { margin-bottom: 0; }
+.cv-ai-more.collapsed { display: none; }
+.cv-ai-toggle { display: inline-flex; align-items: center; gap: 4px; margin-top: 2px; padding: 3px 14px; border: 1px solid var(--border-2); border-radius: 999px; background: var(--panel-2); color: var(--accent-2); font-size: 12px; cursor: pointer; transition: border-color .15s; }
+.cv-ai-toggle:hover { border-color: var(--accent-2); color: #a5e6f7; }
+.cv-tok { color: var(--accent-2); font-weight: 600; }
+/* ===== AI 精读双视图：横向流程图（默认）+ 文字讲解 ===== */
+.cv-digest-tabs { display: flex; gap: 8px; margin: 10px 0 12px; }
+.cv-digest-tab { font-size: 12.5px; padding: 5px 16px; border-radius: 999px; border: 1px solid var(--border-2); background: var(--panel-2); color: var(--muted); cursor: pointer; }
+.cv-digest-tab.active { background: rgba(124,92,255,.16); border-color: rgba(124,92,255,.55); color: #c4b5fd; font-weight: 600; }
+.cv-digest-pane[hidden] { display: none; }
+.cv-fc-scroll { overflow-x: auto; padding: 2px 2px 8px; scrollbar-width: thin; }
+.cv-fc-scroll::-webkit-scrollbar { height: 6px; }
+.cv-fc-scroll::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
+.cv-fc-rail { display: flex; align-items: stretch; width: max-content; min-width: 100%; }
+.cv-fc-step { flex: 0 0 auto; width: 208px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px 9px; cursor: pointer; transition: border-color .15s, background .15s; }
+.cv-fc-step:hover { border-color: var(--border-2); }
+.cv-fc-step.active { border-color: rgba(124,92,255,.6); background: rgba(124,92,255,.08); }
+.cv-fc-no { font-size: 14px; color: #c4b5fd; font-weight: 700; margin-right: 6px; }
+.cv-fc-chips, .cv-fc-step > div:first-child { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.cv-fc-chip { font-family: Consolas, monospace; font-size: 10.5px; padding: 1px 7px; border-radius: 6px; border: 1px solid; white-space: nowrap; }
+.cv-fc-chip.loc { cursor: pointer; }
+.cv-fc-chip.loc:hover { filter: brightness(1.35); }
+.cv-fc-cap { margin-top: 6px; font-size: 11.5px; color: var(--muted); line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.cv-fc-link { align-self: center; flex: 0 0 auto; color: var(--accent-2); font-size: 15px; padding: 0 7px; opacity: .85; }
+.cv-fc-hint { font-size: 11.5px; color: var(--faint); margin-top: 2px; }
+.cv-fc-dock { margin-top: 10px; border: 1px solid var(--border-2); border-radius: 10px; background: var(--bg-2); padding: 10px 14px 11px; }
+.cv-fc-dock[hidden] { display: none; }
+.cv-fc-dock-head { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--text); }
+.cv-fc-dock-close { margin-left: auto; background: none; border: none; color: var(--faint); cursor: pointer; font-size: 12px; }
+.cv-fc-dock-close:hover { color: var(--text); }
+.cv-fc-dock-body { font-size: 12.5px; color: var(--muted); line-height: 1.85; margin-top: 6px; }
+.cv-fc-dock-loc { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 11.5px; color: var(--faint); }
+/* ===== 宏观分支流程图（飞书画板风格 SVG）：圆角节点 + 折线箭头，支线挂主线上方 ===== */
+.cv-mc-board { width: 100%; overflow-x: auto; scrollbar-width: thin; }
+.cv-mc-board::-webkit-scrollbar { height: 6px; }
+.cv-mc-board::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
+.cv-mc-board svg { display: block; width: 100%; height: auto; min-width: 620px; }
+.cv-mc-stage { cursor: pointer; }
+.cv-mc-stage rect {
+  fill: #1c2030; stroke: #3a415c; stroke-width: 1.2;
+  transition: stroke .15s, fill .15s;
+}
+.cv-mc-stage:hover rect { stroke: rgba(124,92,255,.6); }
+.cv-mc-stage.active rect { stroke: rgba(124,92,255,.85); fill: rgba(124,92,255,.14); }
+.cv-mc-stage .mc-t { font-size: 13px; font-weight: 600; fill: var(--text); }
+.cv-mc-stage .mc-m { font-size: 10.5px; fill: #4cc9f0; }
+.cv-mc-stage .mc-d { font-size: 11px; fill: var(--muted); }
+.cv-mc-fork { cursor: pointer; }
+.cv-mc-fork rect {
+  fill: rgba(124,92,255,.06); stroke: rgba(196,181,253,.55); stroke-width: 1.2;
+  stroke-dasharray: 5 4; transition: stroke .15s, fill .15s;
+}
+.cv-mc-fork:hover rect { stroke: rgba(196,181,253,.9); }
+.cv-mc-fork.active rect { stroke: rgba(196,181,253,1); fill: rgba(124,92,255,.16); stroke-dasharray: none; }
+.cv-mc-fork .mc-tag { font-size: 10px; font-weight: 700; fill: #c4b5fd; letter-spacing: 1px; }
+.cv-mc-fork .mc-t { font-size: 12.5px; font-weight: 600; fill: #ddd6fe; }
+.cv-mc-fork .mc-d { font-size: 10.5px; fill: var(--faint); }
+.cv-mc-board path.mc-e { fill: none; stroke: #4cc9f0; stroke-width: 1.6; }
+.cv-mc-board path.mc-ef { fill: none; stroke: #c4b5fd; stroke-width: 1.4; stroke-dasharray: 5 4; }
+.cv-mc-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .cv-uc-list { margin: 0; padding-left: 20px; color: var(--muted); font-size: 13.5px; line-height: 1.9; }
 .cv-uc-list li::marker { color: #7c5cff; }
 /* ===== 多维表格视图 ===== */
@@ -1050,6 +1153,16 @@ td.num { font-family: Consolas, monospace; text-align: right; color: #cdd3e1; }
 .cv-ai-mini { font-size: 11px; color: #7c5cff; border: 1px solid rgba(124,92,255,.45); border-radius: 6px; padding: 1px 7px; }
 .cv-dup-tag { font-size: 11px; color: #e8a33d; border: 1px solid rgba(232,163,61,.45); border-radius: 6px; padding: 1px 7px; }
 .cv-dup-tag.copy { color: var(--faint); border-color: var(--border); }
+.cv-pending-badge { display: inline-block; font-size: 10.5px; font-weight: 700; color: #e8a33d; border: 1px solid rgba(232,163,61,.5); border-radius: 6px; padding: 1px 7px; margin-right: 8px; vertical-align: 2px; letter-spacing: 1px; }
+.cv-v-ai { font-size: 10px; font-weight: 700; color: #86efac; margin-left: 6px; white-space: nowrap; }
+/* 未精读备份区：折叠面板 + 紧凑表格 */
+.cv-backup { margin-top: 26px; border: 1px dashed var(--border-2); border-radius: 14px; padding: 14px 18px; background: rgba(255,255,255,.015); }
+.cv-backup-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px; cursor: pointer; user-select: none; }
+.cv-backup-head:hover h2 { color: var(--text); }
+.cv-backup-arrow { color: #7c5cff; font-size: 14px; }
+.cv-backup-note { font-size: 12px; color: var(--faint); margin-left: auto; }
+.cv-backup-table { margin-top: 12px; }
+.cv-backup-table td { padding: 6px 10px; font-size: 12.5px; }
 .cv-pop { position: absolute; z-index: 50; width: 280px; background: #1b1e2b; border: 1px solid rgba(124,92,255,.45); border-radius: 12px; box-shadow: 0 14px 40px rgba(0,0,0,.5); padding: 12px; }
 .cv-pop-head { font-size: 12.5px; font-weight: 600; color: #dfe4f2; margin-bottom: 8px; }
 .cv-pop-q { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 12.5px; outline: none; margin-bottom: 8px; }

@@ -16,6 +16,7 @@
   function filtered() {
     var q = (F.q || "").toLowerCase();
     var list = wfs().filter(function (w) {
+      if (!w.ai) return false;                       /* 主区只展示已 AI 精读的工作流 */
       if (!F.nsfw && w.nsfw) return false;
       if (F.cat !== "全部" && w.cat !== F.cat) return false;
       if (F.base !== "全部" && w.base !== F.base) return false;
@@ -36,6 +37,55 @@
     return list;
   }
 
+  /* 未精读备份区：全部已解析但还没有 AI 精读的工作流，折叠在页面底部 */
+  function backupList() {
+    var q = (F.q || "").toLowerCase();
+    var list = wfs().filter(function (w) {
+      if (w.ai) return false;
+      if (!F.nsfw && w.nsfw) return false;
+      if (F.cat !== "全部" && w.cat !== F.cat) return false;
+      if (q) {
+        var hay = (w.name + " " + w.by + " " + w.cat + " " + w.base + " " + (w.tags || []).join(" ")).toLowerCase();
+        if (hay.indexOf(q) < 0) return false;
+      }
+      return true;
+    });
+    list.sort(function (a, b) { return (b.dl || 0) - (a.dl || 0); });
+    return list;
+  }
+
+  function renderBackup(st) {
+    var list = backupList();
+    var SHOW = 300;
+    var html = '<div class="section cv-backup collapsed" id="cvBackup">'
+      + '<div class="cv-backup-head" id="cvBackupHead">'
+      + '<span class="cv-backup-arrow">▸</span>'
+      + '<h2 style="font-size:18px;margin:0">未精读工作流备份区</h2>'
+      + '<span class="sec-en">BACKUP · AWAITING AI</span>'
+      + '<span class="cv-backup-note">' + list.length + " 条已解析、等待 AI 精读 — 结构数据完整，精读完成后自动转正进主区</span>"
+      + "</div>"
+      + '<div class="cv-backup-body" style="display:none">';
+    if (!list.length) {
+      html += '<p style="color:var(--muted);margin:10px 0">当前筛选条件下没有未精读的工作流。</p>';
+    } else {
+      html += '<table class="data-table cv-backup-table"><tr><th>工作流</th><th>类别</th><th>底模</th><th>节点</th><th>下载</th><th>发布</th></tr>';
+      list.slice(0, SHOW).forEach(function (w) {
+        html += "<tr>"
+          + '<td><a class="cv-tname" href="#/civitai/' + w.v + '">' + (w.nsfw ? '<span class="cv-nsfw-pill">18+</span>' : "") + esc(w.name) + "</a></td>"
+          + "<td>" + esc(w.cat) + "</td>"
+          + '<td class="mono dim">' + esc(w.base) + "</td>"
+          + '<td class="num">' + w.nodes + "</td>"
+          + '<td class="num">' + fmtN(w.dl) + "</td>"
+          + '<td class="mono dim">' + esc(w.pub || "—") + "</td>"
+          + "</tr>";
+      });
+      html += "</table>";
+      if (list.length > SHOW) html += '<p style="font-size:12px;color:var(--faint);margin-top:8px">仅显示下载量前 ' + SHOW + " 条（共 " + list.length + " 条），可用上方筛选器缩小范围。</p>";
+    }
+    html += "</div></div>";
+    return html;
+  }
+
   function summaryLine(w) {
     var packs = (w.packs || []).filter(function (p) { return p[0] !== "其他自定义"; }).slice(0, 3).map(function (p) { return p[0]; });
     var s = "基于 " + esc(w.base) + " 的" + esc(w.cat) + "流程，共 " + w.nodes + " 个节点";
@@ -54,26 +104,27 @@
 
     var html = '<div class="container">'
       + '<div class="sec-head"><h2>真实工作流库</h2><span class="sec-en">CIVITAI REAL-WORKFLOW LIBRARY</span></div>'
-      + '<p class="sec-desc">以下是从 Civitai 公开抓取的 ' + fmtN(st.parsed) + ' 条真实 ComfyUI 工作流（关键词 workflow、类型 Workflows，按下载量排序收录）。'
-      + '每条都经过本地解析：节点构成、社区节点包依赖、引用的模型文件、画布分辨率一目了然——想知道社区都在用什么节点包、跑什么底模，看这里的统计就有答案。</p>'
+      + '<p class="sec-desc">从 Civitai 公开抓取并本地解析的真实 ComfyUI 工作流库（关键词 workflow、类型 Workflows，按下载量排序收录）。主区只展示<b>已通过 AI 深度精读</b>的工作流：每条都带分步数据流讲解、阶段拆解与逐节点分析；尚未精读的完整收录在页面底部的备份区，精读完成后自动转正。</p>'
       + '<div class="cv-tiles">'
-      + tile(fmtN(st.parsed), "条已解析工作流")
+      + tile(fmtN(st.aiDone || 0), "条已 AI 精读（主区）")
+      + tile(fmtN(st.aiTotal || st.parsed), "条已解析收录")
       + tile(Object.keys(st.packs || {}).length, "个社区节点包在用")
-      + tile(fmtN(Object.entries(st.bases || {}).reduce(function (s, kv) { return s + kv[1]; }, 0)), "条标注了底模")
       + tile((st.formats && st.formats.ui || 0) + " / " + (st.formats && st.formats.api || 0), "UI 格式 / API 格式")
       + "</div>"
       + '<div class="cv-viewbar"><div class="cv-viewtabs">'
       + '<button class="cv-viewtab' + (VIEW === "cards" ? " active" : "") + '" data-view="cards">🗂 卡片视图</button>'
       + '<button class="cv-viewtab' + (VIEW === "table" ? " active" : "") + '" data-view="table">📋 多维表格</button>'
       + "</div>"
-      + (st.aiDone ? '<span class="cv-viewnote">AI 精读已完成 <b>' + st.aiDone + "</b> / " + fmtN(st.parsed) + " 份（重复结构自动同源）</span>" : "")
+      + (st.aiTotal ? '<span class="cv-viewnote">AI 精读 <b>' + (st.aiDone || 0) + "</b> / " + fmtN(st.aiTotal) + " 条（重复结构自动同源）· 未精读在底部备份区</span>" : "")
       + "</div>";
 
     if (VIEW === "table") {
-      html += renderTableShell() + "</div>";
+      html += renderTableShell();
     } else {
       html += renderCardsBody(st);
     }
+    html += renderBackup(st);
+    html += "</div>";
     return html;
   }
 
@@ -220,7 +271,7 @@
 
   function tableFiltered() {
     var f = T.f || {};
-    var base = wfs().filter(function (w) { return !F.nsfw || true; }).filter(function (w) { return F.nsfw || !w.nsfw; });
+    var base = wfs().filter(function (w) { return w.ai && (F.nsfw || !w.nsfw); });   /* 表格视图同样只展示已精读 */
     return base.filter(function (w) {
       for (var i = 0; i < TCOLS.length; i++) {
         var col = TCOLS[i], fl = f[col.k];
@@ -469,12 +520,29 @@
     if (VIEW === "table") mountTable(); else mount();
   }
 
+  /* 备份区折叠/展开（卡片与表格视图共用）：点击标题行切换 body 显隐 + 箭头转向 */
+  function wireBackupToggle() {
+    var head = $("#cvBackupHead");
+    if (!head || head.__wired) return;
+    head.__wired = true;
+    head.addEventListener("click", function () {
+      var body = $("#cvBackup .cv-backup-body");
+      var arrow = $("#cvBackup .cv-backup-arrow");
+      if (!body) return;
+      var open = body.style.display !== "none";
+      body.style.display = open ? "none" : "";
+      $("#cvBackup").classList.toggle("collapsed", open);
+      if (arrow) arrow.textContent = open ? "▸" : "▾";
+    });
+  }
+
   function mountTable() {
     var gs = $("#cvGroup");
     gs.value = T.groupBy;
     $("#cvGSort").value = T.gSort;
     $("#cvGSep").style.display = $("#cvGSort").style.display = T.groupBy ? "" : "none";
     paintTHead(); paintTBody();
+    wireBackupToggle();
     $all(".cv-viewtab").forEach(function (b) {
       b.addEventListener("click", function () { VIEW = b.getAttribute("data-view"); T.openCol = null; rerenderPage(); });
     });
@@ -520,6 +588,7 @@
     $all(".cv-viewtab").forEach(function (b) {
       b.addEventListener("click", function () { VIEW = b.getAttribute("data-view"); rerenderPage(); });
     });
+    wireBackupToggle();
     paintFilters();
     paintGrid();
     $("#cvCats").addEventListener("click", function (e) {
@@ -567,34 +636,29 @@
       + (sel.fmt === "api" ? '<span class="mini-tag">API 格式（自动布局）</span>' : "")
       + (w.variants && w.variants.length > 1 ? '<span class="mini-tag" style="color:#7dd3fc">📦 包内共 ' + w.variants.length + " 份工作流</span>" : "")
       + "</div>"
-      + '<p class="ph-desc" id="cvAiSum">' + esc(summaryLine(w)) + "</p>"
+      + '<div class="ph-desc" id="cvAiSum">' + esc(summaryLine(w)) + "</div>"
       + '<div class="ph-meta" id="cvDiffRow" style="display:none"></div>'
       + '<p class="ph-desc" style="font-size:13px">作者 ' + esc(w.by)
       + ' · <a class="cv-link" href="https://civitai.com/models/' + w.m + '" target="_blank" rel="noopener">在 Civitai 查看源页面 ↗</a>'
-      + (w.tags && w.tags.length ? " · 标签：" + w.tags.map(esc).join("、") : "") + "</p></div>"
-      + '<div id="cvAiBlocks"></div>';
+      + (w.tags && w.tags.length ? " · 标签：" + w.tags.map(esc).join("、") : "") + "</p></div>";
 
     /* 附加工作流切换 */
     if (variants.length > 1) {
       html += '<div class="cv-variant-bar" id="cvVariants"><span class="cv-variant-label">包内工作流：</span>';
       variants.forEach(function (v, i) {
         html += '<a class="cv-variant-btn' + (String(v.i) === String(sel.i) ? " active" : "") + '" href="#/civitai/' + w.v + "/" + i + '" title="' + esc(v.name || "") + '">'
-          + (i === 0 ? "★ 主文件" : "#" + (i + 1)) + " · " + v.nodes + " 节点" + (v.cat && v.cat !== w.cat ? " · " + esc(v.cat) : "") + "</a>";
+          + (i === 0 ? "★ 主文件" : "#" + (i + 1)) + " · " + v.nodes + " 节点" + (v.cat && v.cat !== w.cat ? " · " + esc(v.cat) : "") + (v.ai ? '<span class="cv-v-ai">✓ 已精读</span>' : "") + "</a>";
       });
       html += "</div>";
     }
 
-    /* 交互式节点图（懒加载 + AI 阶段拆解） */
+    /* 交互式节点图 + 三合一联动面板（与「三 · 工作流图鉴」同款通用组件 wfpanel.js） */
     html += '<div class="section"><div class="sec-head"><h2 style="font-size:20px">工作流节点图</h2><span class="sec-en">INTERACTIVE GRAPH</span></div>'
-      + '<p class="sec-desc">按原始画布坐标还原的节点图：拖拽平移 · 滚轮缩放 · <b>点击节点</b>查看它的作用、端口与参数解释；双击空白处复位。连线颜色 = 数据类型。</p>'
+      + '<p class="sec-desc">拖拽平移 · 滚轮缩放 · <b>点击节点</b>查看它在整条流程中的职责；<b>数据流 / 阶段拆解 / 逐节点分析</b>三个视图与图双向联动，可步进、可回放；双击空白处复位。连线颜色 = 数据类型。</p>'
       + (variants.length > 1 ? '<p class="cv-variant-file mono">' + esc(sel.name || ("#" + (sel.i + 1))) + "</p>" : "")
-      + '<div id="cvStages"></div>'
-      + '<div id="cvGraph"><div class="cv-loading">节点图加载中…</div></div>'
-      + '<div id="cvStageItems"></div>'
-      + '<div class="graph-legend"><span>连线颜色：</span>'
-      + [["MODEL", "#8b5cf6"], ["CLIP", "#c9b34a"], ["VAE", "#d9534f"], ["LATENT", "#5faf5f"], ["IMAGE", "#3d8bd6"], ["CONDITIONING", "#e8a33d"], ["CONTROL_NET", "#a1887f"], ["VIDEO", "#d4618c"]]
-        .map(function (x) { return '<span class="lg"><span class="sw" style="background:' + x[1] + '"></span>' + x[0] + "</span>"; }).join("")
-      + "</div></div>";
+      + '<div id="cvPanelRoot"><div class="cv-loading">节点图加载中…</div></div>'
+      + "</div>"
+      + '<div id="cvAiBlocks"></div>';
 
     if (packs.length) {
       html += '<div class="section"><div class="sec-head"><h2 style="font-size:20px">需要安装的社区节点包</h2><span class="sec-en">REQUIRED NODE PACKS</span></div>'
@@ -633,35 +697,62 @@
   }
 
   function loadGraph(vid, vi) {
-    var box = $("#cvGraph");
-    if (!box) return;
-    box.innerHTML = '<div class="cv-loading">节点图加载中…</div>';
+    var root = $("#cvPanelRoot");
+    if (!root) return;
+    root.innerHTML = '<div class="cv-loading">节点图加载中…</div>';
     fetch("assets/files/civitai/graph/" + vid + "__" + vi + ".json")
       .then(function (r) { if (!r.ok) throw new Error("http " + r.status); return r.json(); })
       .then(function (g) {
-        if (!box.isConnected) return;
-        box.innerHTML = "";
-        var handle = null;
-        try { handle = window.ComfyGraph.render(box, g); }
-        catch (e) { box.innerHTML = '<div class="card">该图节点过多，渲染失败。</div>'; }
-        renderAiBlocks(g.ai || null, handle, g.sameAs || null);
+        if (!root.isConnected) return;
+        var ai = g.ai || null;
+        renderAiBlocks(ai, g.sameAs || null, g);
+        if (!window.ComfyWfPanel) { root.innerHTML = '<div class="card">面板组件加载失败，请刷新重试。</div>'; return; }
+        try {
+          root.innerHTML = window.ComfyWfPanel.skeleton(panelData(g, ai));
+          var notes = {};
+          if (ai && ai.na) Object.keys(ai.na).forEach(function (id) {
+            if (ai.na[id] && ai.na[id].desc) notes[id] = ai.na[id].desc;
+          });
+          window.ComfyWfPanel.mount({ root: root, w: panelData(g, ai), notes: notes });
+        } catch (e) { root.innerHTML = '<div class="card">该图节点过多，渲染失败。</div>'; }
       })
       .catch(function () {
-        if (box.isConnected) box.innerHTML = '<div class="card">节点图数据缺失（该工作流可能解析失败或尚未生成）。</div>';
+        if (root.isConnected) root.innerHTML = '<div class="card">节点图数据缺失（该工作流可能解析失败或尚未生成）。</div>';
       });
   }
 
-  /* AI 精读内容渲染：摘要替换、难度、阶段拆解 chips 联动高亮、使用场景、参数与警示 */
-  function renderAiBlocks(ai, handle, sameAs) {
+  /* 图 + AI 精读 → wfpanel 通用数据形状（graph.ai.na 是 {节点id: {brief,desc,params}} 字典） */
+  function panelData(g, ai) {
+    var naList = [];
+    if (ai && ai.na) {
+      var order = {};
+      (g.nodes || []).forEach(function (x, i) { order[x.id] = i; });
+      Object.keys(ai.na).forEach(function (id) {
+        var info = ai.na[id];
+        if (!info) return;
+        var paramsText = (info.params || []).map(function (p) { return p.name + " = " + (p.default == null ? "—" : p.default); }).join(" · ");
+        naList.push({ node: id, detail: info.desc || "", paramsText: paramsText });
+      });
+      naList.sort(function (a, b) {
+        return (order[a.node] !== undefined ? order[a.node] : 1e9) - (order[b.node] !== undefined ? order[b.node] : 1e9);
+      });
+    }
+    return { graph: g, flow: (ai && ai.f) || [], stages: (ai && ai.st) || [], nodeAnalysis: naList };
+  }
+
+  /* AI 精读内容渲染：摘要替换（长文自动分段+折叠+节点高亮）、难度、使用场景、实用技巧、参数建议与警示 */
+  function renderAiBlocks(ai, sameAs, g) {
     var sum = $("#cvAiSum"), diffRow = $("#cvDiffRow"), blocks = $("#cvAiBlocks");
     if (!sum) return;
     if (sameAs) {
-      sum.innerHTML = '<span class="cv-dup-tag copy">同构副本</span>本工作流与 <a class="cv-link mono" href="#/civitai/' + sameAs.split("__")[0] + '">主代表 ' + esc(sameAs) + '</a> 的图结构完全相同，讲解同源。' ;
-      return;
+      sum.innerHTML = '<span class="cv-dup-tag copy">同构副本</span>本工作流与 <a class="cv-link mono" href="#/civitai/' + sameAs.split("__")[0] + '">主代表 ' + esc(sameAs) + '</a> 的图结构完全相同，讲解同源。';
+    } else if (ai && ai.s) {
+      sum.innerHTML = '<span class="cv-ai-badge">AI 精读</span>'
+        + (window.ComfyWfPanel && window.ComfyWfPanel.digestBlock ? window.ComfyWfPanel.digestBlock(ai, g) : esc(ai.s));
+    } else {
+      sum.innerHTML = '<span class="cv-pending-badge">待精读</span>这条工作流已完成结构解析（节点构成 / 节点包依赖 / 模型引用），AI 深度讲解还在路上——发布后内容会自动更新。';
     }
-    if (!ai) return;
-    sum.innerHTML = '<span class="cv-ai-badge">AI 精读</span>' + esc(ai.s || "");
-    if (ai.d) {
+    if (ai && ai.d) {
       var stars = "";
       for (var i = 1; i <= 3; i++) stars += i <= ai.d ? "★" : "☆";
       diffRow.style.display = "";
@@ -669,34 +760,19 @@
     }
     if (blocks) {
       var html = "";
-      if (ai.u && ai.u.length) {
+      if (ai && ai.u && ai.u.length) {
         html += '<div class="section"><div class="sec-head"><h2 style="font-size:20px">什么场景用它</h2><span class="sec-en">USE CASES</span></div><ul class="cv-uc-list">';
         ai.u.forEach(function (u) { html += "<li>" + esc(u) + "</li>"; });
         html += "</ul></div>";
       }
-      if (ai.p) html += '<div class="callout info"><span class="co-ico">🎛</span><div><span class="co-title">参数建议</span>' + esc(ai.p) + "</div></div>";
-      if (ai.n) html += '<div class="callout danger"><span class="co-ico">⚠️</span><div><span class="co-title">使用前必读</span>' + esc(ai.n) + "</div></div>";
-      blocks.innerHTML = html;
-    }
-    var stageBox = $("#cvStages"), itemBox = $("#cvStageItems");
-    if (stageBox && ai.st && ai.st.length && handle) {
-      stageBox.innerHTML = '<div class="stage-chips">' + ai.st.map(function (s, i) {
-        return '<button class="stage-chip" data-i="' + i + '">' + (i + 1) + ". " + esc(s.name) + "</button>";
-      }).join("") + "</div>";
-      var active = -1;
-      stageBox.addEventListener("click", function (e) {
-        var b = e.target.closest(".stage-chip");
-        if (!b) return;
-        var i = parseInt(b.getAttribute("data-i"), 10);
-        $all("#cvStages .stage-chip").forEach(function (x) { x.classList.toggle("active", x === b && active !== i); });
-        if (active === i) { handle.highlight(null); active = -1; }
-        else { handle.highlight(ai.st[i].nodes.map(String)); active = i; }
-      });
-      if (itemBox) {
-        itemBox.innerHTML = '<div class="stage-line">' + ai.st.map(function (s, si) {
-          return '<div class="stage-item"><h4><span class="stage-num">' + (si + 1) + "</span>" + esc(s.name) + "</h4><p>" + esc(s.desc) + "</p></div>";
-        }).join("") + "</div>";
+      if (ai && ai.t && ai.t.length) {
+        html += '<div class="section"><div class="sec-head"><h2 style="font-size:20px">实用技巧与常见坑</h2><span class="sec-en">TIPS</span></div><div class="card">';
+        ai.t.forEach(function (t) { html += '<p style="color:var(--muted);margin-bottom:8px">✦ ' + esc(t) + "</p>"; });
+        html += "</div></div>";
       }
+      if (ai && ai.p) html += '<div class="callout info"><span class="co-ico">🎛</span><div><span class="co-title">参数建议</span>' + esc(ai.p) + "</div></div>";
+      if (ai && ai.n) html += '<div class="callout danger"><span class="co-ico">⚠️</span><div><span class="co-title">使用前必读</span>' + esc(ai.n) + "</div></div>";
+      blocks.innerHTML = html;
     }
   }
 

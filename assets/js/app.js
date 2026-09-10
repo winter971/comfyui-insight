@@ -1,9 +1,9 @@
-﻿/* ============================================================
+/* ============================================================
    ComfyUI 全景解析 — 主应用（hash 路由 + 渲染 + 搜索）
    ============================================================ */
 (function () {
   "use strict";
-  window.COMFY_APP_VER = "20260908h";  /* 运行时版本标记（排查缓存用） */
+  window.COMFY_APP_VER = "20260910r";  /* 运行时版本标记（排查缓存用） */
 
   var D = function () { return window.COMFY_DATA || {}; };
   function pkgs() { return (D().nodePackages || []).slice().sort(function (a, b) { return (a.official === b.official) ? 0 : (a.official ? -1 : 1); }); }
@@ -23,15 +23,6 @@
   }
   function catDot(cat) { return '<span class="cat-dot cat-' + esc(cat) + '"></span>'; }
   function diffStars(n) { n = n || 1; var s = ""; for (var i = 1; i <= 5; i++) s += i <= n ? "★" : "☆"; return s; }
-  /* 面板三个 tab 通用的步进控制条：上一步 / 下一步 / 重置 + 当前聚焦位置 */
-  function stepBarHtml(id) {
-    return '<div class="wf-stepbar" id="' + id + '">'
-      + '<button class="wf-step-btn" data-dir="prev" title="上一步">◀ 上一步</button>'
-      + '<button class="wf-step-btn" data-dir="next" title="下一步">下一步 ▶</button>'
-      + '<button class="wf-step-btn wf-step-reset" data-dir="reset" title="清除当前聚焦">↺ 重置</button>'
-      + '<span class="wf-step-pos">未聚焦</span>'
-      + "</div>";
-  }
 
   /* ============ 首页 ============ */
   function renderHome() {
@@ -304,7 +295,9 @@
           ? '<a class="mini-tag" href="' + esc(wfFile(w.id).sourceUrl) + '" target="_blank" rel="noopener" style="color:#7dd3fc;border-color:rgba(76,201,240,.4)">📄 真实文件：' + esc(wfFile(w.id).sourceName) + " ↗</a>"
           : '<span class="mini-tag">🧪 来源：' + esc(w.source || "社区常见结构") + "（本站自制参考版）</span>")
       + (w.tags || []).map(function (t) { return '<span class="mini-tag">' + esc(t) + "</span>"; }).join("") + "</div>"
-      + '<p class="ph-desc">' + esc(w.summary) + "</p></div>";
+      + '<div class="ph-desc">' + (window.ComfyWfPanel && window.ComfyWfPanel.digestBlock
+          ? window.ComfyWfPanel.digestBlock({ s: w.summary, f: w.flow || [], st: w.stages || [] }, w.graph)
+          : esc(w.summary)) + "</div></div>";
 
     if (w.notice) html += '<div class="callout danger"><span class="co-ico">⚠️</span><div><span class="co-title">使用前必读</span>' + esc(w.notice) + "</div></div>";
 
@@ -325,84 +318,10 @@
         + "</div>";
     }
 
-    /* 交互式节点图 */
+    /* 交互式节点图 + 三合一联动面板（通用组件见 wfpanel.js） */
     html += '<div class="section"><div class="sec-head"><h2>工作流节点图</h2><span class="sec-en">INTERACTIVE GRAPH</span></div>'
-      + '<p class="sec-desc">拖拽平移 · 滚轮缩放 · <b>点击阶段按钮</b>聚焦该环节并高亮数据进出连线，讲解直接显示在图下方；<b>点击节点</b>查看它在整条流程中的职责；双击空白处复位视图。连线颜色 = 数据类型。</p>';
-    if (w.stages && w.stages.length) {
-      html += '<div class="stage-chips" id="stageChips"><button class="stage-chip active" data-stage="-1">🌐 全部</button>';
-      w.stages.forEach(function (s, i) {
-        html += '<button class="stage-chip" data-stage="' + i + '">' + esc((i + 1) + ". " + s.name) + "</button>";
-      });
-      html += "</div>";
-    }
-    html += '<div class="play-bar" id="playBar">'
-      + '<button class="play-btn" id="pbPlay" title="按真实执行顺序逐节点播放数据流动">▶ 播放数据流</button>'
-      + '<button class="pb-mini" id="pbPrev" title="上一步">◀</button>'
-      + '<button class="pb-mini" id="pbNext" title="下一步">▶</button>'
-      + '<button class="pb-mini" id="pbReset" title="从头重播">↺</button>'
-      + '<button class="pb-mini pb-x" id="pbClose" title="退出回放">✕</button>'
-      + '<span class="pb-note">按真实执行顺序回放每一步的数据流入流出</span>'
-      + "</div>"
-      + '<div id="wfGraph"></div>'
-      + '<div class="graph-legend"><span>连线颜色：</span>'
-      + [["MODEL", "#8b5cf6"], ["CLIP", "#c9b34a"], ["VAE", "#d9534f"], ["LATENT", "#5faf5f"], ["IMAGE", "#3d8bd6"], ["CONDITIONING", "#e8a33d"], ["CONTROL_NET", "#a1887f"], ["VIDEO", "#d4618c"]]
-        .map(function (x) { return '<span class="lg"><span class="sw" style="background:' + x[1] + '"></span>' + x[0] + "</span>"; }).join("")
-      + '<span style="margin-left:auto">连线颜色由上游输出类型决定</span></div>'
-      /* 联动面板：数据流 / 阶段拆解 / 逐节点分析 三合一，tab 切换 + 可收起 */
-      + '<div class="wf-panel" id="wfPanel">'
-      + '<div class="wf-tabs">'
-      + '<button class="wf-tab active" data-tab="flow">🔗 数据流</button>'
-      + '<button class="wf-tab" data-tab="stage">🧩 阶段拆解</button>'
-      + '<button class="wf-tab" data-tab="nodes">🔬 逐节点分析</button>'
-      + '<button class="wf-collapse" id="wfCollapse" title="收起/展开面板">▾ 收起</button>'
-      + "</div>"
-      + '<div class="wf-body" id="wfBody">'
-      + '<div class="wf-tabpane active" data-pane="flow">'
-      + stepBarHtml("flowBar")
-      + '<div class="pb-sub mono" id="pbSub"></div>'
-      + (w.flow && w.flow.length
-        ? '<div class="flow-inline-head"><h2>数据是怎么一步步流动的</h2><span class="sec-en">DATA FLOW</span><span class="flow-hint">👆 点击任意步骤，图上高亮该步的数据流动</span></div>'
-          + '<div class="flow-steps" id="flowList">'
-          + w.flow.map(function (f, i) {
-              return '<div class="flow-step" data-fidx="' + i + '"><div class="fs-num">' + (i + 1) + '</div><div><h4>第 ' + (i + 1) + " 步</h4><p>" + esc(f) + "</p></div></div>";
-            }).join("")
-          + "</div>"
-        : '<div class="pb-none" style="padding:8px 0">该工作流暂无分步数据流讲解。</div>')
-      + "</div>"
-      + '<div class="wf-tabpane" data-pane="stage">'
-      + stepBarHtml("stageBar")
-      + '<div class="pb-sub mono" id="stageSub"></div>'
-      + (w.stages && w.stages.length
-        ? '<div class="stage-line">'
-          + w.stages.map(function (s, i) {
-              return '<div class="stage-item" data-stage="' + i + '"><h4><span class="stage-num">' + (i + 1) + "</span>" + esc(s.name) + '<span class="st-nodes">'
-                + (s.nodes || []).map(function (nid) {
-                    var n = nodeById[nid];
-                    return n ? '<span class="mini-tag mono" style="font-size:10.5px">' + esc(n.title) + "</span>" : "";
-                  }).join("") + '</span></h4><p>' + esc(s.desc) + "</p></div>";
-            }).join("")
-          + "</div>"
-        : "")
-      + "</div>"
-      + '<div class="wf-tabpane" data-pane="nodes">'
-      + stepBarHtml("nodeBar")
-      + '<div class="pb-sub mono" id="nodeSub"></div>'
-      + (w.nodeAnalysis && w.nodeAnalysis.length
-        ? '<div class="node-list" id="nodeList">'
-          + w.nodeAnalysis.map(function (a, i) {
-              var n = nodeById[a.node] || { title: a.node, cat: "util" };
-              var lk = lookupNode(n.title);
-              return '<details class="node-card" data-nid="' + esc(a.node) + '"><summary>'
-                + catDot(n.cat) + '<span class="node-name">' + esc(n.title) + '</span><span class="node-brief">' + esc(n.brief || "") + '</span><span class="node-loc">📍 图中已高亮</span><span class="node-chevron">▶</span></summary>'
-                + '<div class="node-body"><div class="nb-row"><div class="nb-label">在本工作流中</div><div>' + esc(a.detail) + "</div></div>"
-                + (n.widgets && n.widgets.length ? '<div class="nb-row"><div class="nb-label">图中参数</div><div class="mono" style="font-size:12.5px;color:#a5b0c8">' + n.widgets.map(esc).join(" · ") + "</div></div>" : "")
-                + (lk ? '<div class="nb-row"><div class="nb-label">节点包详解</div><div><a href="#/nodes/' + esc(lk.pkg.id) + '" style="font-size:12.5px">📖 ' + esc(lk.pkg.name) + " · " + esc(lk.node.name) + " →</a></div></div>" : "")
-                + "</div></details>";
-            }).join("")
-          + "</div>"
-        : '<div class="pb-none" style="padding:8px 0">该工作流暂无逐节点分析。</div>')
-      + "</div>"
-      + "</div></div>"
+      + '<p class="sec-desc">拖拽平移 · 滚轮缩放 · <b>点击阶段按钮</b>聚焦该环节并高亮数据进出连线，讲解直接显示在图下方；<b>点击节点</b>查看它在整条流程中的职责；双击空白处复位视图。连线颜色 = 数据类型。</p>'
+      + '<div id="wfPanelRoot">' + window.ComfyWfPanel.skeleton(panelData(w)) + "</div>"
       + "</div>";
 
     /* 工作流源文件（展示与下载） */
@@ -442,490 +361,31 @@
     return html;
   }
 
+  /* 面板数据整形：nodeAnalysis 统一成 {node, detail, paramsText}（wfpanel.js 通用形状） */
+  function panelData(w) {
+    var nb = {};
+    (w.graph.nodes || []).forEach(function (n) { nb[n.id] = n; });
+    return {
+      graph: w.graph, flow: w.flow, stages: w.stages,
+      nodeAnalysis: (w.nodeAnalysis || []).map(function (a) {
+        var n = nb[a.node] || {};
+        return { node: a.node, detail: a.detail, paramsText: (n.widgets || []).join(" · ") };
+      })
+    };
+  }
+
   function mountWfGraph(id) {
     var w = null;
     wfs().forEach(function (x) { if (x.id === id) w = x; });
-    var host = $("#wfGraph");
-    if (!w || !host || !window.ComfyGraph) return;
-
-    /* 执行回放 UI 状态 */
-    var pbBar = $("#playBar"), pbBtn = $("#pbPlay"), pbPrev = $("#pbPrev"), pbNext = $("#pbNext"),
-        pbReset = $("#pbReset"), pbClose = $("#pbClose"), pbSub = $("#pbSub");
-    var stageSub = $("#stageSub"), nodeSub = $("#nodeSub");
-    var pbTimer = null, pbPlaying = false, pbStep = -1;
-    function stopPbUi() {
-      if (pbTimer) { clearInterval(pbTimer); pbTimer = null; }
-      pbPlaying = false; pbStep = -1;
-      if (pbBtn) pbBtn.textContent = "▶ 播放数据流";
-      if (pbBar) pbBar.classList.remove("playing");
-    }
+    var root = $("#wfPanelRoot");
+    if (!w || !root || !window.ComfyWfPanel) return;
 
     /* 节点图详情面板注入"在本工作流中"语境分析（来自逐节点全量分析） */
     var wfNoteMap = {};
     (w.nodeAnalysis || []).forEach(function (a) {
       if (a && a.node && a.detail) wfNoteMap[a.node] = a.detail;
     });
-    var api = window.ComfyGraph.render(host, w.graph, {
-      notes: wfNoteMap,
-      onPlaybackChange: function (active) { if (!active) { stopPbUi(); panelClearAll(); } },
-      onNodeClick: function (n) {
-        if (n && nodeById2[n.id]) focusNode(n.id);
-        else panelClearAll();  /* 点空白 / 关详情 = 全部取消聚焦 */
-      }
-    });
-    var pbApi = api.playback;
-
-    /* 图内节点索引 + 阶段归属（面板联动与聚焦模型的基础） */
-    var nodeById2 = {};
-    (w.graph.nodes || []).forEach(function (n) { nodeById2[n.id] = n; });
-    var stageOf = {};
-    (w.stages || []).forEach(function (s, si) {
-      (s.nodes || []).forEach(function (nid) { if (stageOf[nid] === undefined) stageOf[nid] = si; });
-    });
-
-    /* 联动面板：三块内容 tab 切换 + 可收起；图交互自动切到对应 tab */
-    var wfPanel = $("#wfPanel"), wfCollapse = $("#wfCollapse");
-    function switchTab(name, expand) {
-      if (!wfPanel) return;
-      if (expand && wfPanel.classList.contains("collapsed")) wfPanel.classList.remove("collapsed");
-      if (wfCollapse) wfCollapse.textContent = wfPanel.classList.contains("collapsed") ? "▸ 展开" : "▾ 收起";
-      $all(".wf-tab", wfPanel).forEach(function (t) { t.classList.toggle("active", t.getAttribute("data-tab") === name); });
-      $all(".wf-tabpane", wfPanel).forEach(function (p) { p.classList.toggle("active", p.getAttribute("data-pane") === name); });
-    }
-    if (wfCollapse) wfCollapse.addEventListener("click", function () {
-      wfPanel.classList.toggle("collapsed");
-      wfCollapse.textContent = wfPanel.classList.contains("collapsed") ? "▸ 展开" : "▾ 收起";
-    });
-    $all(".wf-tab", wfPanel).forEach(function (t) {
-      t.addEventListener("click", function () { switchTab(t.getAttribute("data-tab")); });
-    });
-    /* ── 统一聚焦模型：三个 tab 都有"当前聚焦"，样式一致、可步进、可重置 ──
-       flowFocusIdx / stageFocusIdx / nodeFocusId 分别是三个 tab 的当前焦点 */
-    var flowFocusIdx = -1, stageFocusIdx = -1, nodeFocusId = null;
-    var stageLine = wfPanel ? wfPanel.querySelector(".stage-line") : null;
-    var stageItems = wfPanel ? $all(".stage-line .stage-item", wfPanel) : [];
-    var nodeOrder = [];
-    (w.nodeAnalysis || []).forEach(function (a) { if (a && a.node && nodeById2[a.node]) nodeOrder.push(a.node); });
-    function clampIdx(i, n) { return Math.max(0, Math.min(n - 1, i)); }
-    function posEl(barId) { var bar = $("#" + barId); return bar ? bar.querySelector(".wf-step-pos") : null; }
-    function setPos(barId, focused, total, unit, idx) {
-      var el = posEl(barId);
-      if (!el) return;
-      el.textContent = focused ? "第 " + (idx + 1) + " / " + total + " " + unit : "未聚焦";
-      el.classList.toggle("on", focused);
-    }
-    function updateStepPos() {
-      setPos("flowBar", flowFocusIdx >= 0, (w.flow || []).length, "步", flowFocusIdx);
-      setPos("stageBar", stageFocusIdx >= 0, (w.stages || []).length, "阶段", stageFocusIdx);
-      var ni = nodeFocusId ? nodeOrder.indexOf(nodeFocusId) : -1;
-      setPos("nodeBar", ni >= 0, nodeOrder.length, "节点", ni);
-    }
-    /* 三个 tab 顶部的"当前选中"卡：聚焦什么就地把内容显示在最开头，无需滚动列表 */
-    function renderStageSub(si) {
-      if (!stageSub) return;
-      if (si < 0 || !w.stages[si]) { stageSub.innerHTML = ""; return; }
-      var s = w.stages[si];
-      var parts = (s.nodes || []).map(function (nid) { return nodeById2[nid] ? nodeById2[nid].title : nid; });
-      stageSub.innerHTML = '<div class="pb-card"><div class="pb-head"><span class="pb-pos">第 ' + (si + 1) + " 阶段</span><b>" + esc(s.name) + "</b></div>"
-        + '<div class="pb-row"><span class="pb-k">📖 讲解</span><span class="pb-do-text">' + esc(s.desc) + "</span></div>"
-        + (parts.length ? '<div class="pb-row"><span class="pb-k">🎯 涉及节点</span><span>' + parts.map(function (t) { return '<span class="pb-d"><b>' + esc(t) + "</b></span>"; }).join("") + "</span></div>" : "")
-        + "</div>";
-    }
-    function renderNodeSub(nid) {
-      if (!nodeSub) return;
-      var n = nid ? nodeById2[nid] : null;
-      if (!n) { nodeSub.innerHTML = ""; return; }
-      var na = null;
-      (w.nodeAnalysis || []).forEach(function (a) { if (a.node === nid) na = a; });
-      nodeSub.innerHTML = '<div class="pb-card"><div class="pb-head"><span class="pb-pos">节点聚焦</span><b>' + esc(n.title) + "</b></div>"
-        + (na ? '<div class="pb-row"><span class="pb-k">📖 在本工作流中</span><span class="pb-do-text">' + esc(na.detail) + "</span></div>" : "")
-        + (n.brief ? '<div class="pb-row"><span class="pb-k">⚙ 通用职责</span><span class="pb-do-text">' + esc(n.brief) + "</span></div>" : "")
-        + (n.widgets && n.widgets.length ? '<div class="pb-row"><span class="pb-k">🎚 图中参数</span><span class="mono">' + n.widgets.map(esc).join(" · ") + "</span></div>" : "")
-        + "</div>";
-    }
-    function panelClearAll() {
-      flowFocusIdx = -1; stageFocusIdx = -1; nodeFocusId = null;
-      flowClear(); markStageItem(-1); syncChips(-1); markNodeCard(null);
-      if (pbSub) pbSub.innerHTML = "";
-      renderStageSub(-1);
-      renderNodeSub(null);
-      api.highlight(null);
-      updateStepPos();
-    }
-
-    /* —— 阶段拆解：时间线卡片 ↔ 图高亮 双向联动，选中态标在卡片上 —— */
-    function markStageItem(si) {
-      stageItems.forEach(function (el) {
-        el.classList.toggle("active", parseInt(el.getAttribute("data-stage"), 10) === si);
-      });
-    }
-    /* 阶段选中统一入口：图上方 chips、面板内时间线卡片、步进按钮共用 */
-    function selectStage(si, opts) {
-      opts = opts || {};
-      if (pbApi.isActive()) pbApi.exit();
-      stageFocusIdx = (si >= 0 && w.stages[si]) ? si : -1;
-      flowFocusIdx = -1; nodeFocusId = null;
-      syncChips(stageFocusIdx);
-      markStageItem(stageFocusIdx);
-      flowClear();
-      markNodeCard(null);
-      if (pbSub) pbSub.innerHTML = "";
-      renderNodeSub(null);
-      if (stageFocusIdx < 0) api.highlight(null);
-      else api.highlight((w.stages[si].nodes || []).slice(), true);
-      renderStageSub(stageFocusIdx);
-      updateStepPos();
-      /* 从面板外（阶段 chips）触发时，切到阶段拆解 tab 并展开，让讲解可见 */
-      if (opts.reveal) switchTab("stage", true);
-    }
-    if (stageLine) stageLine.addEventListener("click", function (e) {
-      var item = e.target.closest(".stage-item");
-      if (!item) return;
-      var idx = parseInt(item.getAttribute("data-stage"), 10);
-      if (isNaN(idx) || !w.stages[idx]) return;
-      selectStage(item.classList.contains("active") ? -1 : idx);  /* 再点一次取消聚焦 */
-    });
-
-    /* —— 逐节点分析：卡片 ↔ 图 双向联动，聚焦卡自动展开并滚动到可见 —— */
-    var nodeList = $("#nodeList");
-    function markNodeCard(id) {
-      if (!nodeList) return;
-      $all(".node-card", nodeList).forEach(function (el) {
-        el.classList.toggle("active", el.getAttribute("data-nid") === id);
-      });
-    }
-    function focusNode(nid) {
-      if (!nid || !nodeById2[nid]) return;
-      if (pbApi.isActive()) pbApi.exit();
-      nodeFocusId = nodeOrder.indexOf(nid) >= 0 ? nid : null;
-      flowFocusIdx = -1; stageFocusIdx = -1;
-      flowClear();
-      syncChips(-1);
-      markStageItem(-1);
-      markNodeCard(nid);
-      api.highlight(api.neighborsOf(nid));
-      if (pbSub) pbSub.innerHTML = "";
-      renderStageSub(-1);
-      renderNodeSub(nid);
-      var card = null;
-      if (nodeList) $all(".node-card", nodeList).forEach(function (el) {
-        if (el.getAttribute("data-nid") === nid) card = el;
-      });
-      if (card && !card.open) card.open = true;
-      updateStepPos();
-    }
-    function nodeReset() {
-      if (pbApi.isActive()) pbApi.exit();
-      nodeFocusId = null;
-      markNodeCard(null);
-      api.highlight(null);
-      renderNodeSub(null);
-      updateStepPos();
-    }
-    if (nodeList) {
-      nodeList.addEventListener("click", function (e) {
-        var card = e.target.closest(".node-card");
-        if (!card) return;
-        if (e.target.closest("a")) return;  /* 卡内链接正常跳转 */
-        var id = card.getAttribute("data-nid");
-        if (!id || !nodeById2[id]) return;
-        if (card.classList.contains("active")) { card.open = false; nodeReset(); return; }  /* 再点一次取消聚焦 */
-        focusNode(id);
-      });
-    }
-
-    /* 图上方阶段 chips：与面板内时间线联动 */
-    var chips = $("#stageChips");
-    function syncChips(si) {
-      if (!chips) return;
-      $all(".stage-chip", chips).forEach(function (x) {
-        x.classList.toggle("active", parseInt(x.getAttribute("data-stage"), 10) === si);
-      });
-    }
-    if (chips) {
-      chips.addEventListener("click", function (e) {
-        var b = e.target.closest(".stage-chip");
-        if (!b) return;
-        selectStage(parseInt(b.getAttribute("data-stage"), 10), { reveal: true });
-      });
-    }
-
-    /* DATA FLOW 联动：flow 文本点名了节点标题，按文本匹配建立 步骤→节点 映射 */
-    var flowList = $("#flowList");
-    var flowNodeCache = {};
-    function flowStepIds(i) {
-      if (flowNodeCache[i] !== undefined) return flowNodeCache[i];
-      var text = (w.flow || [])[i] || "";
-      var ids = [];
-      (w.graph.nodes || []).forEach(function (n) {
-        if (text.indexOf(n.title) >= 0) ids.push(n.id);
-      });
-      if (!ids.length && i > 0) ids = flowStepIds(i - 1);  /* 概念补充步（如 Seed 说明）沿用上一步节点 */
-      flowNodeCache[i] = ids;
-      return ids;
-    }
-    var flowOfNode = {};
-    (w.flow || []).forEach(function (f, i) {
-      flowStepIds(i).forEach(function (id) { if (flowOfNode[id] === undefined) flowOfNode[id] = i; });
-    });
-    function flowMark(idx) {
-      if (!flowList) return;
-      $all(".flow-step", flowList).forEach(function (el) {
-        el.classList.toggle("active", parseInt(el.getAttribute("data-fidx"), 10) === idx);
-      });
-    }
-    function flowClear() { flowMark(-1); }
-    /* 聚焦第 idx 步：列表标记 + 图高亮 + 关联阶段联动 + 讲解卡（步进按钮与点击共用） */
-    function focusFlowStep(idx) {
-      var total = (w.flow || []).length;
-      if (!total) return;
-      idx = clampIdx(idx, total);
-      if (pbApi.isActive()) pbApi.exit();
-      flowFocusIdx = idx;
-      nodeFocusId = null;
-      flowMark(idx);
-      markNodeCard(null);
-      renderNodeSub(null);
-      var ids = flowStepIds(idx);
-      stageFocusIdx = -1;
-      syncChips(-1);
-      markStageItem(-1);
-      renderStageSub(-1);
-      if (ids.length) {
-        api.highlight(ids, true);
-        var si = stageOf[ids[0]];
-        if (si !== undefined) { stageFocusIdx = si; syncChips(si); markStageItem(si); renderStageSub(si); }
-      }
-      if (pbSub) {
-        var parts = ids.map(function (id) { return nodeById2[id] ? nodeById2[id].title : id; });
-        pbSub.innerHTML = '<div class="pb-card"><div class="pb-head"><span class="pb-pos">第 ' + (idx + 1) + " 步</span><b>数据流讲解</b></div>"
-          + '<div class="pb-row"><span class="pb-k">📖 讲解</span><span class="pb-do-text">' + esc((w.flow || [])[idx]) + "</span></div>"
-          + (parts.length ? '<div class="pb-row"><span class="pb-k">🎯 涉及节点</span><span>' + parts.map(function (t) { return '<span class="pb-d"><b>' + esc(t) + "</b></span>"; }).join("") + "</span></div>" : "")
-          + "</div>";
-      }
-      updateStepPos();
-    }
-    function flowReset() {
-      if (pbApi.isActive()) pbApi.exit();
-      flowFocusIdx = -1; stageFocusIdx = -1;
-      flowClear();
-      syncChips(-1);
-      markStageItem(-1);
-      markNodeCard(null);
-      api.highlight(null);
-      if (pbSub) pbSub.innerHTML = "";
-      renderStageSub(-1);
-      renderNodeSub(null);
-      updateStepPos();
-    }
-    if (flowList) {
-      flowList.addEventListener("click", function (e) {
-        var el = e.target.closest(".flow-step");
-        if (!el) return;
-        var idx = parseInt(el.getAttribute("data-fidx"), 10);
-        if (el.classList.contains("active")) { flowReset(); return; }  /* 再点一次取消聚焦 */
-        focusFlowStep(idx);
-      });
-    }
-
-    /* —— 步进控制条：三个 tab 统一 上一步 / 下一步 / 重置 —— */
-    function wireStepBar(barId, fn) {
-      var bar = $("#" + barId);
-      if (!bar) return;
-      bar.addEventListener("click", function (e) {
-        var b = e.target.closest(".wf-step-btn");
-        if (!b) return;
-        fn(b.getAttribute("data-dir"));
-      });
-    }
-    wireStepBar("flowBar", function (dir) {
-      if (dir === "reset") return flowReset();
-      if (!(w.flow || []).length) return;
-      focusFlowStep(flowFocusIdx < 0 ? 0 : flowFocusIdx + (dir === "next" ? 1 : -1));
-    });
-    wireStepBar("stageBar", function (dir) {
-      if (dir === "reset") return selectStage(-1);
-      if (!(w.stages || []).length) return;
-      selectStage(stageFocusIdx < 0 ? 0 : stageFocusIdx + (dir === "next" ? 1 : -1));
-    });
-    wireStepBar("nodeBar", function (dir) {
-      if (dir === "reset") return nodeReset();
-      if (!nodeOrder.length) return;
-      var i = nodeFocusId ? nodeOrder.indexOf(nodeFocusId) : -1;
-      focusNode(nodeOrder[i < 0 ? 0 : clampIdx(i + (dir === "next" ? 1 : -1), nodeOrder.length)]);
-    });
-
-    /* 执行回放：数据流卡片 —— 每一步展示输入数据(形态/状态/来源) → 加工 → 输出数据(形态/状态/去向) */
-    var TYPE_SHAPE = {
-      MODEL: "扩散模型权重", CLIP: "文本编码器", CLIP_VISION: "视觉编码器", VAE: "VAE 编解码器",
-      CONDITIONING: "文本语义向量", LATENT: "4×H/8×W/8 潜张量", IMAGE: "H×W×3 像素图", MASK: "H×W 蒙版",
-      CONTROL_NET: "ControlNet 权重", UPSCALE_MODEL: "放大模型权重", STYLE_MODEL: "风格模型权重",
-      VIDEO: "视频帧序列", AUDIO: "音频波形", STRING: "文本", INT: "整数", FLOAT: "小数",
-      COMBO: "选项值", NUMBER: "数值", SIGMAS: "采样日程", NOISE: "噪声种子", SAMPLER: "采样器",
-      GUIDER: "引导器", CFG: "引导系数", "*": "数据"
-    };
-    /* 节点级数据状态转换：title 命中正则 → 该步输入/输出侧的数据状态注解 */
-    var STATE_RULES = [
-      { re: /load\s*checkpoint|checkpoint\s*loader/i,
-        out: { MODEL: "UNET 扩散权重", CLIP: "文本编码器（随 ckpt 加载）", VAE: "像素解码器（随 ckpt 加载）" } },
-      { re: /lora/i,
-        out: { MODEL: "扩散权重（已叠加 LoRA）", CLIP: "文本编码器（LoRA 已注入）" } },
-      { re: /control\s*net/i,
-        in: { CONTROL_NET: "控制网权重", IMAGE: "参考控制图" },
-        out: { CONDITIONING: "已注入空间控制信号的引导向量" } },
-      { re: /clip\s*text\s*encode|text\s*encode/i,
-        out: { CONDITIONING: "prompt 语义向量（决定画什么/不画什么）" } },
-      { re: /empty\s*latent/i,
-        out: { LATENT: "纯噪声 {res}（随机初始化）" } },
-      { re: /load\s*latent/i,
-        out: { LATENT: "外部导入的潜图" } },
-      { re: /ksampler|sampler|sample/i,
-        in: { LATENT: "待去噪潜张量", MODEL: "扩散权重", CONDITIONING: "正/负引导向量" },
-        out: { LATENT: "去噪完成的潜表示（已含图像信息）" } },
-      { re: /vae\s*encode|encode.*vae/i,
-        out: { LATENT: "图像压缩编码后的潜表示" } },
-      { re: /vae\s*decode|decode/i,
-        in: { LATENT: "去噪完成的潜表示", VAE: "解码器权重" },
-        out: { IMAGE: "解码还原的 RGB 像素图" } },
-      { re: /load\s*image/i,
-        out: { IMAGE: "原始像素图", MASK: "蒙版" } },
-      { re: /upscale/i,
-        out: { IMAGE: "放大后的像素图", UPSCALE_MODEL: "放大模型权重", LATENT: "放大后的潜张量" } },
-      { re: /save\s*image|preview/i,
-        in: { IMAGE: "最终像素图" } },
-      { re: /image\s*(scale|resize|rotate|flip|blend|composite|invert|crop|pad)/i,
-        out: { IMAGE: "处理后的像素图", MASK: "处理后的蒙版" } }
-    ];
-    function stateRulesFor(title) {
-      for (var i = 0; i < STATE_RULES.length; i++) if (STATE_RULES[i].re.test(title)) return STATE_RULES[i];
-      return null;
-    }
-    /* {res} 占位符 → 从 widgets 里的分辨率算出真实潜张量形状 */
-    function resolveState(st, n) {
-      if (!st || st.indexOf("{res}") < 0) return st;
-      var dims = null, i, m, ws = (n && n.widgets) || [];
-      for (i = 0; i < ws.length; i++) {
-        m = String(ws[i]).match(/(\d{2,5})\s*[x×]\s*(\d{2,5})/i);
-        if (m) { dims = [parseInt(m[1], 10), parseInt(m[2], 10)]; break; }
-      }
-      return dims
-        ? st.replace("{res}", "4×" + Math.round(dims[1] / 8) + "×" + Math.round(dims[0] / 8))
-        : st.replace("{res}", "4×H/8×W/8");
-    }
-    function typeOfLink(lk) {
-      var a = nodeById2[lk.from];
-      if (!a || !a.outputs) return "";
-      var o = a.outputs[typeof lk.fromOut === "number" ? lk.fromOut : 0];
-      return (o && o.type) || "";
-    }
-    function groupFlow(lks, dir, rule, n) {
-      var byType = {}, order = [];
-      lks.forEach(function (lk) {
-        var t = typeOfLink(lk) || "DATA";
-        var other = dir === "in" ? lk.from : lk.to;
-        var ot = nodeById2[other] ? nodeById2[other].title : other;
-        if (!byType[t]) { byType[t] = { t: t, srcs: [] }; order.push(t); }
-        if (byType[t].srcs.indexOf(ot) < 0) byType[t].srcs.push(ot);
-      });
-      return order.map(function (t) {
-        var g = byType[t];
-        var st = rule && rule[dir] && rule[dir][t];
-        return '<span class="pb-d"><span class="pb-t" style="color:' + window.ComfyGraph.typeColor(t) + '">' + esc(t) + "</span> "
-          + esc(resolveState(st || TYPE_SHAPE[t] || "数据", n))
-          + ' <i class="pb-src">' + (dir === "in" ? "← " : "→ ") + esc(g.srcs.join("、")) + "</i></span>";
-      }).join("");
-    }
-    function setPbStep(i) {
-      var cur = pbApi.seq[i];
-      pbApi.apply(i);
-      pbStep = i;
-      var n = nodeById2[cur];
-      var ins = (w.graph.links || []).filter(function (lk) { return lk.to === cur; });
-      var outs = (w.graph.links || []).filter(function (lk) { return lk.from === cur; });
-      var si = stageOf[cur];
-      if (si !== undefined) { syncChips(si); markStageItem(si); }
-      stageFocusIdx = si !== undefined ? si : -1;
-      var fi = flowOfNode[cur];
-      flowMark(fi !== undefined ? fi : -1);
-      flowFocusIdx = fi !== undefined ? fi : -1;
-      nodeFocusId = nodeOrder.indexOf(cur) >= 0 ? cur : null;
-      markNodeCard(cur);
-      renderStageSub(stageFocusIdx);
-      renderNodeSub(nodeFocusId);
-      updateStepPos();
-      if (pbSub) {
-        var rule = n ? stateRulesFor(n.title || "") : null;
-        var inHtml = ins.length ? groupFlow(ins, "in", rule, n) : '<span class="pb-none">（源头节点，无输入）</span>';
-        var outHtml = outs.length ? groupFlow(outs, "out", rule, n) : '<span class="pb-none">（终点节点，数据保存/预览）</span>';
-        var wid = (n && n.widgets && n.widgets.length)
-          ? '<div class="pb-wid">本步参数：' + esc(n.widgets.join(" · ")) + "</div>" : "";
-        var flowLine = (fi !== undefined && (w.flow || [])[fi])
-          ? '<div class="pb-row"><span class="pb-k">📖 讲解</span><span class="pb-do-text">' + esc(w.flow[fi]) + "</span></div>" : "";
-        var doRow = (n && (n.brief || wid))
-          ? '<div class="pb-row"><span class="pb-k">⚙ 加工</span><span class="pb-do-text">' + esc(n.brief || "") + wid + "</span></div>" : "";
-        pbSub.innerHTML = '<div class="pb-card">'
-          + '<div class="pb-head"><span class="pb-pos">[' + (i + 1) + "/" + pbApi.seq.length + ']</span><b>' + esc(n ? n.title : cur) + "</b>"
-          + (si !== undefined && w.stages[si] ? '<span class="pb-stage-tag">' + esc((si + 1) + ". " + w.stages[si].name) + "</span>" : "")
-          + "</div>"
-          + flowLine
-          + '<div class="pb-row"><span class="pb-k">⬅ 输入</span><span>' + inHtml + "</span></div>"
-          + doRow
-          + '<div class="pb-row"><span class="pb-k">➡ 输出</span><span>' + outHtml + "</span></div>"
-          + "</div>";
-      }
-    }
-    function pbStart() {
-      pbApi.enter();
-      pbPlaying = true;
-      if (pbBar) pbBar.classList.add("playing");
-      if (pbBtn) pbBtn.textContent = "⏸ 暂停";
-      setPbStep(0);
-      if (pbTimer) clearInterval(pbTimer);
-      pbTimer = setInterval(function () {
-        if (pbStep >= pbApi.seq.length - 1) { pbFinish(); return; }
-        setPbStep(pbStep + 1);
-      }, 1600);
-    }
-    function pbFinish() {
-      var total = pbApi.seq.length;
-      pbApi.exit();  /* 触发 onPlaybackChange → stopPbUi 复位按钮 */
-      if (pbSub) pbSub.innerHTML = '<span class="pb-done">✅ 播放完成 — 已按真实执行顺序走完全部 ' + total + " 个节点，点击节点可查看详细讲解</span>";
-      syncChips(-1);
-    }
-    function pbManual(delta) {
-      if (pbTimer) { clearInterval(pbTimer); pbTimer = null; }
-      pbPlaying = false;
-      if (pbBtn) pbBtn.textContent = "▶ 继续";
-      if (!pbApi.isActive()) pbApi.enter();
-      var base = pbStep < 0 ? 0 : pbStep;
-      setPbStep(Math.min(pbApi.seq.length - 1, Math.max(0, base + delta)));
-    }
-    if (pbBtn) pbBtn.addEventListener("click", function () {
-      if (pbPlaying) {  /* 暂停 */
-        if (pbTimer) { clearInterval(pbTimer); pbTimer = null; }
-        pbPlaying = false;
-        pbBtn.textContent = "▶ 继续";
-        return;
-      }
-      if (pbApi.isActive() && pbStep >= 0) {  /* 从暂停处继续 */
-        pbPlaying = true;
-        pbBtn.textContent = "⏸ 暂停";
-        if (pbTimer) clearInterval(pbTimer);
-        pbTimer = setInterval(function () {
-          if (pbStep >= pbApi.seq.length - 1) { pbFinish(); return; }
-          setPbStep(pbStep + 1);
-        }, 1600);
-      } else pbStart();
-    });
-    if (pbPrev) pbPrev.addEventListener("click", function () { pbManual(-1); });
-    if (pbNext) pbNext.addEventListener("click", function () { pbManual(1); });
-    if (pbReset) pbReset.addEventListener("click", function () {
-      stopPbUi();
-      pbStart();
-    });
-    if (pbClose) pbClose.addEventListener("click", function () {
-      pbApi.exit();  /* 触发 onPlaybackChange → panelClearAll 统一清理面板聚焦 */
-    });
+    window.ComfyWfPanel.mount({ root: root, w: panelData(w), notes: wfNoteMap });
 
     /* 源 JSON 加载 / 展示 / 下载 */
     var box = $("#wfJsonBox"), pre = $("#wfJsonPre");
