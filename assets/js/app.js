@@ -3,7 +3,7 @@
    ============================================================ */
 (function () {
   "use strict";
-  window.COMFY_APP_VER = "20260910s";  /* 运行时版本标记（排查缓存用） */
+  window.COMFY_APP_VER = "20260911d";  /* 运行时版本标记（排查缓存用） */
 
   var D = function () { return window.COMFY_DATA || {}; };
   function pkgs() { return (D().nodePackages || []).slice().sort(function (a, b) { return (a.official === b.official) ? 0 : (a.official ? -1 : 1); }); }

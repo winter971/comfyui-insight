@@ -1,0 +1,1 @@
+{"h":"<p>这是一个 ComfyUI 工作流程，它根据提示生成图像，然后对生成的人脸进行 FaceSwaps。<br></p><p><strong>INFO: It is intended to be one person only!</strong></p>","lang":"en","v":2,"o":{"en":"<p>This is a ComfyUI Workflow that generates a image Based on a Prompt and then FaceSwaps the Face of the generated Person.<br></p><p><strong>INFO: It is intended to be one person only!</strong></p>"}}

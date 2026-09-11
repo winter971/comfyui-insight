@@ -1,0 +1,1 @@
+{"h":"<p>将模型和剪辑更改为 GGUF，使用两个 LORA，创建类似于 RX-93 Nu Gundam 的工作流程。您需要准备的只是一个 GGUF 模型、两个 LoRa 模型和一个节点。</p>","lang":"en","v":2,"o":{"en":"<p>Change the model and clip to GGUF, use two LORAs, and create a workflow that resembles the RX-93 Nu Gundam.All you need to prepare is a GGUF model, two LoRa models, and a node.</p>"}}

@@ -1,0 +1,1 @@
+{"h":"<p>这是我使用的基本 Z-Image Turbo 工作流程。它适用于任何 Diffusion_Model 版本的 Z-Image Turbo，模型建议为 VAE 和文本编码器。为了帮助您入门，我已将所需的节点保持在最低限度。</p>","lang":"en","v":2,"o":{"en":"<p>This is a basic Z-Image Turbo workflow that I use. It works for any Diffusion_Model version of Z-Image Turbo, with the model suggested VAE and Text Encoder. I've kept the required nodes to a minimum to get you started.</p>"}}

@@ -226,6 +226,7 @@
 
     var svgNS = "http://www.w3.org/2000/svg";
     var svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("class", "cvg");
     svg.setAttribute("viewBox", fullVB.x + " " + fullVB.y + " " + fullVB.w + " " + fullVB.h);
     var aspect = fullVB.h / fullVB.w;
     container.style.minHeight = "320px";
@@ -571,6 +572,7 @@
     });
     svg.addEventListener("pointermove", function (e) {
       if (!panning) return;
+      try { var sel = window.getSelection(); if (sel.rangeCount) sel.removeAllRanges(); } catch (err) {}
       var rect = svg.getBoundingClientRect();
       var kx = vb.w / rect.width, ky = vb.h / rect.height;
       vb.x = start.vx - (e.clientX - start.x) * kx;
@@ -597,6 +599,7 @@
       if (!dragMoved && Math.abs(e.clientX - dragNode.sx) + Math.abs(e.clientY - dragNode.sy) > 4) {
         dragMoved = true;
         svg.classList.add("nodedragging");
+        try { window.getSelection().removeAllRanges(); } catch (err) {} /* 清掉拖拽瞬间可能已产生的文字选中 */
       }
       if (!dragMoved) return;
       dragNode.n.x = Math.round(dragNode.x0 + (e.clientX - dragNode.sx) * dragNode.kx);

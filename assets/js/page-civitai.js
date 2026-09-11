@@ -207,6 +207,7 @@
       html += '<a class="wf-card" href="#/civitai/' + w.v + '">'
         + "<h3><span class=\"wf-cat-pill\">" + esc(w.cat) + "</span>" + (w.nsfw ? '<span class="cv-nsfw-pill">18+</span>' : "") + esc(w.name) + "</h3>"
         + '<div class="wf-desc">' + summaryLine(w) + "</div>"
+        + (w.de ? '<div class="wf-civdesc" title="作者在 Civitai 发布的简介">' + esc(w.de).replace(/\n/g, " ") + "</div>" : "")
         + '<div class="wf-foot"><span class="mini-tag">⬇ ' + fmtN(w.dl) + '</span><span class="mini-tag">👍 ' + fmtN(w.up) + "</span>"
         + '<span class="mini-tag">' + w.nodes + " 节点</span>"
         + (w.variants && w.variants.length > 1 ? '<span class="mini-tag" style="color:#7dd3fc">📦 ' + w.variants.length + " 份工作流</span>" : "")
@@ -640,7 +641,15 @@
       + '<div class="ph-meta" id="cvDiffRow" style="display:none"></div>'
       + '<p class="ph-desc" style="font-size:13px">作者 ' + esc(w.by)
       + ' · <a class="cv-link" href="https://civitai.com/models/' + w.m + '" target="_blank" rel="noopener">在 Civitai 查看源页面 ↗</a>'
-      + (w.tags && w.tags.length ? " · 标签：" + w.tags.map(esc).join("、") : "") + "</p></div>";
+      + (w.tags && w.tags.length ? " · 标签：" + w.tags.map(esc).join("、") : "") + "</p></div>"
+      + '<div class="section cv-desc-section" id="cvAuthorDesc">'
+      + '<button type="button" class="cv-desc-head" id="cvDescToggle" aria-expanded="true">'
+      + '<h2 style="font-size:20px">作者在 Civitai 的简介</h2>'
+      + '<span class="sec-en">AUTHOR DESCRIPTION</span>'
+      + '<span class="cv-desc-arrow" aria-hidden="true">▾</span></button>'
+      + '<div class="cv-desc-body" id="cvAuthorDescBody">'
+      + '<div class="cv-desc-html"><span class="cv-desc-loading">简介加载中…</span></div>'
+      + "</div></div>";
 
     /* 附加工作流切换 */
     if (variants.length > 1) {
@@ -776,8 +785,102 @@
     }
   }
 
+  /* 简介折叠：默认展开（初始 aria-expanded=true、body 无 collapsed 类、▾），点击整体收起 */
+  function bindDescToggle() {
+    var btn = document.getElementById("cvDescToggle");
+    var body = document.getElementById("cvAuthorDescBody");
+    if (!btn || !body) return;
+    btn.addEventListener("click", function () {
+      var collapsed = body.classList.toggle("cv-collapsed");
+      btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    });
+  }
+
+  var LANG_NAMES = {
+    en: "English", ja: "日本語", ko: "한국어", fr: "Français", de: "Deutsch", es: "Español",
+    ru: "Русский", pt: "Português", it: "Italiano", ar: "العربية", hi: "हिन्दी", tr: "Türkçe",
+    vi: "Tiếng Việt", th: "ไทย", id: "Bahasa Indonesia", pl: "Polski", nl: "Nederlands",
+    uk: "Українська", auto: "原文"
+  };
+
+  var DESC_SRC_NOTE = '<p class="cv-desc-src">— 原文由作者发布于 Civitai 模型页，链接均在新标签页打开</p>';
+  function origTabLabel(k) {
+    if (k === "zh") return "中文（原文）";
+    return (LANG_NAMES[k] || k) + " 原文";
+  }
+
+  /* 作者简介：按 modelId 懒加载（HTML 在发布管线已做白名单净化 + 外文已机翻为中文）。
+     中文单语直接展示；外文/多语：Tab 切换 —— 默认「中文」译文，其余按语言类型（English 原文 / 한국어 原文 …）分页；
+     空/缺失隐藏整个区块。d.o 为 {语言码: 原文HTML}（v2），兼容旧版字符串 */
+  function loadDesc(mid) {
+    var box = document.getElementById("cvAuthorDesc");
+    if (!box) return;
+    /* 简介里的示例图多在 image.civitai.com，国内直连可能超时：加载失败即隐藏，不留碎图 */
+    box.addEventListener("error", function (e) {
+      if (e.target && e.target.tagName === "IMG") e.target.style.display = "none";
+    }, true);
+    fetch("assets/files/civitai/desc/" + mid + ".json")
+      .then(function (r) { if (!r.ok) throw new Error("http " + r.status); return r.json(); })
+      .then(function (d) {
+        if (!box.isConnected) return;
+        if (!d || !d.h || !d.h.trim()) { box.remove(); return; }
+        var host = box.querySelector(".cv-desc-html");
+        if (!host) return;
+
+        var oMap = null;
+        if (d.o && typeof d.o === "object") oMap = d.o;
+        else if (typeof d.o === "string") { oMap = {}; oMap[d.lang || "auto"] = d.o; }
+        var langs = oMap ? Object.keys(oMap) : [];
+
+        /* 中文单语：无 Tab 直接展示 */
+        if (!langs.length) {
+          host.innerHTML = d.h + DESC_SRC_NOTE;
+          return;
+        }
+
+        /* 多语：中文（默认）+ 每种原文语言一个 Tab */
+        var primaryName = LANG_NAMES[d.lang] || "";
+        var html = '<div class="cv-dtabs" role="tablist" aria-label="简介语言切换">';
+        html += '<button type="button" class="cv-dtab active" role="tab" aria-selected="true" data-k="__zh">中文<span class="cv-tr-mark">译</span></button>';
+        langs.forEach(function (k) {
+          html += '<button type="button" class="cv-dtab" role="tab" aria-selected="false" data-k="' + esc(k) + '">' + esc(origTabLabel(k)) + "</button>";
+        });
+        html += '</div><div class="cv-dpanes">';
+        var hint = d.lang === "zh"
+          ? "外文片段由机器翻译，术语以原文为准"
+          : "中文由机器翻译" + (primaryName ? "自 " + esc(primaryName) + "，" : "，") + "术语以原文为准";
+        html += '<div class="cv-dpane active" data-k="__zh">'
+          + '<div class="cv-trans-hint"><span class="cv-trans-tag">译</span>' + hint + "</div>"
+          + '<div class="cv-desc-html">' + d.h + "</div>" + DESC_SRC_NOTE + "</div>";
+        langs.forEach(function (k) {
+          html += '<div class="cv-dpane" data-k="' + esc(k) + '"><div class="cv-desc-html">' + oMap[k] + "</div></div>";
+        });
+        html += "</div>";
+        host.innerHTML = html;
+
+        var tabs = host.querySelectorAll(".cv-dtab");
+        var panes = host.querySelectorAll(".cv-dpane");
+        tabs.forEach(function (tab) {
+          tab.addEventListener("click", function () {
+            var k = tab.getAttribute("data-k");
+            tabs.forEach(function (t) {
+              var on = t === tab;
+              t.classList.toggle("active", on);
+              t.setAttribute("aria-selected", on ? "true" : "false");
+            });
+            panes.forEach(function (p) { p.classList.toggle("active", p.getAttribute("data-k") === k); });
+          });
+        });
+      })
+      .catch(function () { if (box.isConnected) box.remove(); });
+  }
+
   function mountDetail(vid, vi) {
+    bindDescToggle();
     loadGraph(String(vid), vi || 0);
+    var mid = null;
+    wfs().forEach(function (x) { if (String(x.v) === String(vid)) mid = x.m; });
+    if (mid != null) loadDesc(mid);
   }
 
   window.PAGE_CIVITAI = { render: render, mount: mount, renderDetail: renderDetail, mountDetail: mountDetail };

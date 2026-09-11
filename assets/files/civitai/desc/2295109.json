@@ -1,0 +1,1 @@
+{"h":"<p>优化的合并工作流程，4 个步骤的 lcm、cfg 0.1 的 sgm_uniform，然后是 11 个步骤的 dpmpp_3m_sde_gpu、cfg 3.6 的 kerras 和 0.61 降噪。</p>","lang":"en","v":2,"o":{"en":"<p>An optimized merged workflow, 4 steps of lcm, sgm_uniform at cfg 0.1, followed by 11 steps of dpmpp_3m_sde_gpu, kerras at cfg 3.6 and .61 denoise.</p>"}}

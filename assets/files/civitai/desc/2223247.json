@@ -1,0 +1,1 @@
+{"h":"<p>使用 Z 图像涡轮模型和各种 llm 进行提示和升级的工作流程分两遍：SDXL（使用指定模型）和 SeedVR2。</p><p>必须将文件复制到 custom_nodes 目录。请参阅自述文件。</p>","lang":"en","v":2,"o":{"en":"<p>A workflow that uses the Z-image turbo model and various llm for prompting and upscaling in two passes: SDXL (use the specified model) and seedVR2.</p><p>A file must be copied to the custom_nodes directory. See the readme file.</p>"}}
