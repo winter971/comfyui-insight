@@ -2,3 +2,4 @@ _shots/
 *.png
 node_modules/
 *.py
+.wrangler/
