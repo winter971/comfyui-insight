@@ -3,7 +3,7 @@
    ============================================================ */
 (function () {
   "use strict";
-  window.COMFY_APP_VER = "20260914d";  /* 运行时版本标记（排查缓存用） */
+  window.COMFY_APP_VER = "20260914e";  /* 运行时版本标记（排查缓存用） */
 
   var D = function () { return window.COMFY_DATA || {}; };
   function pkgs() { return (D().nodePackages || []).slice().sort(function (a, b) { return (a.official === b.official) ? 0 : (a.official ? -1 : 1); }); }
@@ -90,6 +90,7 @@
     });
     html += '<span class="spacer" style="flex:1"></span>'
       + '<input id="pkgQ" type="text" placeholder="在节点包内搜索…" value="' + esc(nodeFilter.q || "") + '" style="height:32px;background:var(--panel);border:1px solid var(--border);border-radius:9px;color:var(--text);padding:0 12px;font-size:13px;outline:none;width:200px;font-family:inherit">';
+    html += '<button class="filter-clear" id="pkgClear" hidden>' + ICO.svg("x", 13) + "清除筛选</button>";
     html += "</div>";
     html += '<div class="pkg-grid" id="pkgGrid"></div>';
     html += '<div class="callout tip" style="margin-top:26px"><span class="co-ico"></span><div><span class="co-title">看不懂某个节点？</span>到工作流图鉴里找一条用到它的工作流，在图上点它——结合上下文理解节点是最快的方式。</div></div>';
@@ -97,8 +98,15 @@
     return html;
   }
 
-  function paintPkgGrid() {
-    var grid = $("#pkgGrid");
+  /* 有筛选时才显示「清除筛选」 */
+  function syncPkgClear() {
+    var el = $("#pkgClear");
+    if (!el) return;
+    var active = (nodeFilter.cat && nodeFilter.cat !== "全部") || !!(nodeFilter.q || "").trim();
+    el.hidden = !active;
+  }
+
+  function paintPkgGrid() {    var grid = $("#pkgGrid");
     if (!grid) return;
     var P = pkgs();
     var activeCat = nodeFilter.cat || "全部";
@@ -535,6 +543,29 @@
     return h;
   }
 
+  /* 404：无效路由给明确出口，而不是静默回首页 */
+  function renderNotFound() {
+    var path = currentRoute();
+    var entries = [
+      ["/", "首页", "全站总览与学习路线"],
+      ["/arch", "一 · 架构解析", "前后端分工、执行引擎、扩展开发"],
+      ["/nodes", "二 · 节点包全解", "每个节点的作用与上下游"],
+      ["/workflows", "三 · 工作流图鉴", "常见工作流逐节点图解"],
+      ["/civitai", "四 · 真实工作流库", "社区真实工作流与专题"]
+    ];
+    var html = '<div class="container"><div class="nf">'
+      + '<p class="nf-code">404</p>'
+      + '<h1>这个地址没有内容</h1>'
+      + '<p class="nf-path">路由 <code>' + esc(path) + '</code> 没有对应页面。可能是链接过期，或者地址少了一个字符。</p>'
+      + '<button class="nf-search" id="nfSearch">' + ICO.svg("search", 15) + '去搜索节点 / 包 / 工作流</button>'
+      + '<div class="nf-list">';
+    entries.forEach(function (e) {
+      html += '<a href="#' + e[0] + '"><b>' + esc(e[1]) + '</b><span>' + esc(e[2]) + "</span></a>";
+    });
+    html += "</div></div></div>";
+    return html;
+  }
+
   function render() {
     var r = currentRoute();
     var app = $("#app");
@@ -570,9 +601,17 @@
         nodeFilter.cat = b.getAttribute("data-cat");
         $all("#pkgFilters .filter-btn").forEach(function (x) { x.classList.toggle("active", x === b); });
         paintPkgGrid();
+        syncPkgClear();
+      });
+      var clr = $("#pkgClear");
+      if (clr) clr.addEventListener("click", function () {
+        nodeFilter.cat = "全部";
+        nodeFilter.q = "";
+        render();
       });
       var qIn = $("#pkgQ");
-      if (qIn) qIn.addEventListener("input", function () { nodeFilter.q = qIn.value; paintPkgGrid(); });
+      if (qIn) qIn.addEventListener("input", function () { nodeFilter.q = qIn.value; paintPkgGrid(); syncPkgClear(); });
+      syncPkgClear();
       return;
     }
     if (parts[0] === "workflows" && parts[1]) {
@@ -623,7 +662,9 @@
       return;
     }
     if (parts[0] === "about") { app.innerHTML = renderAbout(); return; }
-    app.innerHTML = renderHome();
+    app.innerHTML = renderNotFound();
+    var nfBtn = $("#nfSearch");
+    if (nfBtn) nfBtn.addEventListener("click", function () { var i = $("#globalSearch"); if (i) { i.focus(); i.select(); } });
   }
 
   /* ============ 搜索框事件 ============ */
@@ -638,10 +679,23 @@
       res.forEach(function (r) {
         html += '<a class="sr-item" href="' + r.href + '"><div class="sr-title"><span class="sr-badge" style="color:' + (tColor[r.type] || "#9aa3b8") + ';border:1px solid currentColor">' + esc(r.type) + "</span>" + esc(r.title) + '</div><div class="sr-sub">' + esc(r.sub) + "</div></a>";
       });
-      box.innerHTML = html || '<div class="sr-item"><div class="sr-sub">没有找到相关内容</div></div>';
+      var suggest = ["KSampler", "ControlNet", "Flux", "视频生成", "LoRA", "放大"];
+      box.innerHTML = html || ('<div class="sr-empty"><div class="sr-empty-t">没有找到「' + esc(q.trim()) + '」</div>'
+        + '<div class="sr-hint">换个说法，或试试这些：</div><div class="sr-chips">'
+        + suggest.map(function (s) { return '<button type="button" class="sr-chip" data-q="' + esc(s) + '">' + esc(s) + "</button>"; }).join("")
+        + '</div><div class="sr-hint">也可以直接浏览 <a href="#/nodes">节点包全解</a> 或 <a href="#/civitai">真实工作流库</a>。</div></div>');
       box.classList.add("open");
     });
-    box.addEventListener("click", function () { box.classList.remove("open"); input.value = ""; });
+    box.addEventListener("click", function (e) {
+      var chip = e.target.closest(".sr-chip");
+      if (chip) {
+        e.preventDefault();
+        input.value = chip.getAttribute("data-q");
+        input.dispatchEvent(new Event("input"));
+        return;
+      }
+      if (e.target.closest("a")) { box.classList.remove("open"); input.value = ""; return; }
+    });
     document.addEventListener("click", function (e) {
       if (!e.target.closest(".search-wrap")) box.classList.remove("open");
     });
