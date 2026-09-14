@@ -122,7 +122,7 @@
     var lay = graph._layouts[node.id];
     var color = CAT_COLORS[node.cat] || "#647088";
     var s = '<g class="g-node" data-nid="' + esc(node.id) + '" transform="translate(' + node.x + ',' + node.y + ')">';
-    s += '<rect class="g-node-body" width="' + lay.w + '" height="' + lay.h + '" rx="9" fill="#1b1e2b" stroke="#3a4157" stroke-width="1"/>';
+    s += '<rect class="g-node-body" width="' + lay.w + '" height="' + lay.h + '" rx="9" fill="#221d18" stroke="#463b30" stroke-width="1"/>';
     s += '<path d="M 0 9 A 9 9 0 0 1 9 0 L ' + (lay.w - 9) + ' 0 A 9 9 0 0 1 ' + lay.w + ' 9 L ' + lay.w + ' ' + HEADER_H + ' L 0 ' + HEADER_H + ' Z" fill="' + color + '" opacity="0.92"/>';
     s += '<rect x="0" y="' + HEADER_H + '" width="' + lay.w + '" height="2.5" fill="' + color + '" opacity="0.5"/>';
     s += '<text class="g-node-title" x="' + (lay.w / 2) + '" y="17.5" text-anchor="middle">' + esc(node.title) + '</text>';
@@ -131,14 +131,14 @@
     var inputs = node.inputs || [], outputs = node.outputs || [];
     for (i = 0; i < inputs.length; i++) {
       y = HEADER_H + i * PORT_H + PORT_H / 2 + 1;
-      s += '<circle cx="0" cy="' + y + '" r="4.5" fill="' + typeColor(inputs[i].type) + '" stroke="#101218" stroke-width="1.5"/>';
+      s += '<circle cx="0" cy="' + y + '" r="4.5" fill="' + typeColor(inputs[i].type) + '" stroke="#14110e" stroke-width="1.5"/>';
       s += '<text class="g-port-text" x="9" y="' + (y + 3.5) + '">' + esc(inputs[i].name) +
         ' <tspan fill="' + typeColor(inputs[i].type) + '" opacity="0.85">' + esc(inputs[i].type || "") + '</tspan></text>';
     }
     for (i = 0; i < outputs.length; i++) {
       y = HEADER_H + i * PORT_H + PORT_H / 2 + 1;
       var ot = outputs[i].type || outputs[i].name || "";
-      s += '<circle cx="' + lay.w + '" cy="' + y + '" r="4.5" fill="' + typeColor(ot) + '" stroke="#101218" stroke-width="1.5"/>';
+      s += '<circle cx="' + lay.w + '" cy="' + y + '" r="4.5" fill="' + typeColor(ot) + '" stroke="#14110e" stroke-width="1.5"/>';
       s += '<text class="g-port-text" x="' + (lay.w - 9) + '" y="' + (y + 3.5) + '" text-anchor="end" fill="' + typeColor(ot) + '">' + esc(ot) + '</text>';
     }
     var rowMax = Math.max(inputs.length, outputs.length);
@@ -706,7 +706,7 @@
         var zh = help ? help.typeZh(inp.type) : "";
         inner += '<g class="mock-row" data-kind="input" data-idx="' + i + '" title="' + esc2(inp.name + " · " + (zh || inp.type || "")) + '">'
           + '<rect class="mock-row-hl" x="1" y="' + (y + 1.5) + '" width="' + (lay.w - 2) + '" height="' + (PORT_H - 3) + '" rx="4" fill="transparent" stroke="transparent"/>'
-          + '<circle cx="0" cy="' + (y + PORT_H / 2 + 1) + '" r="4.5" fill="' + typeColor(inp.type) + '" stroke="#101218" stroke-width="1.5"/>'
+          + '<circle cx="0" cy="' + (y + PORT_H / 2 + 1) + '" r="4.5" fill="' + typeColor(inp.type) + '" stroke="#14110e" stroke-width="1.5"/>'
           + '<text class="g-port-text" x="9" y="' + (y + PORT_H / 2 + 4.5) + '">' + esc2(inp.name) + "</text></g>";
       }
       if (outp) {
@@ -715,7 +715,7 @@
         var ozh = help ? help.typeZh(ot) : "";
         inner += '<g class="mock-row" data-kind="output" data-idx="' + i + '" title="' + esc2((outp.name || ot) + " · " + (ozh || ot)) + '">'
           + '<rect class="mock-row-hl" x="1" y="' + (y2 + 1.5) + '" width="' + (lay.w - 2) + '" height="' + (PORT_H - 3) + '" rx="4" fill="transparent" stroke="transparent"/>'
-          + '<circle cx="' + lay.w + '" cy="' + (y2 + PORT_H / 2 + 1) + '" r="4.5" fill="' + typeColor(ot) + '" stroke="#101218" stroke-width="1.5"/>'
+          + '<circle cx="' + lay.w + '" cy="' + (y2 + PORT_H / 2 + 1) + '" r="4.5" fill="' + typeColor(ot) + '" stroke="#14110e" stroke-width="1.5"/>'
           + '<text class="g-port-text" x="' + (lay.w - 9) + '" y="' + (y2 + PORT_H / 2 + 4.5) + '" text-anchor="end" fill="' + typeColor(ot) + '">' + esc2(ot) + "</text></g>";
       }
     }
@@ -730,7 +730,7 @@
     });
 
     /* 外壳（放在最上层线框之下） */
-    var shell = '<rect class="g-node-body" width="' + lay.w + '" height="' + lay.h + '" rx="9" fill="#1b1e2b" stroke="#3a4157" stroke-width="1"/>'
+    var shell = '<rect class="g-node-body" width="' + lay.w + '" height="' + lay.h + '" rx="9" fill="#221d18" stroke="#463b30" stroke-width="1"/>'
       + '<path d="M 0 9 A 9 9 0 0 1 9 0 L ' + (lay.w - 9) + ' 0 A 9 9 0 0 1 ' + lay.w + ' 9 L ' + lay.w + ' ' + HEADER_H + ' L 0 ' + HEADER_H + ' Z" fill="' + color + '" opacity="0.92"/>'
       + '<rect x="0" y="' + HEADER_H + '" width="' + lay.w + '" height="2.5" fill="' + color + '" opacity="0.5"/>'
       + '<text class="g-node-title" x="' + (lay.w / 2) + '" y="17.5" text-anchor="middle">' + esc2(node.title) + "</text>";

@@ -40,7 +40,7 @@
 
     var html = "";
     if (w.stages && w.stages.length) {
-      html += '<div class="stage-chips" id="stageChips"><button class="stage-chip active" data-stage="-1">🌐 全部</button>';
+      html += '<div class="stage-chips" id="stageChips"><button class="stage-chip active" data-stage="-1">' + ICO.svg("layers", 13) + '全部</button>';
       w.stages.forEach(function (s, i) {
         html += '<button class="stage-chip" data-stage="' + i + '">' + esc((i + 1) + ". " + s.name) + "</button>";
       });
@@ -62,9 +62,9 @@
       /* 三合一联动面板：tab 切换 + 可收起 */
       + '<div class="wf-panel" id="wfPanel">'
       + '<div class="wf-tabs">'
-      + '<button class="wf-tab active" data-tab="flow">🔗 数据流</button>'
-      + '<button class="wf-tab" data-tab="stage">🧩 阶段拆解</button>'
-      + '<button class="wf-tab" data-tab="nodes">🔬 逐节点分析</button>'
+      + '<button class="wf-tab active" data-tab="flow">' + ICO.svg("link", 14) + '数据流</button>'
+      + '<button class="wf-tab" data-tab="stage">' + ICO.svg("puzzle", 14) + '阶段拆解</button>'
+      + '<button class="wf-tab" data-tab="nodes">' + ICO.svg("microscope", 14) + '逐节点分析</button>'
       + '<button class="wf-collapse" id="wfCollapse" title="收起/展开面板">▾ 收起</button>'
       + "</div>"
       + '<div class="wf-body" id="wfBody">'
@@ -72,7 +72,7 @@
       + stepBarHtml("flowBar")
       + '<div class="pb-sub mono" id="pbSub"></div>'
       + (w.flow && w.flow.length
-        ? '<div class="flow-inline-head"><h2>数据是怎么一步步流动的</h2><span class="sec-en">DATA FLOW</span><span class="flow-hint">👆 点击任意步骤，图上高亮该步的数据流动</span></div>'
+        ? '<div class="flow-inline-head"><h2>数据是怎么一步步流动的</h2><span class="sec-en">DATA FLOW</span><span class="flow-hint">点击任意步骤，图上高亮该步的数据流动</span></div>'
           + '<div class="flow-steps" id="flowList">'
           + w.flow.map(function (f, i) {
               return '<div class="flow-step" data-fidx="' + i + '"><div class="fs-num">' + (i + 1) + '</div><div><h4>第 ' + (i + 1) + " 步</h4><p>" + esc(f) + "</p></div></div>";
@@ -103,7 +103,7 @@
           + w.nodeAnalysis.map(function (a) {
               var n = nodeById[a.node] || { title: a.node, cat: "util" };
               return '<details class="node-card" data-nid="' + esc(a.node) + '"><summary>'
-                + catDot(n.cat) + '<span class="node-name">' + esc(n.title) + '</span><span class="node-brief">' + esc(n.brief || "") + '</span><span class="node-loc">📍 图中已高亮</span><span class="node-chevron">▶</span></summary>'
+                + catDot(n.cat) + '<span class="node-name">' + esc(n.title) + '</span><span class="node-brief">' + esc(n.brief || "") + '</span><span class="node-loc">图中已高亮</span><span class="node-chevron">▶</span></summary>'
                 + '<div class="node-body"><div class="nb-row"><div class="nb-label">在本工作流中</div><div>' + esc(a.detail) + "</div></div>"
                 + (a.paramsText ? '<div class="nb-row"><div class="nb-label">图中参数</div><div class="mono" style="font-size:12.5px;color:#a5b0c8">' + esc(a.paramsText) + "</div></div>" : "")
                 + nodeLinkRow(n)
@@ -121,7 +121,7 @@
     if (!window.ComfyLookupNode) return "";
     var lk = window.ComfyLookupNode(n.title);
     if (!lk) return "";
-    return '<div class="nb-row"><div class="nb-label">节点包详解</div><div><a href="#/nodes/' + esc(lk.pkg.id) + '" style="font-size:12.5px">📖 ' + esc(lk.pkg.name) + " · " + esc(lk.node.name) + " →</a></div></div>";
+    return '<div class="nb-row"><div class="nb-label">节点包详解</div><div><a href="#/nodes/' + esc(lk.pkg.id) + '" style="font-size:12.5px">' + esc(lk.pkg.name) + " · " + esc(lk.node.name) + " →</a></div></div>";
   }
 
   /* ============ 挂载与联动 ============ */
@@ -203,8 +203,8 @@
       var s = w.stages[si];
       var parts = (s.nodes || []).map(function (nid) { return nodeById2[nid] ? nodeById2[nid].title : nid; });
       stageSub.innerHTML = '<div class="pb-card"><div class="pb-head"><span class="pb-pos">第 ' + (si + 1) + " 阶段</span><b>" + esc(s.name) + "</b></div>"
-        + '<div class="pb-row"><span class="pb-k">📖 讲解</span><span class="pb-do-text">' + esc(s.desc) + "</span></div>"
-        + (parts.length ? '<div class="pb-row"><span class="pb-k">🎯 涉及节点</span><span>' + parts.map(function (t) { return '<span class="pb-d"><b>' + esc(t) + "</b></span>"; }).join("") + "</span></div>" : "")
+        + '<div class="pb-row"><span class="pb-k">讲解</span><span class="pb-do-text">' + esc(s.desc) + "</span></div>"
+        + (parts.length ? '<div class="pb-row"><span class="pb-k">涉及节点</span><span>' + parts.map(function (t) { return '<span class="pb-d"><b>' + esc(t) + "</b></span>"; }).join("") + "</span></div>" : "")
         + "</div>";
     }
     function renderNodeSub(nid) {
@@ -214,9 +214,9 @@
       var na = null;
       (w.nodeAnalysis || []).forEach(function (a) { if (a.node === nid) na = a; });
       nodeSub.innerHTML = '<div class="pb-card"><div class="pb-head"><span class="pb-pos">节点聚焦</span><b>' + esc(n.title) + "</b></div>"
-        + (na && na.detail ? '<div class="pb-row"><span class="pb-k">📖 在本工作流中</span><span class="pb-do-text">' + esc(na.detail) + "</span></div>" : "")
-        + (n.brief ? '<div class="pb-row"><span class="pb-k">⚙ 通用职责</span><span class="pb-do-text">' + esc(n.brief) + "</span></div>" : "")
-        + (n.widgets && n.widgets.length ? '<div class="pb-row"><span class="pb-k">🎚 图中参数</span><span class="mono">' + n.widgets.map(esc).join(" · ") + "</span></div>" : "")
+        + (na && na.detail ? '<div class="pb-row"><span class="pb-k">在本工作流中</span><span class="pb-do-text">' + esc(na.detail) + "</span></div>" : "")
+        + (n.brief ? '<div class="pb-row"><span class="pb-k">通用职责</span><span class="pb-do-text">' + esc(n.brief) + "</span></div>" : "")
+        + (n.widgets && n.widgets.length ? '<div class="pb-row"><span class="pb-k">图中参数</span><span class="mono">' + n.widgets.map(esc).join(" · ") + "</span></div>" : "")
         + "</div>";
     }
     function panelClearAll() {
@@ -372,8 +372,8 @@
       if (pbSub) {
         var parts = ids.map(function (id) { return nodeById2[id] ? nodeById2[id].title : id; });
         pbSub.innerHTML = '<div class="pb-card"><div class="pb-head"><span class="pb-pos">第 ' + (idx + 1) + " 步</span><b>数据流讲解</b></div>"
-          + '<div class="pb-row"><span class="pb-k">📖 讲解</span><span class="pb-do-text">' + esc((w.flow || [])[idx]) + "</span></div>"
-          + (parts.length ? '<div class="pb-row"><span class="pb-k">🎯 涉及节点</span><span>' + parts.map(function (t) { return '<span class="pb-d"><b>' + esc(t) + "</b></span>"; }).join("") + "</span></div>" : "")
+          + '<div class="pb-row"><span class="pb-k">讲解</span><span class="pb-do-text">' + esc((w.flow || [])[idx]) + "</span></div>"
+          + (parts.length ? '<div class="pb-row"><span class="pb-k">涉及节点</span><span>' + parts.map(function (t) { return '<span class="pb-d"><b>' + esc(t) + "</b></span>"; }).join("") + "</span></div>" : "")
           + "</div>";
       }
       updateStepPos();
@@ -531,9 +531,9 @@
         var wid = (n && n.widgets && n.widgets.length)
           ? '<div class="pb-wid">本步参数：' + esc(n.widgets.join(" · ")) + "</div>" : "";
         var flowLine = (fi !== undefined && (w.flow || [])[fi])
-          ? '<div class="pb-row"><span class="pb-k">📖 讲解</span><span class="pb-do-text">' + esc(w.flow[fi]) + "</span></div>" : "";
+          ? '<div class="pb-row"><span class="pb-k">讲解</span><span class="pb-do-text">' + esc(w.flow[fi]) + "</span></div>" : "";
         var doRow = (n && (n.brief || wid))
-          ? '<div class="pb-row"><span class="pb-k">⚙ 加工</span><span class="pb-do-text">' + esc(n.brief || "") + wid + "</span></div>" : "";
+          ? '<div class="pb-row"><span class="pb-k">加工</span><span class="pb-do-text">' + esc(n.brief || "") + wid + "</span></div>" : "";
         pbSub.innerHTML = '<div class="pb-card">'
           + '<div class="pb-head"><span class="pb-pos">[' + (i + 1) + "/" + pbApi.seq.length + ']</span><b>' + esc(n ? n.title : cur) + "</b>"
           + (si !== undefined && w.stages[si] ? '<span class="pb-stage-tag">' + esc((si + 1) + ". " + w.stages[si].name) + "</span>" : "")
@@ -560,7 +560,7 @@
     function pbFinish() {
       var total = pbApi.seq.length;
       pbApi.exit();
-      if (pbSub) pbSub.innerHTML = '<span class="pb-done">✅ 播放完成 — 已按真实执行顺序走完全部 ' + total + " 个节点，点击节点可查看详细讲解</span>";
+      if (pbSub) pbSub.innerHTML = '<span class="pb-done">播放完成 — 已按真实执行顺序走完全部 ' + total + " 个节点，点击节点可查看详细讲解</span>";
       syncChips(-1);
     }
     function pbManual(delta) {
@@ -712,7 +712,7 @@
     var H = mainY + NH + PAD;
     var uid = "mcb" + (++MC_UID);
     var defs = '<defs><marker id="' + uid + 'a" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#4cc9f0"/></marker>'
-      + '<marker id="' + uid + 'f" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#c4b5fd"/></marker></defs>';
+      + '<marker id="' + uid + 'f" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#f0c078"/></marker></defs>';
     var body = "", edges = "";
     function escT(s, n) { var t = esc(String(s || "")); return t.length > n ? t.slice(0, n - 1) + "…" : t; }
     main.forEach(function (si, k) {
@@ -746,7 +746,7 @@
       var fcy = FORKY + FH / 2;
       body += '<g class="cv-mc-fork" data-fi="' + fi + '">'
         + '<rect x="' + fx + '" y="' + FORKY + '" width="' + NW + '" height="' + FH + '" rx="10"/>'
-        + '<text class="mc-tag" x="' + (fx + 12) + '" y="' + (FORKY + 17) + '">⚡ 可选支线</text>'
+        + '<text class="mc-tag" x="' + (fx + 12) + '" y="' + (FORKY + 17) + '">可选支线</text>'
         + '<text class="mc-t" x="' + (fx + 12) + '" y="' + (FORKY + 36) + '">' + escT(fs.name, 13) + "</text>"
         + '<text class="mc-d" x="' + (fx + 12) + '" y="' + (FORKY + 50) + '">' + escT(shortDesc(fs.desc), 18) + "</text>"
         + "</g>";
@@ -770,9 +770,9 @@
       }
     });
     return '<div class="cv-digest">'
-      + '<div class="cv-digest-tabs"><button type="button" class="cv-digest-tab active" data-pane="flow">🧭 流程图</button><button type="button" class="cv-digest-tab" data-pane="text">📝 文字讲解</button></div>'
+      + '<div class="cv-digest-tabs"><button type="button" class="cv-digest-tab active" data-pane="flow">' + ICO.svg("compass", 14) + '流程图</button><button type="button" class="cv-digest-tab" data-pane="text">文字讲解</button></div>'
       + '<div class="cv-digest-pane" data-pane="flow"><div class="cv-mc-board"><svg viewBox="0 0 ' + W + " " + H + '" role="img">' + defs + edges + body + "</svg></div>"
-      + '<div class="cv-fc-hint">点击节点块 → 下方交互图高亮对应阶段' + (forks.length ? " · ⚡ 虚线为被旁路/静音的可启用支线" : "") + '</div><div class="cv-fc-dock" hidden></div></div>'
+      + '<div class="cv-fc-hint">点击节点块 → 下方交互图高亮对应阶段' + (forks.length ? " · 虚线为被旁路/静音的可启用支线" : "") + '</div><div class="cv-fc-dock" hidden></div></div>'
       + textPane
       + '<script type="application/json" class="cv-fc-data">' + JSON.stringify(data).replace(/</g, "\\u003c") + "</" + "script>"
       + "</div>";
@@ -810,7 +810,7 @@
       return '<div class="cv-fc-step" data-idx="' + i + '"><div><span class="cv-fc-no">' + (FC_NO[i] || i + 1) + '</span></div><div class="cv-fc-cap">' + esc(cap) + "</div></div>";
     });
     return '<div class="cv-digest">'
-      + '<div class="cv-digest-tabs"><button type="button" class="cv-digest-tab active" data-pane="flow">🧭 流程图</button><button type="button" class="cv-digest-tab" data-pane="text">📝 文字讲解</button></div>'
+      + '<div class="cv-digest-tabs"><button type="button" class="cv-digest-tab active" data-pane="flow">' + ICO.svg("compass", 14) + '流程图</button><button type="button" class="cv-digest-tab" data-pane="text">文字讲解</button></div>'
       + '<div class="cv-digest-pane" data-pane="flow"><div class="cv-fc-scroll"><div class="cv-fc-rail">' + cards.join('<div class="cv-fc-link">→</div>') + '</div></div><div class="cv-fc-hint">点击步骤查看完整讲解</div><div class="cv-fc-dock" hidden></div></div>'
       + textPane + "</div>";
   }

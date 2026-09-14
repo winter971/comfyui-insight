@@ -127,8 +127,8 @@
       + tile((st.formats && st.formats.ui || 0) + " / " + (st.formats && st.formats.api || 0), "UI 格式 / API 格式")
       + "</div>"
       + '<div class="cv-viewbar"><div class="cv-viewtabs">'
-      + '<button class="cv-viewtab' + (VIEW === "cards" ? " active" : "") + '" data-view="cards">🗂 卡片视图</button>'
-      + '<button class="cv-viewtab' + (VIEW === "table" ? " active" : "") + '" data-view="table">📋 多维表格</button>'
+      + '<button class="cv-viewtab' + (VIEW === "cards" ? " active" : "") + '" data-view="cards">' + ICO.svg("cards", 14) + '卡片视图</button>'
+      + '<button class="cv-viewtab' + (VIEW === "table" ? " active" : "") + '" data-view="table">' + ICO.svg("table", 14) + '多维表格</button>'
       + "</div>"
       + (st.aiTotal ? '<span class="cv-viewnote">AI 精读 <b>' + (st.aiDone || 0) + "</b> / " + fmtN(st.aiTotal) + " 条（重复结构自动同源）· 未精读在底部备份区</span>" : "")
       + "</div>";
@@ -223,9 +223,9 @@
         + "<h3><span class=\"wf-cat-pill\">" + esc(w.cat) + "</span>" + (w.nsfw ? '<span class="cv-nsfw-pill">18+</span>' : "") + esc(w.name) + "</h3>"
         + '<div class="wf-desc">' + summaryLine(w) + "</div>"
         + (w.de ? '<div class="wf-civdesc" title="作者在 Civitai 发布的简介">' + esc(w.de).replace(/\n/g, " ") + "</div>" : "")
-        + '<div class="wf-foot"><span class="mini-tag">⬇ ' + fmtN(w.dl) + '</span><span class="mini-tag">👍 ' + fmtN(w.up) + "</span>"
+        + '<div class="wf-foot"><span class="mini-tag">' + ICO.svg("download", 13) + fmtN(w.dl) + '</span><span class="mini-tag">' + ICO.svg("thumb", 13) + fmtN(w.up) + "</span>"
         + '<span class="mini-tag">' + w.nodes + " 节点</span>"
-        + (w.variants && w.variants.length > 1 ? '<span class="mini-tag" style="color:#7dd3fc">📦 ' + w.variants.length + " 份工作流</span>" : "")
+        + (w.variants && w.variants.length > 1 ? '<span class="mini-tag" style="color:#e8b98f">' + ICO.svg("box", 13) + w.variants.length + " 份工作流</span>" : "")
         + '<span class="mini-tag">' + esc(w.base) + "</span>"
         + (w.pub ? '<span class="mini-tag">' + esc(w.pub) + "</span>" : "")
         + "</div></a>";
@@ -644,13 +644,13 @@
       + '<a class="back-link" href="#/civitai">← 返回真实工作流库</a>'
       + '<div class="pkg-hero"><h1>' + (w.nsfw ? '<span class="cv-nsfw-pill">18+</span>' : "") + esc(w.name) + "</h1>"
       + '<div class="ph-meta"><span class="wf-cat-pill">' + esc(sel.cat || w.cat) + '</span>'
-      + '<span class="mini-tag">⬇ ' + fmtN(w.dl) + '</span><span class="mini-tag">👍 ' + fmtN(w.up) + "</span>"
+      + '<span class="mini-tag">' + ICO.svg("download", 13) + fmtN(w.dl) + '</span><span class="mini-tag">' + ICO.svg("thumb", 13) + fmtN(w.up) + "</span>"
       + '<span class="mini-tag">' + sel.nodes + " 节点 / " + (sel.links || 0) + " 连线</span>"
       + '<span class="mini-tag">' + esc(w.base) + "</span>"
       + (sel.res ? '<span class="mini-tag">画布 ' + sel.res.width + "×" + sel.res.height + "</span>" : "")
       + (w.pub ? '<span class="mini-tag">发布 ' + esc(w.pub) + "</span>" : "")
       + (sel.fmt === "api" ? '<span class="mini-tag">API 格式（自动布局）</span>' : "")
-      + (w.variants && w.variants.length > 1 ? '<span class="mini-tag" style="color:#7dd3fc">📦 包内共 ' + w.variants.length + " 份工作流</span>" : "")
+      + (w.variants && w.variants.length > 1 ? '<span class="mini-tag" style="color:#e8b98f">' + ICO.svg("box", 13) + "包内共 " + w.variants.length + " 份工作流</span>" : "")
       + "</div>"
       + '<div class="ph-desc" id="cvAiSum">' + esc(summaryLine(w)) + "</div>"
       + '<div class="ph-meta" id="cvDiffRow" style="display:none"></div>'
@@ -701,7 +701,7 @@
         html += '<tr><td class="mono" style="color:#93c5fd">' + esc(m.f) + "</td><td style=\"color:var(--muted)\">" + esc(m.n) + "</td></tr>";
       });
       html += "</table>"
-        + '<div class="callout info" style="margin-top:12px"><span class="co-ico">📥</span><div><span class="co-title">说明</span>以上是这条工作流引用的模型文件名，按名字在 Civitai / Hugging Face 搜索下载，放入 models 对应子目录即可复跑。</div></div>'
+        + '<div class="callout info" style="margin-top:12px"><span class="co-ico"></span><div><span class="co-title">说明</span>以上是这条工作流引用的模型文件名，按名字在 Civitai / Hugging Face 搜索下载，放入 models 对应子目录即可复跑。</div></div>'
         + "</div>";
     }
 
@@ -794,8 +794,8 @@
         ai.t.forEach(function (t) { html += '<p style="color:var(--muted);margin-bottom:8px">✦ ' + esc(t) + "</p>"; });
         html += "</div></div>";
       }
-      if (ai && ai.p) html += '<div class="callout info"><span class="co-ico">🎛</span><div><span class="co-title">参数建议</span>' + esc(ai.p) + "</div></div>";
-      if (ai && ai.n) html += '<div class="callout danger"><span class="co-ico">⚠️</span><div><span class="co-title">使用前必读</span>' + esc(ai.n) + "</div></div>";
+      if (ai && ai.p) html += '<div class="callout info"><span class="co-ico"></span><div><span class="co-title">参数建议</span>' + esc(ai.p) + "</div></div>";
+      if (ai && ai.n) html += '<div class="callout danger"><span class="co-ico"></span><div><span class="co-title">使用前必读</span>' + esc(ai.n) + "</div></div>";
       blocks.innerHTML = html;
     }
   }

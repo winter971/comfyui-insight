@@ -70,8 +70,7 @@
       + (t.coreCount < t.memberCount ? tile(t.coreCount, "条核心（名称命中）") : "")
       + "</div>"
       + '<div class="tp-jump">'
-      + ['intro:导言', 'pipeline:管线', 'specs:模型规格', 'members:成员', 'compare:横向对比', 'guide:怎么选', 'pitfalls:踩坑', 'faq:常见问题']
-        .map(function (x) { var p = x.split(":"); return '<a class="tp-jump-btn" href="#tp-' + p[0] + '">' + p[1] + "</a>"; }).join("")
+      + jumps(t).map(function (x) { var p = x.split(":"); return '<a class="tp-jump-btn" href="#tp-' + p[0] + '">' + p[1] + "</a>"; }).join("")
       + "</div></div>";
 
     /* 导言 */
@@ -123,10 +122,10 @@
         html += '<a class="wf-card" href="#/civitai/' + m.v + '">'
           + "<h3>" + (m.nsfw ? '<span class="cv-nsfw-pill">18+</span>' : "") + esc(m.name) + "</h3>"
           + '<div class="wf-desc">' + esc(m.by ? "作者 " + m.by + " · " : "") + m.nodes + " 节点 · " + esc(m.cat || "") + "</div>"
-          + '<div class="wf-foot"><span class="mini-tag">⬇ ' + fmtN(m.dl) + '</span><span class="mini-tag">👍 ' + fmtN(m.up) + "</span>"
+          + '<div class="wf-foot"><span class="mini-tag">' + fmtN(m.dl) + '</span><span class="mini-tag">' + fmtN(m.up) + "</span>"
           + (m.ai ? '<span class="cv-ai-mini">已精读</span>' : '<span class="mini-tag">待精读</span>')
           + (m.pub ? '<span class="mini-tag">' + esc(m.pub) + "</span>" : "")
-          + (m.vc > 1 ? '<span class="mini-tag" style="color:#7dd3fc">📦 ' + m.vc + " 份</span>" : "")
+          + (m.vc > 1 ? '<span class="mini-tag" style="color:#e8b98f">' + m.vc + " 份</span>" : "")
           + "</div></a>";
       });
       html += "</div></div>";
@@ -154,7 +153,7 @@
     /* 踩坑 */
     if ((t.pitfalls || []).length) {
       html += '<div class="section" id="tp-pitfalls"><div class="sec-head"><h2 style="font-size:20px">踩坑清单</h2><span class="sec-en">PITFALLS</span></div>'
-        + '<div class="callout danger"><span class="co-ico">⚠️</span><div><span class="co-title">动手前先看这些</span><ul class="tp-list">';
+        + '<div class="callout danger"><span class="co-ico"></span><div><span class="co-title">动手前先看这些</span><ul class="tp-list">';
       t.pitfalls.forEach(function (p) { html += "<li>" + esc(p) + "</li>"; });
       html += "</ul></div></div></div>";
     }
@@ -168,6 +167,21 @@
       html += "</div></div>";
     }
 
+    /* 延伸阅读：专题相关的外部资料（作者指南 / 原页面），并回链库内精读 */
+    if ((t.resources || []).length) {
+      html += '<div class="section" id="tp-res"><div class="sec-head"><h2 style="font-size:20px">延伸阅读</h2><span class="sec-en">RESOURCES</span>'
+        + '<span style="font-size:12px;color:var(--faint)">外部链接在新标签页打开</span></div>';
+      t.resources.forEach(function (r) {
+        var v = (r.rel || [])[0];
+        html += '<div class="tp-res">'
+          + '<a class="tp-res-t" href="' + esc(r.u) + '" target="_blank" rel="noopener">' + esc(r.t) + " ↗</a>"
+          + (r.d ? '<div class="tp-res-d">' + esc(r.d) + "</div>" : "")
+          + (v ? '<a class="tp-res-go" href="#/civitai/' + v + '">看库内精读 →</a>' : "")
+          + "</div>";
+      });
+      html += "</div>";
+    }
+
     html += '<div style="margin-top:26px"><a class="filter-btn" href="#/civitai/topic">← 全部专题</a> '
       + '<a class="filter-btn" href="#/civitai">浏览完整工作流库</a></div></div>';
     return html;
@@ -175,6 +189,16 @@
 
   function tile(num, label) {
     return '<div class="cv-tile"><div class="cv-tile-num">' + num + '</div><div class="cv-tile-label">' + esc(label) + "</div></div>";
+  }
+
+  /* 顶部快速跳转：只列这个专题实际拥有的区块 */
+  function jumps(t) {
+    var j = ["intro:导言", "pipeline:管线", "specs:模型规格", "members:成员", "compare:横向对比"];
+    if ((t.guide || []).length) j.push("guide:怎么选");
+    if ((t.pitfalls || []).length) j.push("pitfalls:踩坑");
+    if ((t.faq || []).length) j.push("faq:常见问题");
+    if ((t.resources || []).length) j.push("res:延伸阅读");
+    return j;
   }
 
   /* 对比表 */

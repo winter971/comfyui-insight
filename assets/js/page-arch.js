@@ -13,30 +13,30 @@
   /* ---------------- SVG 图 1：前后端整体架构 ---------------- */
   var SVG_ARCH =
   '<svg class="arch-svg" viewBox="0 0 1160 620" xmlns="http://www.w3.org/2000/svg">'
-  + '<defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#4cc9f0"/></marker>'
+  + '<defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#d97757"/></marker>'
   + '<marker id="arp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#a78bfa"/></marker></defs>'
 
   /* 前端大框 */
-  + '<rect x="30" y="30" width="440" height="540" rx="14" fill="#171a26" stroke="#7c5cff" stroke-width="1.5" stroke-dasharray="none"/>'
-  + '<text x="250" y="62" text-anchor="middle" class="lbl-strong" style="font-size:16px">🖥️ 前端（浏览器 / Electron 桌面壳）</text>'
-  + '<rect x="55" y="90" width="390" height="86" rx="9" fill="#1e2233" stroke="#3a4157"/><text x="250" y="118" text-anchor="middle" class="lbl-strong">LiteGraph 节点画布 (Canvas)</text><text x="250" y="142" text-anchor="middle" class="lbl">拖拽节点、连线、摆布局 —— 你看到的工作流编辑器</text><text x="250" y="162" text-anchor="middle" class="lbl-small">litegraph.core.js / litegraph.extensions.js</text>'
-  + '<rect x="55" y="196" width="390" height="80" rx="9" fill="#1e2233" stroke="#3a4157"/><text x="250" y="224" text-anchor="middle" class="lbl-strong">工作流序列化 (workflow.json)</text><text x="250" y="247" text-anchor="middle" class="lbl">把画布上的节点与连线导出为 JSON</text><text x="250" y="265" text-anchor="middle" class="lbl-small">ComfyUI 原生格式 / ComfyAPI 格式两套序列化</text>'
-  + '<rect x="55" y="296" width="390" height="80" rx="9" fill="#1e2233" stroke="#3a4157"/><text x="250" y="324" text-anchor="middle" class="lbl-strong">前端扩展系统</text><text x="250" y="347" text-anchor="middle" class="lbl">自定义节点可在 web 目录注入 JS：注册控件、右键菜单、面板</text><text x="250" y="365" text-anchor="middle" class="lbl-small">app.registerExtension({...})</text>'
-  + '<rect x="55" y="396" width="390" height="80" rx="9" fill="#1e2233" stroke="#3a4157"/><text x="250" y="424" text-anchor="middle" class="lbl-strong">WebSocket 客户端</text><text x="250" y="447" text-anchor="middle" class="lbl">实时接收进度、预览图、执行状态消息</text><text x="250" y="465" text-anchor="middle" class="lbl-small">/ws · binary 预览帧 + JSON 状态消息</text>'
-  + '<rect x="55" y="496" width="390" height="56" rx="9" fill="#221d33" stroke="#7c5cff" opacity="0.9"/><text x="250" y="523" text-anchor="middle" class="lbl-strong" style="fill:#c4b5fd">桌面版外壳 (Electron)</text><text x="250" y="541" text-anchor="middle" class="lbl-small">管理 Python 环境 / GPU 驱动 / 自动更新 (Comfy Desktop)</text>'
+  + '<rect x="30" y="30" width="440" height="540" rx="14" fill="#1f1a16" stroke="#e8a33d" stroke-width="1.5" stroke-dasharray="none"/>'
+  + '<text x="250" y="62" text-anchor="middle" class="lbl-strong" style="font-size:16px">前端（浏览器 / Electron 桌面壳）</text>'
+  + '<rect x="55" y="90" width="390" height="86" rx="9" fill="#262019" stroke="#463b30"/><text x="250" y="118" text-anchor="middle" class="lbl-strong">LiteGraph 节点画布 (Canvas)</text><text x="250" y="142" text-anchor="middle" class="lbl">拖拽节点、连线、摆布局 —— 你看到的工作流编辑器</text><text x="250" y="162" text-anchor="middle" class="lbl-small">litegraph.core.js / litegraph.extensions.js</text>'
+  + '<rect x="55" y="196" width="390" height="80" rx="9" fill="#262019" stroke="#463b30"/><text x="250" y="224" text-anchor="middle" class="lbl-strong">工作流序列化 (workflow.json)</text><text x="250" y="247" text-anchor="middle" class="lbl">把画布上的节点与连线导出为 JSON</text><text x="250" y="265" text-anchor="middle" class="lbl-small">ComfyUI 原生格式 / ComfyAPI 格式两套序列化</text>'
+  + '<rect x="55" y="296" width="390" height="80" rx="9" fill="#262019" stroke="#463b30"/><text x="250" y="324" text-anchor="middle" class="lbl-strong">前端扩展系统</text><text x="250" y="347" text-anchor="middle" class="lbl">自定义节点可在 web 目录注入 JS：注册控件、右键菜单、面板</text><text x="250" y="365" text-anchor="middle" class="lbl-small">app.registerExtension({...})</text>'
+  + '<rect x="55" y="396" width="390" height="80" rx="9" fill="#262019" stroke="#463b30"/><text x="250" y="424" text-anchor="middle" class="lbl-strong">WebSocket 客户端</text><text x="250" y="447" text-anchor="middle" class="lbl">实时接收进度、预览图、执行状态消息</text><text x="250" y="465" text-anchor="middle" class="lbl-small">/ws · binary 预览帧 + JSON 状态消息</text>'
+  + '<rect x="55" y="496" width="390" height="56" rx="9" fill="#2b2318" stroke="#e8a33d" opacity="0.9"/><text x="250" y="523" text-anchor="middle" class="lbl-strong" style="fill:#f0c078">桌面版外壳 (Electron)</text><text x="250" y="541" text-anchor="middle" class="lbl-small">管理 Python 环境 / GPU 驱动 / 自动更新 (Comfy Desktop)</text>'
 
   /* 后端大框 */
-  + '<rect x="690" y="30" width="440" height="540" rx="14" fill="#171a26" stroke="#4cc9f0" stroke-width="1.5"/>'
-  + '<text x="910" y="62" text-anchor="middle" class="lbl-strong" style="font-size:16px">⚙️ 后端（Python / FastAPI 进程）</text>'
-  + '<rect x="715" y="90" width="390" height="76" rx="9" fill="#1e2233" stroke="#3a4157"/><text x="910" y="118" text-anchor="middle" class="lbl-strong">HTTP / WebSocket 服务 (main.py)</text><text x="910" y="141" text-anchor="middle" class="lbl">/prompt 提交任务 · /history 查询 · /view 取图 · /ws 推送</text><text x="910" y="159" text-anchor="middle" class="lbl-small">api_server / protocol.py</text>'
-  + '<rect x="715" y="186" width="390" height="96" rx="9" fill="#1e2233" stroke="#3a4157"/><text x="910" y="214" text-anchor="middle" class="lbl-strong">执行引擎 (execution.py + comfy_execution)</text><text x="910" y="238" text-anchor="middle" class="lbl">校验图 → 拓扑排序 → 逐节点求值 → 缓存复用</text><text x="910" y="257" text-anchor="middle" class="lbl">graph.py 图结构 · caching.py 结果缓存 · validation.py 校验</text><text x="910" y="274" text-anchor="middle" class="lbl-small">PromptQueue 任务队列（支持排队多条）</text>'
-  + '<rect x="715" y="302" width="390" height="76" rx="9" fill="#1e2233" stroke="#3a4157"/><text x="910" y="330" text-anchor="middle" class="lbl-strong">节点注册表 (nodes.py)</text><text x="910" y="353" text-anchor="middle" class="lbl">NODE_CLASS_MAPPINGS：名字 → 节点类的全局字典</text><text x="910" y="371" text-anchor="middle" class="lbl-small">启动时扫描 custom_nodes/ 逐个导入合并</text>'
-  + '<rect x="715" y="398" width="390" height="76" rx="9" fill="#1e2233" stroke="#3a4157"/><text x="910" y="426" text-anchor="middle" class="lbl-strong">模型与显存管理 (comfy/model_management.py)</text><text x="910" y="449" text-anchor="middle" class="lbl">探测 VRAM / RAM，决定模型加载、卸载、低显存策略</text><text x="910" y="467" text-anchor="middle" class="lbl-small">sd.py · samplers.py · latent_formats.py 等</text>'
-  + '<rect x="715" y="494" width="390" height="56" rx="9" fill="#1a2433" stroke="#4cc9f0" opacity="0.9"/><text x="910" y="521" text-anchor="middle" class="lbl-strong" style="fill:#7dd3fc">diffusion 后端 (torch)</text><text x="910" y="539" text-anchor="middle" class="lbl-small">统一定义了 SD/SDXL/Flux/Wan 等上百种模型的推理实现</text>'
+  + '<rect x="690" y="30" width="440" height="540" rx="14" fill="#1f1a16" stroke="#d97757" stroke-width="1.5"/>'
+  + '<text x="910" y="62" text-anchor="middle" class="lbl-strong" style="font-size:16px">后端（Python / FastAPI 进程）</text>'
+  + '<rect x="715" y="90" width="390" height="76" rx="9" fill="#262019" stroke="#463b30"/><text x="910" y="118" text-anchor="middle" class="lbl-strong">HTTP / WebSocket 服务 (main.py)</text><text x="910" y="141" text-anchor="middle" class="lbl">/prompt 提交任务 · /history 查询 · /view 取图 · /ws 推送</text><text x="910" y="159" text-anchor="middle" class="lbl-small">api_server / protocol.py</text>'
+  + '<rect x="715" y="186" width="390" height="96" rx="9" fill="#262019" stroke="#463b30"/><text x="910" y="214" text-anchor="middle" class="lbl-strong">执行引擎 (execution.py + comfy_execution)</text><text x="910" y="238" text-anchor="middle" class="lbl">校验图 → 拓扑排序 → 逐节点求值 → 缓存复用</text><text x="910" y="257" text-anchor="middle" class="lbl">graph.py 图结构 · caching.py 结果缓存 · validation.py 校验</text><text x="910" y="274" text-anchor="middle" class="lbl-small">PromptQueue 任务队列（支持排队多条）</text>'
+  + '<rect x="715" y="302" width="390" height="76" rx="9" fill="#262019" stroke="#463b30"/><text x="910" y="330" text-anchor="middle" class="lbl-strong">节点注册表 (nodes.py)</text><text x="910" y="353" text-anchor="middle" class="lbl">NODE_CLASS_MAPPINGS：名字 → 节点类的全局字典</text><text x="910" y="371" text-anchor="middle" class="lbl-small">启动时扫描 custom_nodes/ 逐个导入合并</text>'
+  + '<rect x="715" y="398" width="390" height="76" rx="9" fill="#262019" stroke="#463b30"/><text x="910" y="426" text-anchor="middle" class="lbl-strong">模型与显存管理 (comfy/model_management.py)</text><text x="910" y="449" text-anchor="middle" class="lbl">探测 VRAM / RAM，决定模型加载、卸载、低显存策略</text><text x="910" y="467" text-anchor="middle" class="lbl-small">sd.py · samplers.py · latent_formats.py 等</text>'
+  + '<rect x="715" y="494" width="390" height="56" rx="9" fill="#221d18" stroke="#d97757" opacity="0.9"/><text x="910" y="521" text-anchor="middle" class="lbl-strong" style="fill:#e8b98f">diffusion 后端 (torch)</text><text x="910" y="539" text-anchor="middle" class="lbl-small">统一定义了 SD/SDXL/Flux/Wan 等上百种模型的推理实现</text>'
 
   /* 中间连线 */
   + '<path class="arrow-line" marker-end="url(#ar)" d="M 470 130 C 560 130, 600 110, 715 112"/>'
-  + '<text x="592" y="102" text-anchor="middle" class="lbl-small" style="fill:#4cc9f0">POST /prompt (workflow json)</text>'
+  + '<text x="592" y="102" text-anchor="middle" class="lbl-small" style="fill:#d97757">POST /prompt (workflow json)</text>'
   + '<path class="arrow-line purple dashed" marker-end="url(#arp)" d="M 715 435 C 600 435, 560 437, 470 437"/>'
   + '<text x="592" y="418" text-anchor="middle" class="lbl-small" style="fill:#a78bfa">WebSocket: progress / executing / executed</text>'
   + '<path class="arrow-line dashed" marker-end="url(#ar)" d="M 470 437 C 520 470, 640 500, 715 505" opacity="0.6"/>'
@@ -46,24 +46,24 @@
   /* ---------------- SVG 图 2：一次执行的完整生命周期 ---------------- */
   var SVG_LIFE =
   '<svg class="arch-svg" viewBox="0 0 1160 560" xmlns="http://www.w3.org/2000/svg">'
-  + '<defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#4cc9f0"/></marker></defs>'
-  + '<rect x="20" y="200" width="180" height="120" rx="10" fill="#221d33" stroke="#7c5cff"/><text x="110" y="235" text-anchor="middle" class="lbl-strong">🖱️ 用户点 Queue</text><text x="110" y="260" text-anchor="middle" class="lbl">前端把画布序列化为</text><text x="110" y="280" text-anchor="middle" class="lbl">prompt JSON 提交</text>'
-  + '<rect x="260" y="200" width="190" height="120" rx="10" fill="#1e2233" stroke="#3a4157"/><text x="355" y="228" text-anchor="middle" class="lbl-strong">服务端校验</text><text x="355" y="252" text-anchor="middle" class="lbl">validation.py：检查每个节点</text><text x="355" y="272" text-anchor="middle" class="lbl">的输入类型/必填项/文件存在</text><text x="355" y="292" text-anchor="middle" class="lbl-small">不合法直接返回错误</text>'
-  + '<rect x="510" y="200" width="180" height="120" rx="10" fill="#1e2233" stroke="#3a4157"/><text x="600" y="228" text-anchor="middle" class="lbl-strong">入队排队</text><text x="600" y="252" text-anchor="middle" class="lbl">PromptQueue 先进先出，</text><text x="600" y="272" text-anchor="middle" class="lbl">可以一次排多条任务</text><text x="600" y="292" text-anchor="middle" class="lbl-small">执行线程循环取任务</text>'
-  + '<rect x="750" y="200" width="190" height="120" rx="10" fill="#1e2233" stroke="#3a4157"/><text x="845" y="228" text-anchor="middle" class="lbl-strong">缓存判定</text><text x="845" y="252" text-anchor="middle" class="lbl">自上而下找到第一个</text><text x="845" y="272" text-anchor="middle" class="lbl">输出变化的节点，</text><text x="845" y="292" text-anchor="middle" class="lbl-small">它之后的才需要重算</text>'
-  + '<rect x="990" y="200" width="150" height="120" rx="10" fill="#1a2433" stroke="#4cc9f0"/><text x="1065" y="228" text-anchor="middle" class="lbl-strong">🚀 执行</text><text x="1065" y="252" text-anchor="middle" class="lbl">拓扑顺序逐节点</text><text x="1065" y="272" text-anchor="middle" class="lbl">调用 + WebSocket</text><text x="1065" y="292" text-anchor="middle" class="lbl">推送进度</text>'
+  + '<defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#d97757"/></marker></defs>'
+  + '<rect x="20" y="200" width="180" height="120" rx="10" fill="#2b2318" stroke="#e8a33d"/><text x="110" y="235" text-anchor="middle" class="lbl-strong">用户点 Queue</text><text x="110" y="260" text-anchor="middle" class="lbl">前端把画布序列化为</text><text x="110" y="280" text-anchor="middle" class="lbl">prompt JSON 提交</text>'
+  + '<rect x="260" y="200" width="190" height="120" rx="10" fill="#262019" stroke="#463b30"/><text x="355" y="228" text-anchor="middle" class="lbl-strong">服务端校验</text><text x="355" y="252" text-anchor="middle" class="lbl">validation.py：检查每个节点</text><text x="355" y="272" text-anchor="middle" class="lbl">的输入类型/必填项/文件存在</text><text x="355" y="292" text-anchor="middle" class="lbl-small">不合法直接返回错误</text>'
+  + '<rect x="510" y="200" width="180" height="120" rx="10" fill="#262019" stroke="#463b30"/><text x="600" y="228" text-anchor="middle" class="lbl-strong">入队排队</text><text x="600" y="252" text-anchor="middle" class="lbl">PromptQueue 先进先出，</text><text x="600" y="272" text-anchor="middle" class="lbl">可以一次排多条任务</text><text x="600" y="292" text-anchor="middle" class="lbl-small">执行线程循环取任务</text>'
+  + '<rect x="750" y="200" width="190" height="120" rx="10" fill="#262019" stroke="#463b30"/><text x="845" y="228" text-anchor="middle" class="lbl-strong">缓存判定</text><text x="845" y="252" text-anchor="middle" class="lbl">自上而下找到第一个</text><text x="845" y="272" text-anchor="middle" class="lbl">输出变化的节点，</text><text x="845" y="292" text-anchor="middle" class="lbl-small">它之后的才需要重算</text>'
+  + '<rect x="990" y="200" width="150" height="120" rx="10" fill="#221d18" stroke="#d97757"/><text x="1065" y="228" text-anchor="middle" class="lbl-strong">执行</text><text x="1065" y="252" text-anchor="middle" class="lbl">拓扑顺序逐节点</text><text x="1065" y="272" text-anchor="middle" class="lbl">调用 + WebSocket</text><text x="1065" y="292" text-anchor="middle" class="lbl">推送进度</text>'
   + '<path class="arrow-line" marker-end="url(#ar2)" d="M200 260 L260 260"/><path class="arrow-line" marker-end="url(#ar2)" d="M450 260 L510 260"/><path class="arrow-line" marker-end="url(#ar2)" d="M690 260 L750 260"/><path class="arrow-line" marker-end="url(#ar2)" d="M940 260 L990 260"/>'
   /* 执行展开区 */
   + '<rect x="240" y="20" width="900" height="140" rx="10" fill="#131720" stroke="#262b38"/>'
-  + '<text x="690" y="46" text-anchor="middle" class="lbl-strong" style="font-size:15px">🚀 执行阶段内部（摘自 execution.py 的主循环）</text>'
-  + '<rect x="265" y="66" width="190" height="72" rx="8" fill="#1e2233" stroke="#3a4157"/><text x="360" y="96" text-anchor="middle" class="lbl-strong" style="font-size:12.5px">拓扑排序取下一个节点</text><text x="360" y="118" text-anchor="middle" class="lbl-small">所有上游都算完才轮到它</text>'
-  + '<rect x="495" y="66" width="190" height="72" rx="8" fill="#1e2233" stroke="#3a4157"/><text x="590" y="96" text-anchor="middle" class="lbl-strong" style="font-size:12.5px">按名字查 NODE_CLASS_MAPPINGS</text><text x="590" y="118" text-anchor="middle" class="lbl-small">实例化 → 准备输入（含隐式转换）</text>'
-  + '<rect x="725" y="66" width="190" height="72" rx="8" fill="#1e2233" stroke="#3a4157"/><text x="820" y="96" text-anchor="middle" class="lbl-strong" style="font-size:12.5px">调用节点 FUNCTION</text><text x="820" y="118" text-anchor="middle" class="lbl-small">如 KSampler.sample()，产出输出</text>'
-  + '<rect x="955" y="66" width="160" height="72" rx="8" fill="#1a2433" stroke="#4cc9f0"/><text x="1035" y="96" text-anchor="middle" class="lbl-strong" style="font-size:12.5px">输出送缓存 + 下发</text><text x="1035" y="118" text-anchor="middle" class="lbl-small">OUTPUT_NODE 节点触发存图/推送</text>'
+  + '<text x="690" y="46" text-anchor="middle" class="lbl-strong" style="font-size:15px">执行阶段内部（摘自 execution.py 的主循环）</text>'
+  + '<rect x="265" y="66" width="190" height="72" rx="8" fill="#262019" stroke="#463b30"/><text x="360" y="96" text-anchor="middle" class="lbl-strong" style="font-size:12.5px">拓扑排序取下一个节点</text><text x="360" y="118" text-anchor="middle" class="lbl-small">所有上游都算完才轮到它</text>'
+  + '<rect x="495" y="66" width="190" height="72" rx="8" fill="#262019" stroke="#463b30"/><text x="590" y="96" text-anchor="middle" class="lbl-strong" style="font-size:12.5px">按名字查 NODE_CLASS_MAPPINGS</text><text x="590" y="118" text-anchor="middle" class="lbl-small">实例化 → 准备输入（含隐式转换）</text>'
+  + '<rect x="725" y="66" width="190" height="72" rx="8" fill="#262019" stroke="#463b30"/><text x="820" y="96" text-anchor="middle" class="lbl-strong" style="font-size:12.5px">调用节点 FUNCTION</text><text x="820" y="118" text-anchor="middle" class="lbl-small">如 KSampler.sample()，产出输出</text>'
+  + '<rect x="955" y="66" width="160" height="72" rx="8" fill="#221d18" stroke="#d97757"/><text x="1035" y="96" text-anchor="middle" class="lbl-strong" style="font-size:12.5px">输出送缓存 + 下发</text><text x="1035" y="118" text-anchor="middle" class="lbl-small">OUTPUT_NODE 节点触发存图/推送</text>'
   + '<path class="arrow-line" marker-end="url(#ar2)" d="M455 102 L495 102"/><path class="arrow-line" marker-end="url(#ar2)" d="M685 102 L725 102"/><path class="arrow-line" marker-end="url(#ar2)" d="M915 102 L955 102"/>'
   /* 底部说明 */
   + '<rect x="20" y="380" width="1120" height="150" rx="10" fill="#131720" stroke="#262b38"/>'
-  + '<text x="580" y="412" text-anchor="middle" class="lbl-strong" style="font-size:15px">🔁 循环直至没有可执行节点 —— 三个关键行为</text>'
+  + '<text x="580" y="412" text-anchor="middle" class="lbl-strong" style="font-size:15px">循环直至没有可执行节点 —— 三个关键行为</text>'
   + '<text x="200" y="452" text-anchor="middle" class="lbl-strong" style="font-size:13px">1. 增量执行</text><text x="200" y="474" text-anchor="middle" class="lbl">只重算受参数变化影响的部分</text><text x="200" y="494" text-anchor="middle" class="lbl">改提示词不会重新加载模型</text>'
   + '<text x="580" y="452" text-anchor="middle" class="lbl-strong" style="font-size:13px">2. 实时反馈</text><text x="580" y="474" text-anchor="middle" class="lbl">每个节点开始/结束时发 executing 消息</text><text x="580" y="494" text-anchor="middle" class="lbl">采样过程中持续推送预览图</text>'
   + '<text x="960" y="452" text-anchor="middle" class="lbl-strong" style="font-size:13px">3. 资源调度</text><text x="960" y="474" text-anchor="middle" class="lbl">model_management 在节点间隙</text><text x="960" y="494" text-anchor="middle" class="lbl">加载/换出模型，防止显存溢出</text>'
@@ -73,12 +73,12 @@
   var SVG_EXT =
   '<svg class="arch-svg" viewBox="0 0 1160 320" xmlns="http://www.w3.org/2000/svg">'
   + '<defs><marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#a78bfa"/></marker></defs>'
-  + '<rect x="30" y="110" width="200" height="100" rx="10" fill="#1e2233" stroke="#3a4157"/><text x="130" y="145" text-anchor="middle" class="lbl-strong">启动</text><text x="130" y="170" text-anchor="middle" class="lbl">main.py 初始化服务</text><text x="130" y="190" text-anchor="middle" class="lbl-small">加载官方 nodes.py</text>'
-  + '<rect x="280" y="110" width="210" height="100" rx="10" fill="#1e2233" stroke="#3a4157"/><text x="385" y="140" text-anchor="middle" class="lbl-strong">扫描 custom_nodes/</text><text x="385" y="164" text-anchor="middle" class="lbl">每个子文件夹当作一个</text><text x="385" y="184" text-anchor="middle" class="lbl-small">Python 包导入 __init__.py</text>'
-  + '<rect x="540" y="110" width="210" height="100" rx="10" fill="#1e2233" stroke="#3a4157"/><text x="645" y="140" text-anchor="middle" class="lbl-strong">读取导出字典</text><text x="645" y="164" text-anchor="middle" class="lbl">NODE_CLASS_MAPPINGS</text><text x="645" y="184" text-anchor="middle" class="lbl-small">WEB_DIRECTORY 前端文件(可选)</text>'
-  + '<rect x="800" y="110" width="330" height="100" rx="10" fill="#1a2433" stroke="#4cc9f0"/><text x="965" y="140" text-anchor="middle" class="lbl-strong">合并进全局注册表</text><text x="965" y="164" text-anchor="middle" class="lbl">从此你的节点与官方节点完全平级：</text><text x="965" y="184" text-anchor="middle" class="lbl-small">前端能搜到、能连线、能被任何工作流引用</text>'
+  + '<rect x="30" y="110" width="200" height="100" rx="10" fill="#262019" stroke="#463b30"/><text x="130" y="145" text-anchor="middle" class="lbl-strong">启动</text><text x="130" y="170" text-anchor="middle" class="lbl">main.py 初始化服务</text><text x="130" y="190" text-anchor="middle" class="lbl-small">加载官方 nodes.py</text>'
+  + '<rect x="280" y="110" width="210" height="100" rx="10" fill="#262019" stroke="#463b30"/><text x="385" y="140" text-anchor="middle" class="lbl-strong">扫描 custom_nodes/</text><text x="385" y="164" text-anchor="middle" class="lbl">每个子文件夹当作一个</text><text x="385" y="184" text-anchor="middle" class="lbl-small">Python 包导入 __init__.py</text>'
+  + '<rect x="540" y="110" width="210" height="100" rx="10" fill="#262019" stroke="#463b30"/><text x="645" y="140" text-anchor="middle" class="lbl-strong">读取导出字典</text><text x="645" y="164" text-anchor="middle" class="lbl">NODE_CLASS_MAPPINGS</text><text x="645" y="184" text-anchor="middle" class="lbl-small">WEB_DIRECTORY 前端文件(可选)</text>'
+  + '<rect x="800" y="110" width="330" height="100" rx="10" fill="#221d18" stroke="#d97757"/><text x="965" y="140" text-anchor="middle" class="lbl-strong">合并进全局注册表</text><text x="965" y="164" text-anchor="middle" class="lbl">从此你的节点与官方节点完全平级：</text><text x="965" y="184" text-anchor="middle" class="lbl-small">前端能搜到、能连线、能被任何工作流引用</text>'
   + '<path class="arrow-line purple" marker-end="url(#ar3)" d="M230 160 L280 160"/><path class="arrow-line purple" marker-end="url(#ar3)" d="M490 160 L540 160"/><path class="arrow-line purple" marker-end="url(#ar3)" d="M750 160 L800 160"/>'
-  + '<text x="580" y="60" text-anchor="middle" class="lbl-strong" style="font-size:15px">🧩 自定义节点是如何「长」进 ComfyUI 的</text>'
+  + '<text x="580" y="60" text-anchor="middle" class="lbl-strong" style="font-size:15px">自定义节点是如何「长」进 ComfyUI 的</text>'
   + '<text x="580" y="280" text-anchor="middle" class="lbl">这就是 ComfyUI 生态爆发的机制：不改框架一行代码，任何人都以相同接口扩展它 —— 官方节点和第三方节点在引擎眼里毫无区别。</text>'
   + "</svg>";
 
@@ -280,7 +280,7 @@
     h += '<h2 id="a-arch">整体架构：前后端分离的图执行器</h2>'
       + '<p>ComfyUI 是标准的<b>前后端分离</b>结构：前端只负责「画图和收集参数」，后端负责「真正的校验与执行」。两者通过 HTTP + WebSocket 通信。这个设计带来一个重要能力：<b>前端可以整个换掉</b>（网页版、桌面版、第三方界面都只是不同的前端），后端执行引擎稳定不变。</p>'
       + '<div class="arch-figure">' + SVG_ARCH + '<div class="figcap">图 1 · ComfyUI 前后端整体架构（右列模块名即真实源码文件）</div></div>'
-      + '<div class="callout info"><span class="co-ico">🧠</span><div><span class="co-title">关键认知</span>你在画布上看到的「连线」并不直接执行任何东西 —— 前端只是把图序列化成 JSON 提交给后端；真正读懂这张图、决定先算谁后算谁、缓存什么，全部发生在后端的执行引擎里。</div></div>';
+      + '<div class="callout info"><span class="co-ico"></span><div><span class="co-title">关键认知</span>你在画布上看到的「连线」并不直接执行任何东西 —— 前端只是把图序列化成 JSON 提交给后端；真正读懂这张图、决定先算谁后算谁、缓存什么，全部发生在后端的执行引擎里。</div></div>';
 
     /* 4. 生命周期 */
     h += '<h2 id="a-life">一次执行的生命周期：从点击 Queue 到图片落盘</h2>'
@@ -292,7 +292,7 @@
       + '<h3>① 增量缓存执行</h3><p>引擎执行前会沿图自上而下比较每个节点的「输入指纹」：如果某节点的所有输入与上次完全一致，直接复用上次结果。于是<b>只有被改动节点影响到的下游才会重算</b>。反复调提示词时省掉模型加载、VAE 编码等所有上游开销，这是 ComfyUI 迭代效率高的根本原因。</p>'
       + '<h3>② 拓扑排序与数据驱动</h3><p>节点执行顺序不由画布位置决定，而是由<b>数据依赖</b>决定（拓扑序）：一个节点必须等它所有上游都产出数据才能执行。图本质上是声明式的 —— 你描述「什么数据从哪来到哪去」，引擎自己安排顺序。这也解释了为什么循环依赖会被拒绝。</p>'
       + '<h3>③ 显存调度</h3><p>comfy/model_management.py 是看不见的管家：它探测显存容量与带宽，决定模型加载精度（fp16 / fp8）、常驻还是用完即卸、多个模型谁给谁让路。低显存机器能跑大模型、队列连跑不炸，靠的都是它。</p>'
-      + '<div class="callout warn"><span class="co-ico">⚡</span><div><span class="co-title">由此推导的实用经验</span>把「不变的东西」（模型加载、固定编码）放在图的左侧并保持参数不动，让缓存最大化命中；把「常改的东西」（提示词、种子）放在靠下游的位置 —— 工作流布局习惯直接影响迭代速度。</div></div>';
+      + '<div class="callout warn"><span class="co-ico"></span><div><span class="co-title">由此推导的实用经验</span>把「不变的东西」（模型加载、固定编码）放在图的左侧并保持参数不动，让缓存最大化命中；把「常改的东西」（提示词、种子）放在靠下游的位置 —— 工作流布局习惯直接影响迭代速度。</div></div>';
 
     /* 6. 目录树 */
     h += '<h2 id="a-tree">源码目录导读</h2>'
@@ -303,10 +303,10 @@
     h += '<h2 id="a-node-sys">节点系统解剖：一个节点的全部定义</h2>'
       + '<p>ComfyUI 里「节点」就是一个遵循极简协议的 Python 类。引擎靠四个约定认识它：</p>'
       + '<table class="data-table"><tr><th>约定</th><th>作用</th><th>一句话理解</th></tr>'
-      + '<tr><td class="mono" style="color:#c4b5fd">INPUT_TYPES()</td><td style="color:var(--muted)">声明输入：连接输入、控件（COMBO/INT/FLOAT/STRING…）及其默认值范围</td><td style="color:var(--muted)">「我需要什么」</td></tr>'
-      + '<tr><td class="mono" style="color:#c4b5fd">RETURN_TYPES</td><td style="color:var(--muted)">声明输出类型元组</td><td style="color:var(--muted)">「我产出什么」</td></tr>'
-      + '<tr><td class="mono" style="color:#c4b5fd">FUNCTION</td><td style="color:var(--muted)">真正执行的函数名（引擎按名调用）</td><td style="color:var(--muted)">「我干活的方法」</td></tr>'
-      + '<tr><td class="mono" style="color:#c4b5fd">CATEGORY</td><td style="color:var(--muted)">右键菜单 / 搜索里的分组路径</td><td style="color:var(--muted)">「我在菜单哪里」</td></tr></table>'
+      + '<tr><td class="mono" style="color:#f0c078">INPUT_TYPES()</td><td style="color:var(--muted)">声明输入：连接输入、控件（COMBO/INT/FLOAT/STRING…）及其默认值范围</td><td style="color:var(--muted)">「我需要什么」</td></tr>'
+      + '<tr><td class="mono" style="color:#f0c078">RETURN_TYPES</td><td style="color:var(--muted)">声明输出类型元组</td><td style="color:var(--muted)">「我产出什么」</td></tr>'
+      + '<tr><td class="mono" style="color:#f0c078">FUNCTION</td><td style="color:var(--muted)">真正执行的函数名（引擎按名调用）</td><td style="color:var(--muted)">「我干活的方法」</td></tr>'
+      + '<tr><td class="mono" style="color:#f0c078">CATEGORY</td><td style="color:var(--muted)">右键菜单 / 搜索里的分组路径</td><td style="color:var(--muted)">「我在菜单哪里」</td></tr></table>'
       + '<p style="margin-top:14px">类型的意义远不止显示：<b>连线合法性完全由类型匹配决定</b>（MODEL 接 MODEL、IMAGE 接 IMAGE），这使整张图在提交前就能被静态检查。下面是一个完整可用的最小自定义节点：</p>'
       + '<div class="code-head"><span>custom_nodes/my-nodes/__init__.py</span><span>最小自定义节点</span></div><pre><code>' + esc(CODE_MIN_NODE) + "</code></pre>";
 
@@ -319,7 +319,7 @@
       + '<div class="flow-step"><div class="fs-num">4</div><div><h4>重启验证与调试</h4><p>重启后端后，在画布双击搜索节点名即可。调试用 print + 控制台日志；前端 JS 问题看浏览器 DevTools。打包发布就是把这个文件夹推到 GitHub —— ComfyUI-Manager 能直接从 Git 地址安装。</p></div></div>'
       + "</div>"
       + '<div class="arch-figure">' + SVG_EXT + '<div class="figcap">图 3 · 自定义节点的加载与合并过程</div></div>'
-      + '<div class="callout tip"><span class="co-ico">🧪</span><div><span class="co-title">练手建议</span>从「封装你常用的一段连线」开始写第一个节点（比如「一键双层 CLIP 编码」），比直接读文档学得快。ComfyUI 自带的 example_node.py.example 是官方模板。</div></div>';
+      + '<div class="callout tip"><span class="co-ico"></span><div><span class="co-title">练手建议</span>从「封装你常用的一段连线」开始写第一个节点（比如「一键双层 CLIP 编码」），比直接读文档学得快。ComfyUI 自带的 example_node.py.example 是官方模板。</div></div>';
 
     /* 9. 接管 */
     h += '<h2 id="a-takeover">接管 ComfyUI，可不可行？</h2>'
@@ -333,15 +333,15 @@
     h += '<h3>路线 A 实战：用脚本驱动 ComfyUI</h3>'
       + '<p>ComfyUI 的 API 是公开且稳定的：提交用 POST /prompt，进度用 /ws WebSocket，取结果用 /history + /view。下面是一个完整可跑的 Python 客户端：</p>'
       + '<div class="code-head"><span>comfy_client.py</span><span>API 驱动示例</span></div><pre><code>' + esc(CODE_API) + "</code></pre>"
-      + '<div class="callout info"><span class="co-ico">📡</span><div><span class="co-title">关键消息一览</span>status（队列状态）· executing（某个节点开始/结束，node 为 null 表示整图完成）· progress（采样步数进度）· executed（节点输出元数据）· binary 预览帧（采样的实时预览图）。做监控面板或进度条，监听这几类消息就够了。</div></div>';
+      + '<div class="callout info"><span class="co-ico"></span><div><span class="co-title">关键消息一览</span>status（队列状态）· executing（某个节点开始/结束，node 为 null 表示整图完成）· progress（采样步数进度）· executed（节点输出元数据）· binary 预览帧（采样的实时预览图）。做监控面板或进度条，监听这几类消息就够了。</div></div>';
 
     /* 10. FAQ */
     h += '<h2 id="a-faq">常见问题</h2>';
     FAQ.forEach(function (f) {
-      h += '<details class="faq-item"><summary>❓ ' + esc(f[0]) + '</summary><div class="faq-body"><p>' + esc(f[1]) + "</p></div></details>";
+      h += '<details class="faq-item"><summary>' + esc(f[0]) + '</summary><div class="faq-body"><p>' + esc(f[1]) + "</p></div></details>";
     });
 
-    h += '<div class="callout" style="margin-top:30px"><span class="co-ico">➡️</span><div>架构部分到此结束。带着这些认知进入<a href="#/nodes">第二部分 · 节点包全解</a>——你会发现自己已经能看懂每个节点「为什么在那个位置」了。</div></div>';
+    h += '<div class="callout" style="margin-top:30px"><span class="co-ico"></span><div>架构部分到此结束。带着这些认知进入<a href="#/nodes">第二部分 · 节点包全解</a>——你会发现自己已经能看懂每个节点「为什么在那个位置」了。</div></div>';
     h += "</div></div>";
     return h;
   }

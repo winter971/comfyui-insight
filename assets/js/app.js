@@ -3,7 +3,7 @@
    ============================================================ */
 (function () {
   "use strict";
-  window.COMFY_APP_VER = "20260914c";  /* 运行时版本标记（排查缓存用） */
+  window.COMFY_APP_VER = "20260914d";  /* 运行时版本标记（排查缓存用） */
 
   var D = function () { return window.COMFY_DATA || {}; };
   function pkgs() { return (D().nodePackages || []).slice().sort(function (a, b) { return (a.official === b.official) ? 0 : (a.official ? -1 : 1); }); }
@@ -34,7 +34,7 @@
     html += '<section class="hero">'
       + '<h1>ComfyUI 全景解析</h1>'
       + '<p class="sub">架构 · 节点 · 工作流 —— 一个可随时查询的中文可视化知识库。看懂 ComfyUI 是怎么运转的、每个节点在做什么、每条工作流为什么这样连。</p>'
-      + '<div class="hero-badges"><span class="badge acc">📦 基于 ComfyUI v0.34.2</span><span class="badge cyan">🎨 全程可视化图解</span><span class="badge">🧩 覆盖官方 + 主流第三方节点包</span></div>'
+      + '<div class="hero-badges"><span class="badge acc">' + ICO.svg("box", 14) + '基于 ComfyUI v0.34.2</span><span class="badge cyan">' + ICO.svg("eye", 14) + '全程可视化图解</span><span class="badge">' + ICO.svg("puzzle", 14) + '覆盖官方 + 主流第三方节点包</span></div>'
       + '<div class="hot-chips"><span style="color:var(--faint);font-size:12px;align-self:center">热门：</span>'
       + ["KSampler", "ControlNet", "换脸", "Flux", "LoRA", "视频生成", "IPAdapter", "放大"].map(function (t) {
           return '<button class="hot-chip" data-q="' + esc(t) + '">' + esc(t) + "</button>";
@@ -44,10 +44,10 @@
 
     html += '<div class="container">';
     html += '<div class="entry-grid">'
-      + '<a class="entry-card ec-purple" href="#/arch"><span class="ec-num">01</span><div class="ec-ico">🏗️</div><h3>架构解析</h3><p>前后端如何分工、执行引擎如何跑一张图、节点系统怎么加载、以及开发自己的节点或用 API 接管 ComfyUI 是否可行。</p><div class="ec-meta">架构图 · 生命周期 · 扩展开发 · API 接管</div></a>'
-      + '<a class="entry-card ec-cyan" href="#/nodes"><span class="ec-num">02</span><div class="ec-ico">🧩</div><h3>节点包全解</h3><p>以节点包为单位，逐一分析每个节点：干了什么、上下游是什么、为什么需要。附交互式节点图，点击节点即可查看说明。</p><div class="ec-meta">' + P.length + " 个节点包 · " + nodeCount + " 个节点详解</div></a>"
-      + '<a class="entry-card ec-green" href="#/workflows"><span class="ec-num">03</span><div class="ec-ico">🕸️</div><h3>工作流图鉴</h3><p>从文生图到视频生成、从换脸到风格迁移：常见工作流的全量图解与逐节点分析，像官方界面一样可视化呈现。</p><div class="ec-meta">' + W.length + " 条工作流 · 覆盖图 / 视频 / 人物 / 风格</div></a>"
-      + '<a class="entry-card ec-orange" href="#/civitai"><span class="ec-num">04</span><div class="ec-ico">🌐</div><h3>真实工作流库</h3><p>从 Civitai 抓取并解析的真实社区工作流：每条都标注节点构成、需要安装的社区节点包、引用的模型文件与画布分辨率，可按底模 / 节点包 / 类别筛选。</p><div class="ec-meta">' + (D().civitaiWorkflows || []).length + " 条真实工作流 · 持续抓取更新</div></a>"
+      + '<a class="entry-card ec-a" href="#/arch"><div class="ec-ico">' + ICO.svg("layers", 22) + '</div><h3>架构解析</h3><p>前后端如何分工、执行引擎如何跑一张图、节点系统怎么加载、以及开发自己的节点或用 API 接管 ComfyUI 是否可行。</p><div class="ec-meta">架构图 · 生命周期 · 扩展开发 · API 接管</div></a>'
+      + '<a class="entry-card ec-b" href="#/nodes"><div class="ec-ico">' + ICO.svg("puzzle", 22) + '</div><h3>节点包全解</h3><p>以节点包为单位，逐一分析每个节点：干了什么、上下游是什么、为什么需要。附交互式节点图，点击节点即可查看说明。</p><div class="ec-meta">' + P.length + " 个节点包 · " + nodeCount + " 个节点详解</div></a>"
+      + '<a class="entry-card ec-c" href="#/workflows"><div class="ec-ico">' + ICO.svg("network", 22) + '</div><h3>工作流图鉴</h3><p>从文生图到视频生成、从换脸到风格迁移：常见工作流的全量图解与逐节点分析，像官方界面一样可视化呈现。</p><div class="ec-meta">' + W.length + " 条工作流 · 覆盖图 / 视频 / 人物 / 风格</div></a>"
+      + '<a class="entry-card ec-d" href="#/civitai"><div class="ec-ico">' + ICO.svg("globe", 22) + '</div><h3>真实工作流库</h3><p>从 Civitai 抓取并解析的真实社区工作流：每条都标注节点构成、需要安装的社区节点包、引用的模型文件与画布分辨率，可按底模 / 节点包 / 类别筛选。</p><div class="ec-meta">' + (D().civitaiWorkflows || []).length + " 条真实工作流 · 持续抓取更新</div></a>"
       + "</div>";
 
     html += '<div class="stats-bar">'
@@ -59,9 +59,9 @@
 
     html += '<div class="section"><div class="sec-head"><h2>怎么使用这个站</h2><span class="sec-en">HOW TO USE</span></div>'
       + '<div class="grid-3">'
-      + '<div class="card"><h4>🔍 当作查询工具</h4><p style="color:var(--muted);font-size:13.5px">顶部搜索框可以搜任何节点名（如 KSampler）、包名（如 Impact Pack）或工作流（如 换脸）。遇到不认识的节点，搜一下就有上下游解释。</p></div>'
-      + '<div class="card"><h4>🧭 按路线学习</h4><p style="color:var(--muted);font-size:13.5px">推荐顺序：先读「架构解析」建立整体认知，再按类别浏览「节点包全解」，最后在「工作流图鉴」里对照真实连线理解数据流。</p></div>'
-      + '<div class="card"><h4>🖱️ 图是可交互的</h4><p style="color:var(--muted);font-size:13.5px">所有节点图都支持拖拽平移、滚轮缩放，点击任意节点会弹出它的说明卡片——就像在 ComfyUI 里点开节点一样。</p></div>'
+      + '<div class="card"><h4>当作查询工具</h4><p style="color:var(--muted);font-size:13.5px">顶部搜索框可以搜任何节点名（如 KSampler）、包名（如 Impact Pack）或工作流（如 换脸）。遇到不认识的节点，搜一下就有上下游解释。</p></div>'
+      + '<div class="card"><h4>按路线学习</h4><p style="color:var(--muted);font-size:13.5px">推荐顺序：先读「架构解析」建立整体认知，再按类别浏览「节点包全解」，最后在「工作流图鉴」里对照真实连线理解数据流。</p></div>'
+      + '<div class="card"><h4>图是可交互的</h4><p style="color:var(--muted);font-size:13.5px">所有节点图都支持拖拽平移、滚轮缩放，点击任意节点会弹出它的说明卡片——就像在 ComfyUI 里点开节点一样。</p></div>'
       + "</div></div>";
 
     html += '<div class="section"><div class="sec-head"><h2>数据流一分钟看懂</h2><span class="sec-en">TL;DR</span></div>'
@@ -92,7 +92,7 @@
       + '<input id="pkgQ" type="text" placeholder="在节点包内搜索…" value="' + esc(nodeFilter.q || "") + '" style="height:32px;background:var(--panel);border:1px solid var(--border);border-radius:9px;color:var(--text);padding:0 12px;font-size:13px;outline:none;width:200px;font-family:inherit">';
     html += "</div>";
     html += '<div class="pkg-grid" id="pkgGrid"></div>';
-    html += '<div class="callout tip" style="margin-top:26px"><span class="co-ico">💡</span><div><span class="co-title">看不懂某个节点？</span>到工作流图鉴里找一条用到它的工作流，在图上点它——结合上下文理解节点是最快的方式。</div></div>';
+    html += '<div class="callout tip" style="margin-top:26px"><span class="co-ico"></span><div><span class="co-title">看不懂某个节点？</span>到工作流图鉴里找一条用到它的工作流，在图上点它——结合上下文理解节点是最快的方式。</div></div>';
     html += "</div>";
     return html;
   }
@@ -132,8 +132,8 @@
       + (p.author ? '<span class="mini-tag">作者：' + esc(p.author) + "</span>" : "")
       + '<span class="mini-tag n">' + (p.nodes || []).length + " 个节点</span></div>"
       + '<p class="ph-desc">' + esc(p.summary) + "</p>"
-      + '<div class="callout info" style="margin:16px 0 0"><span class="co-ico">🎯</span><div><span class="co-title">什么时候用它</span>' + esc(p.why) + "</div></div>"
-      + '<div class="callout" style="margin:10px 0 0"><span class="co-ico">📦</span><div><span class="co-title">安装方式</span>' + esc(p.install) + "</div></div>"
+      + '<div class="callout info" style="margin:16px 0 0"><span class="co-ico"></span><div><span class="co-title">什么时候用它</span>' + esc(p.why) + "</div></div>"
+      + '<div class="callout" style="margin:10px 0 0"><span class="co-ico"></span><div><span class="co-title">安装方式</span>' + esc(p.install) + "</div></div>"
       + "</div>";
 
     html += '<div class="sec-head"><h3 style="font-size:19px">节点详解</h3><span class="sec-en">NODE BY NODE</span></div>';
@@ -148,9 +148,9 @@
         + '<div class="np-mock" data-mocknode="' + i + '"></div>'
         + '<div class="np-details">'
 
-        + '<details class="np-sec" open><summary>🎯 节点作用</summary><div class="np-sec-body"><div class="np-prose">' + esc(n.desc)
+        + '<details class="np-sec" open><summary>节点作用</summary><div class="np-sec-body"><div class="np-prose">' + esc(n.desc)
         + (n.why ? '<div style="margin-top:8px"><b style="color:#dfe4f2">为什么需要：</b>' + esc(n.why) + "</div>" : "")
-        + (n.tips ? '<div class="callout tip" style="margin:10px 0 0"><span class="co-ico">💡</span><div>' + esc(n.tips) + "</div></div>" : "")
+        + (n.tips ? '<div class="callout tip" style="margin:10px 0 0"><span class="co-ico"></span><div>' + esc(n.tips) + "</div></div>" : "")
         + "</div></div></details>"
 
         + ((n.inputs && n.inputs.length) ? '<details class="np-sec"' + (i === 0 ? " open" : "") + ' data-sec="input"><summary>⬅ 输入 <span class="sec-count">' + n.inputs.length + '</span><span class="node-chevron">▶</span></summary><div class="np-sec-body">'
@@ -177,7 +177,7 @@
             }).join("")
           + "</div></details>" : "")
 
-        + (hasParams ? '<details class="np-sec" data-sec="param"><summary>🎛 参数详解 <span class="sec-count">' + Math.max((n.params || []).length, (n.widgets || []).length) + '</span><span class="node-chevron">▶</span></summary><div class="np-sec-body" data-parambody="' + i + '"></div></details>' : "")
+        + (hasParams ? '<details class="np-sec" data-sec="param"><summary>参数详解 <span class="sec-count">' + Math.max((n.params || []).length, (n.widgets || []).length) + '</span><span class="node-chevron">▶</span></summary><div class="np-sec-body" data-parambody="' + i + '"></div></details>' : "")
 
         + "</div></div></div></details>";
     });
@@ -270,7 +270,7 @@
         + "<h3><span class=\"wf-cat-pill\">" + esc(w.category) + "</span>" + esc(w.name) + "</h3>"
         + '<div class="wf-desc">' + esc(w.summary) + "</div>"
         + '<div class="wf-foot"><span class="diff">' + diffStars(w.difficulty) + '</span><span class="mini-tag">' + (w.graph.nodes || []).length + " 个节点</span>"
-        + (wfFile(w.id) ? '<span class="mini-tag" style="color:#7dd3fc">📄 真实文件</span>' : '<span class="mini-tag" style="color:var(--warn)">🧪 自制参考</span>')
+        + (wfFile(w.id) ? '<span class="mini-tag" style="color:#e8b98f">' + ICO.svg("doc", 13) + '真实文件</span>' : '<span class="mini-tag" style="color:var(--warn)">自制参考</span>')
         + (w.tags || []).slice(0, 3).map(function (t) { return '<span class="mini-tag">' + esc(t) + "</span>"; }).join("")
         + "</div></a>";
     });
@@ -292,29 +292,29 @@
       + '<div class="pkg-hero"><h1>' + esc(w.name) + "</h1>"
       + '<div class="ph-meta"><span class="wf-cat-pill">' + esc(w.category) + '</span><span class="diff">' + diffStars(w.difficulty) + '</span><span class="mini-tag">' + (w.graph.nodes || []).length + " 个节点</span>"
       + (wfFile(w.id)
-          ? '<a class="mini-tag" href="' + esc(wfFile(w.id).sourceUrl) + '" target="_blank" rel="noopener" style="color:#7dd3fc;border-color:rgba(76,201,240,.4)">📄 真实文件：' + esc(wfFile(w.id).sourceName) + " ↗</a>"
-          : '<span class="mini-tag">🧪 来源：' + esc(w.source || "社区常见结构") + "（本站自制参考版）</span>")
+          ? '<a class="mini-tag" href="' + esc(wfFile(w.id).sourceUrl) + '" target="_blank" rel="noopener" style="color:#e8b98f;border-color:rgba(217,119,87,.4)">' + ICO.svg("doc", 13) + '真实文件：' + esc(wfFile(w.id).sourceName) + " ↗</a>"
+          : '<span class="mini-tag">来源：' + esc(w.source || "社区常见结构") + "（本站自制参考版）</span>")
       + (w.tags || []).map(function (t) { return '<span class="mini-tag">' + esc(t) + "</span>"; }).join("") + "</div>"
       + '<div class="ph-desc">' + (window.ComfyWfPanel && window.ComfyWfPanel.digestBlock
           ? window.ComfyWfPanel.digestBlock({ s: w.summary, f: w.flow || [], st: w.stages || [] }, w.graph)
           : esc(w.summary)) + "</div></div>";
 
-    if (w.notice) html += '<div class="callout danger"><span class="co-ico">⚠️</span><div><span class="co-title">使用前必读</span>' + esc(w.notice) + "</div></div>";
+    if (w.notice) html += '<div class="callout danger"><span class="co-ico"></span><div><span class="co-title">使用前必读</span>' + esc(w.notice) + "</div></div>";
 
     /* 依赖清单（模型 / LoRA / 控制网等，前置展示） */
-    var depBadge = { "Checkpoint": "#8b5cf6", "LoRA": "#4ade80", "ControlNet": "#a1887f", "VAE": "#d9534f", "UNET/Diffusion": "#7c5cff", "CLIP": "#c9b34a", "ClipVision": "#c9b34a", "Upscale": "#4cc9f0", "检测模型": "#c98a5c", "InstantID": "#f9a8d4", "人脸模型": "#f9a8d4", "超分": "#4cc9f0", "其他": "#647088" };
+    var depBadge = { "Checkpoint": "#c98a5c", "LoRA": "#86b86a", "ControlNet": "#a1887f", "VAE": "#e0684f", "UNET/Diffusion": "#d97757", "CLIP": "#c9b34a", "ClipVision": "#c9b34a", "Upscale": "#e8a33d", "检测模型": "#b8875c", "InstantID": "#d98f9f", "人脸模型": "#d98f9f", "超分": "#e8a33d", "其他": "#8a8078" };
     if (w.models && w.models.length) {
       html += '<div class="section" style="margin-top:26px"><div class="sec-head"><h2 style="font-size:20px">依赖清单</h2><span class="sec-en">REQUIRED MODELS</span>'
         + '<span style="font-size:12px;color:var(--faint)">共 ' + w.models.length + " 项，放到 models 对应子目录后刷新</span></div>"
         + '<table class="data-table"><tr><th>类型</th><th>文件 / 要求</th><th>说明与获取指引</th></tr>';
       w.models.forEach(function (m) {
-        var c = depBadge[m.type] || "#647088";
+        var c = depBadge[m.type] || "#8a8078";
         html += "<tr><td><span style=\"font-size:11px;font-weight:600;padding:2px 10px;border-radius:99px;border:1px solid " + c + "55;background:" + c + "14;color:" + c + "\">" + esc(m.type) + "</span></td>"
           + '<td class="mono" style="color:#93c5fd">' + esc(m.name) + "</td>"
           + '<td style="color:var(--muted)">' + esc(m.note) + "</td></tr>";
       });
       html += "</table>"
-        + '<div class="callout info" style="margin-top:12px"><span class="co-ico">📥</span><div><span class="co-title">获取指引</span>官方模型优先从 Comfy Org 的 Hugging Face 页面获取（comfyanonymous/ComfyUI_docs 或对应官方仓库）；社区微调模型与 LoRA 常见来源为 Civitai 与 Hugging Face。下载后放入对应目录：Checkpoint → models/checkpoints，LoRA → models/loras，ControlNet → models/controlnet，VAE → models/vae，放大模型 → models/upscale_models。</div></div>'
+        + '<div class="callout info" style="margin-top:12px"><span class="co-ico"></span><div><span class="co-title">获取指引</span>官方模型优先从 Comfy Org 的 Hugging Face 页面获取（comfyanonymous/ComfyUI_docs 或对应官方仓库）；社区微调模型与 LoRA 常见来源为 Civitai 与 Hugging Face。下载后放入对应目录：Checkpoint → models/checkpoints，LoRA → models/loras，ControlNet → models/controlnet，VAE → models/vae，放大模型 → models/upscale_models。</div></div>'
         + "</div>";
     }
 
@@ -328,24 +328,24 @@
     var mf = wfFile(w.id);
     html += '<div class="section"><div class="sec-head"><h2>工作流源文件</h2><span class="sec-en">WORKFLOW FILE</span></div>'
       + '<div class="card"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:6px">'
-      + '<button class="bulk-btn" id="wfJsonToggle">📋 查看源 JSON</button>'
-      + '<button class="bulk-btn" id="wfJsonDownload">⬇ 下载 .json</button>'
+      + '<button class="bulk-btn" id="wfJsonToggle">' + ICO.svg("code", 14) + '查看源 JSON</button>'
+      + '<button class="bulk-btn" id="wfJsonDownload">' + ICO.svg("download", 14) + '下载 .json</button>'
       + (mf
-          ? '<a class="mini-tag" href="' + esc(mf.sourceUrl) + '" target="_blank" rel="noopener" style="color:#7dd3fc;border-color:rgba(76,201,240,.4)">📄 溯源：' + esc(mf.sourceName) + " ↗</a>"
-            + '<span style="font-size:12px;color:#86efac">✓ 公开仓库原始文件 · 结构校验通过</span>'
-          : '<span style="font-size:12px;color:var(--warn)">🧪 本站自制参考版 · 非任何作者的原始文件</span>')
+          ? '<a class="mini-tag" href="' + esc(mf.sourceUrl) + '" target="_blank" rel="noopener" style="color:#e8b98f;border-color:rgba(217,119,87,.4)">' + ICO.svg("link", 13) + '溯源：' + esc(mf.sourceName) + " ↗</a>"
+            + '<span style="font-size:12px;color:#a8cf8a">✓ 公开仓库原始文件 · 结构校验通过</span>'
+          : '<span style="font-size:12px;color:var(--warn)">本站自制参考版 · 非任何作者的原始文件</span>')
       + "</div>"
       + '<div id="wfJsonBox" style="display:none"><div class="code-head"><span>' + esc(w.id) + ".json</span><span>" + (mf ? "UI 格式（官方原始）" : "API 格式（自制参考）") + "</span></div><pre id=\"wfJsonPre\" style=\"max-height:440px;overflow:auto\"></pre></div>"
       + (mf
-          ? '<div class="callout info" style="margin:12px 0 0"><span class="co-ico">🧭</span><div><span class="co-title">如何导入</span>下载 JSON 后：方式一，把文件直接拖进 ComfyUI 画布；方式二，菜单 Workflow → Open 选择文件。导入后请把各加载节点里的模型文件名改成你本机已有的文件（见上方依赖清单）；若提示缺节点，先在 ComfyUI-Manager 里安装对应节点包。本文件来自上方标注的公开仓库，可点击溯源。</div></div>'
-          : '<div class="callout warn" style="margin:12px 0 0"><span class="co-ico">🧭</span><div><span class="co-title">关于此文件</span>该工作流暂无对应的公开原始文件，此处为本站依据社区通用结构构造的参考实现（API 格式），已通过结构校验。导入方式同左：拖入画布或 Workflow → Open。第三方节点若提示缺失请先用 Manager 安装；参数如与最新版节点包有出入，请对照上方节点图与参数详解微调。</div></div>')
+          ? '<div class="callout info" style="margin:12px 0 0"><span class="co-ico"></span><div><span class="co-title">如何导入</span>下载 JSON 后：方式一，把文件直接拖进 ComfyUI 画布；方式二，菜单 Workflow → Open 选择文件。导入后请把各加载节点里的模型文件名改成你本机已有的文件（见上方依赖清单）；若提示缺节点，先在 ComfyUI-Manager 里安装对应节点包。本文件来自上方标注的公开仓库，可点击溯源。</div></div>'
+          : '<div class="callout warn" style="margin:12px 0 0"><span class="co-ico"></span><div><span class="co-title">关于此文件</span>该工作流暂无对应的公开原始文件，此处为本站依据社区通用结构构造的参考实现（API 格式），已通过结构校验。导入方式同左：拖入画布或 Workflow → Open。第三方节点若提示缺失请先用 Manager 安装；参数如与最新版节点包有出入，请对照上方节点图与参数详解微调。</div></div>')
       + "</div></div>";
 
     /* 参数表 */
     if (w.params && w.params.length) {
       html += '<div class="section"><div class="sec-head"><h2>关键参数参考</h2><span class="sec-en">PARAMETERS</span></div><table class="data-table"><tr><th>参数</th><th>图中取值</th><th>说明</th></tr>';
       w.params.forEach(function (p) {
-        html += "<tr><td class=\"mono\" style=\"color:#c4b5fd\">" + esc(p.name) + "</td><td class=\"mono\">" + esc(p.value) + "</td><td style=\"color:var(--muted)\">" + esc(p.desc) + "</td></tr>";
+        html += "<tr><td class=\"mono\" style=\"color:#f0c078\">" + esc(p.name) + "</td><td class=\"mono\">" + esc(p.value) + "</td><td style=\"color:var(--muted)\">" + esc(p.desc) + "</td></tr>";
       });
       html += "</table></div>";
     }
@@ -413,11 +413,11 @@
               ? '<span style="color:var(--warn)">⏳ 该工作流的源文件正在整理，将在下一个版本提供。</span>'
               : pretty(t);
             box.style.display = "block";
-            tBtn.textContent = "📋 收起源 JSON";
+            tBtn.innerHTML = ICO.svg("code", 14) + "收起源 JSON";
           });
         } else {
           box.style.display = "none";
-          tBtn.textContent = "📋 查看源 JSON";
+          tBtn.innerHTML = ICO.svg("code", 14) + "查看源 JSON";
         }
       });
       dBtn.addEventListener("click", function () {
@@ -425,7 +425,7 @@
           if (t === null) {
             pre.innerHTML = '<span style="color:var(--warn)">⏳ 该工作流的源文件正在整理，将在下一个版本提供。</span>';
             box.style.display = "block";
-            tBtn.textContent = "📋 收起源 JSON";
+            tBtn.innerHTML = ICO.svg("code", 14) + "收起源 JSON";
             return;
           }
           var blob = new Blob([t], { type: "application/json" });
@@ -634,7 +634,7 @@
       if (!q.trim()) { box.classList.remove("open"); return; }
       var res = globalSearch(q);
       var html = "";
-      var tColor = { "包": "#7dd3fc", "节点": "#c4b5fd", "工作流": "#86efac", "工作流节点": "#fcd34d", "架构": "#f9a8d4" };
+      var tColor = { "包": "#e8b98f", "节点": "#f0c078", "工作流": "#a8cf8a", "工作流节点": "#e8c15a", "架构": "#d98f9f" };
       res.forEach(function (r) {
         html += '<a class="sr-item" href="' + r.href + '"><div class="sr-title"><span class="sr-badge" style="color:' + (tColor[r.type] || "#9aa3b8") + ';border:1px solid currentColor">' + esc(r.type) + "</span>" + esc(r.title) + '</div><div class="sr-sub">' + esc(r.sub) + "</div></a>";
       });
@@ -679,6 +679,23 @@
       input.dispatchEvent(new Event("input"));
       input.focus();
     });
+
+    /* 移动端导航：汉堡开合 + 遮罩/Esc/路由切换关闭 */
+    var navToggle = $("#navToggle"), navBackdrop = $("#navBackdrop");
+    function closeNav() {
+      if (!document.body.classList.contains("nav-open")) return;
+      document.body.classList.remove("nav-open");
+      if (navToggle) navToggle.setAttribute("aria-expanded", "false");
+    }
+    if (navToggle) {
+      navToggle.addEventListener("click", function () {
+        var open = document.body.classList.toggle("nav-open");
+        navToggle.setAttribute("aria-expanded", open ? "true" : "false");
+      });
+    }
+    if (navBackdrop) navBackdrop.addEventListener("click", closeNav);
+    window.addEventListener("hashchange", closeNav);
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeNav(); });
   }
 
   /* 节点包页批量展开/收起 */
