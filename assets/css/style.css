@@ -1319,3 +1319,9 @@ td.num { font-family: Consolas, monospace; text-align: right; color: #cdd3e1; }
   .tp-guide-row { grid-template-columns: 1fr; gap: 4px; }
   .cv-topic-all { margin-left: 0; }
 }
+
+/* 专题：分组「查看全部」与限量说明 */
+.tp-group-all { margin-left: auto; font-size: 12.5px; color: #7dd3fc; text-decoration: none; white-space: nowrap; }
+.tp-group-all:hover { text-decoration: underline; }
+.tp-group-all.dim { color: var(--faint); }
+.tp-note { font-size: 12px; color: var(--faint); margin-bottom: 6px; }

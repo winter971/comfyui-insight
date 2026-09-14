@@ -175,7 +175,7 @@
       + '<select id="cvSort" class="cv-sel">'
       + '<option value="dl">按下载量</option><option value="up">按点赞</option><option value="pub">按发布时间</option><option value="nodes">按节点数</option>'
       + "</select>"
-      + '<input id="cvQ" class="cv-q" type="text" placeholder="搜工作流名 / 作者 / 模型文件…">'
+      + '<input id="cvQ" class="cv-q" type="text" placeholder="搜工作流名 / 作者 / 模型文件…" value="' + esc(F.q || "") + '">'
       + '<label class="cv-nsfw"><input type="checkbox" id="cvNsfw"> 显示 NSFW（' + (st.nsfwCount || 0) + " 条）</label>"
       + "</div>"
       + '<div class="wf-grid" id="cvGrid"></div>'
@@ -898,5 +898,11 @@
     if (mid != null) loadDesc(mid);
   }
 
-  window.PAGE_CIVITAI = { render: render, mount: mount, renderDetail: renderDetail, mountDetail: mountDetail };
+  /* 供专题页深链 #/civitai/q=<关键词> 使用：预置搜索词并回到第一页 */
+  function setQuery(q) { F.q = q || ""; F.page = 1; }
+
+  window.PAGE_CIVITAI = {
+    render: render, mount: mount, renderDetail: renderDetail, mountDetail: mountDetail,
+    setQuery: setQuery
+  };
 })();

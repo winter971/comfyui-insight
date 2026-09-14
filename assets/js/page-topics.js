@@ -67,7 +67,7 @@
       + tile(t.memberCount, "条工作流")
       + tile(t.aiCount, "条已 AI 精读")
       + tile(t.groups.length, "个玩法分组")
-      + tile(t.coreCount, "条核心（名称命中）")
+      + (t.coreCount < t.memberCount ? tile(t.coreCount, "条核心（名称命中）") : "")
       + "</div>"
       + '<div class="tp-jump">'
       + ['intro:导言', 'pipeline:管线', 'specs:模型规格', 'members:成员', 'compare:横向对比', 'guide:怎么选', 'pitfalls:踩坑', 'faq:常见问题']
@@ -109,7 +109,14 @@
       + '<span style="font-size:12px;color:var(--faint)">按玩法分组 · 点任意一条进入精读详情</span></div>';
     t.groups.forEach(function (g) {
       html += '<div class="tp-group">'
-        + '<div class="tp-group-head"><h3>' + esc(g.name) + '</h3><span class="tp-group-n">' + g.members.length + " 条</span></div>"
+        + '<div class="tp-group-head"><h3>' + esc(g.name) + '</h3><span class="tp-group-n">'
+        + (g.truncated ? g.members.length + " / " + g.total + " 条" : g.members.length + " 条") + "</span>"
+        + (g.truncated
+            ? (g.q
+                ? '<a class="tp-group-all" href="#/civitai/q=' + encodeURIComponent(g.q) + '">在库中查看全部 ' + g.total + " 条 →</a>"
+                : '<span class="tp-group-all dim">按下载量展示前 ' + g.members.length + " 条</span>")
+            : "")
+        + "</div>"
         + (g.desc ? '<p class="tp-group-desc">' + esc(g.desc) + "</p>" : "")
         + '<div class="wf-grid">';
       g.members.forEach(function (m) {
@@ -130,6 +137,7 @@
     html += '<div class="section" id="tp-compare"><div class="sec-head"><h2 style="font-size:20px">横向对比</h2><span class="sec-en">COMPARISON</span>'
       + '<span style="font-size:12px;color:var(--faint)">点表头排序 · 点分组只看某一类</span></div>'
       + '<div class="filter-bar" id="tpCmpSubs"></div>'
+      + (t.compare.truncated ? '<p class="tp-note">共 ' + t.compare.total + " 条，此处列出 " + t.compare.rows.length + " 条（优先已 AI 精读）</p>" : "")
       + '<div class="tp-cmp-wrap"><table class="tp-cmp"><thead id="tpCmpHead"></thead><tbody id="tpCmpBody"></tbody></table></div>'
       + (t.compare.note ? '<p style="font-size:12px;color:var(--faint);margin-top:8px">' + esc(t.compare.note) + "</p>" : "")
       + "</div>";

@@ -3,7 +3,7 @@
    ============================================================ */
 (function () {
   "use strict";
-  window.COMFY_APP_VER = "20260914a";  /* 运行时版本标记（排查缓存用） */
+  window.COMFY_APP_VER = "20260914b";  /* 运行时版本标记（排查缓存用） */
 
   var D = function () { return window.COMFY_DATA || {}; };
   function pkgs() { return (D().nodePackages || []).slice().sort(function (a, b) { return (a.official === b.official) ? 0 : (a.official ? -1 : 1); }); }
@@ -602,7 +602,17 @@
       }
       return;
     }
+    if (parts[0] === "civitai" && parts[1] && parts[1].indexOf("q=") === 0) {
+      /* 专题页「在库中查看全部」深链：#/civitai/q=<关键词> */
+      var kw = parts[1].slice(2);
+      try { kw = decodeURIComponent(kw); } catch (e) { /* 保持原文 */ }
+      if (window.PAGE_CIVITAI) window.PAGE_CIVITAI.setQuery(kw);
+      app.innerHTML = window.PAGE_CIVITAI ? window.PAGE_CIVITAI.render() : "<div class=container>加载中…</div>";
+      if (window.PAGE_CIVITAI) window.PAGE_CIVITAI.mount();
+      return;
+    }
     if (parts[0] === "civitai" && parts[1]) {
+      if (window.PAGE_CIVITAI) window.PAGE_CIVITAI.setQuery("");
       app.innerHTML = window.PAGE_CIVITAI ? window.PAGE_CIVITAI.renderDetail(parts[1], parseInt(parts[2], 10) || 0) : "<div class=container>加载中…</div>";
       if (window.PAGE_CIVITAI) window.PAGE_CIVITAI.mountDetail(parts[1], parseInt(parts[2], 10) || 0);
       return;
