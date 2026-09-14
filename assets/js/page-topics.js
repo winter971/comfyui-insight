@@ -98,7 +98,7 @@
       html += '<div class="section" id="tp-specs"><div class="sec-head"><h2 style="font-size:20px">模型规格</h2><span class="sec-en">SPECIFICATIONS</span></div>'
         + '<table class="data-table"><tr><th style="width:160px">项目</th><th>说明</th></tr>';
       t.specs.items.forEach(function (it) {
-        html += '<tr><td class="mono" style="color:#93c5fd">' + esc(it.k) + '</td><td style="color:var(--muted)">' + esc(it.v) + "</td></tr>";
+        html += '<tr><td class="mono" style="color:#e8b98f">' + esc(it.k) + '</td><td style="color:var(--muted)">' + esc(it.v) + "</td></tr>";
       });
       html += "</table></div>";
     }

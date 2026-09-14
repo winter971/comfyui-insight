@@ -3,7 +3,7 @@
    ============================================================ */
 (function () {
   "use strict";
-  window.COMFY_APP_VER = "20260914g";  /* 运行时版本标记（排查缓存用） */
+  window.COMFY_APP_VER = "20260914h";  /* 运行时版本标记（排查缓存用） */
 
   var D = function () { return window.COMFY_DATA || {}; };
   function pkgs() { return (D().nodePackages || []).slice().sort(function (a, b) { return (a.official === b.official) ? 0 : (a.official ? -1 : 1); }); }
@@ -318,7 +318,7 @@
       w.models.forEach(function (m) {
         var c = depBadge[m.type] || "#8a8078";
         html += "<tr><td><span style=\"font-size:11px;font-weight:600;padding:2px 10px;border-radius:99px;border:1px solid " + c + "55;background:" + c + "14;color:" + c + "\">" + esc(m.type) + "</span></td>"
-          + '<td class="mono" style="color:#93c5fd">' + esc(m.name) + "</td>"
+          + '<td class="mono" style="color:#e8b98f">' + esc(m.name) + "</td>"
           + '<td style="color:var(--muted)">' + esc(m.note) + "</td></tr>";
       });
       html += "</table>"

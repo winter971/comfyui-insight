@@ -698,7 +698,7 @@
       html += '<div class="section"><div class="sec-head"><h2 style="font-size:20px">引用的模型 / LoRA 文件</h2><span class="sec-en">MODEL REFERENCES</span></div>'
         + '<table class="data-table"><tr><th>文件名</th><th>所在节点</th></tr>';
       models.forEach(function (m) {
-        html += '<tr><td class="mono" style="color:#93c5fd">' + esc(m.f) + "</td><td style=\"color:var(--muted)\">" + esc(m.n) + "</td></tr>";
+        html += '<tr><td class="mono" style="color:#e8b98f">' + esc(m.f) + "</td><td style=\"color:var(--muted)\">" + esc(m.n) + "</td></tr>";
       });
       html += "</table>"
         + '<div class="callout info" style="margin-top:12px"><span class="co-ico"></span><div><span class="co-title">说明</span>以上是这条工作流引用的模型文件名，按名字在 Civitai / Hugging Face 搜索下载，放入 models 对应子目录即可复跑。</div></div>'
