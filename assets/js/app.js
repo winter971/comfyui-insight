@@ -3,7 +3,7 @@
    ============================================================ */
 (function () {
   "use strict";
-  window.COMFY_APP_VER = "20260913ae";  /* 运行时版本标记（排查缓存用） */
+  window.COMFY_APP_VER = "20260914a";  /* 运行时版本标记（排查缓存用） */
 
   var D = function () { return window.COMFY_DATA || {}; };
   function pkgs() { return (D().nodePackages || []).slice().sort(function (a, b) { return (a.official === b.official) ? 0 : (a.official ? -1 : 1); }); }
@@ -590,6 +590,16 @@
         $all("#wfFilters .filter-btn").forEach(function (x) { x.classList.toggle("active", x === b); });
         paintWfGrid();
       });
+      return;
+    }
+    if (parts[0] === "civitai" && parts[1] === "topic") {
+      if (parts[2]) {
+        app.innerHTML = window.PAGE_TOPICS ? window.PAGE_TOPICS.renderDetail(parts[2]) : "<div class=container>加载中…</div>";
+        if (window.PAGE_TOPICS) window.PAGE_TOPICS.mountDetail(parts[2]);
+      } else {
+        app.innerHTML = window.PAGE_TOPICS ? window.PAGE_TOPICS.renderList() : "<div class=container>加载中…</div>";
+        if (window.PAGE_TOPICS) window.PAGE_TOPICS.mountList();
+      }
       return;
     }
     if (parts[0] === "civitai" && parts[1]) {

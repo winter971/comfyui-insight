@@ -96,6 +96,20 @@
     return s + "。";
   }
 
+  /* 专题入口条：把感兴趣的专题从两千多条里拎出来，挂在库页顶部 */
+  function topicsBar() {
+    var tps = D().civitaiTopics || [];
+    if (!tps.length) return "";
+    return '<div class="cv-topics">'
+      + '<span class="cv-topics-label">专题</span>'
+      + tps.map(function (t) {
+        return '<a class="cv-topic-chip" href="#/civitai/topic/' + esc(t.id) + '" title="' + esc(t.tagline || "") + '">'
+          + "<span>" + esc(t.icon) + "</span>" + esc(t.short || t.name) + "<i>" + t.memberCount + "</i></a>";
+      }).join("")
+      + '<a class="cv-topic-all" href="#/civitai/topic">全部专题 →</a>'
+      + "</div>";
+  }
+
   /* ============ 列表页 ============ */
   var VIEW = "cards"; // cards | table
   function render() {
@@ -105,6 +119,7 @@
     var html = '<div class="container">'
       + '<div class="sec-head"><h2>真实工作流库</h2><span class="sec-en">CIVITAI REAL-WORKFLOW LIBRARY</span></div>'
       + '<p class="sec-desc">从 Civitai 公开抓取并本地解析的真实 ComfyUI 工作流库（关键词 workflow、类型 Workflows，按下载量排序收录）。主区只展示<b>已通过 AI 深度精读</b>的工作流：每条都带分步数据流讲解、阶段拆解与逐节点分析；尚未精读的完整收录在页面底部的备份区，精读完成后自动转正。</p>'
+      + topicsBar()
       + '<div class="cv-tiles">'
       + tile(fmtN(st.aiDone || 0), "条已 AI 精读（主区）")
       + tile(fmtN(st.aiTotal || st.parsed), "条已解析收录")
