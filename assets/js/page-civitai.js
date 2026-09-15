@@ -657,6 +657,14 @@
       + '<p class="ph-desc" style="font-size:13px">作者 ' + esc(w.by)
       + ' · <a class="cv-link" href="https://civitai.com/models/' + w.m + '" target="_blank" rel="noopener">在 Civitai 查看源页面 ↗</a>'
       + (w.tags && w.tags.length ? " · 标签：" + w.tags.map(esc).join("、") : "") + "</p></div>"
+      /* 封面图：数据层 cv 字段（本地化后才有值，缺失则不渲染整块）。
+         NSFW 条目默认模糊 + 遮罩，点一下才揭示——只对当前这张图生效，不动列表的全局开关 F.nsfw */
+      + (w.cv ? '<figure class="cv-cover' + (w.nsfw && !F.nsfw ? " is-veiled" : "") + '" id="cvCover">'
+          + '<img class="cv-cover-img" src="' + esc(w.cv) + '" alt="' + esc(w.name) + ' 封面" loading="lazy" decoding="async">'
+          + (w.nsfw && !F.nsfw ? '<button type="button" class="cv-cover-veil" id="cvCoverVeil">'
+              + '<span class="cv-cover-veil-t">18+ 封面已模糊</span>'
+              + '<span class="cv-cover-veil-s">点击查看原图</span></button>' : "")
+          + "</figure>" : "")
       + '<div class="section cv-desc-section" id="cvAuthorDesc">'
       + '<button type="button" class="cv-desc-head" id="cvDescToggle" aria-expanded="true">'
       + '<h2 style="font-size:20px">作者在 Civitai 的简介</h2>'
@@ -800,6 +808,17 @@
     }
   }
 
+  /* 封面模糊揭示：只揭开详情页当前这一张，不改列表的 NSFW 全局开关 */
+  function bindCoverReveal() {
+    var veil = document.getElementById("cvCoverVeil");
+    if (!veil) return;
+    veil.addEventListener("click", function () {
+      var fig = document.getElementById("cvCover");
+      if (fig) fig.classList.remove("is-veiled");
+      veil.remove();
+    });
+  }
+
   /* 简介折叠：默认展开（初始 aria-expanded=true、body 无 collapsed 类、▾），点击整体收起 */
   function bindDescToggle() {
     var btn = document.getElementById("cvDescToggle");
@@ -892,6 +911,7 @@
 
   function mountDetail(vid, vi) {
     bindDescToggle();
+    bindCoverReveal();
     loadGraph(String(vid), vi || 0);
     var mid = null;
     wfs().forEach(function (x) { if (String(x.v) === String(vid)) mid = x.m; });
