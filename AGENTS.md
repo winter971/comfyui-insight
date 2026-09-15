@@ -99,11 +99,11 @@ NODE_PATH=<...> node _sources/e2e_cloud.cjs "http://127.0.0.1:8090/index.html?th
 - 字符串卫生：数据文件内容禁止反引号、markdown 符号、单引号字符（渲染器按纯文本处理）。
 
 ## 当前状态与下一步（更新于 2026-09-15）
-- **线上版本 `?v=20260915d`**（本地已升，尚未发布），双平台一致：https://comfyui-insight.pages.dev 与 https://winter971.github.io/comfyui-insight 。版本号只在 index.html（13 处）与 assets/js/app.js 的 `window.COMFY_APP_VER`，两者必须同步；`_sources/e2e_cloud.cjs` 里也写死了期望值。
-- **已上线（2026-09-15 晚）：多主题层**——三主题（`c` 精装出版物 · 默认 / `f` 数据人文主义 / `base` 原版深色），顶栏右侧切换器 + 抽屉内切换器，`localStorage.cvgTheme` 记忆，`?theme=` 可直接指定。**未发布**，等确认后再走发布五步。
+- **线上版本 `?v=20260915d`**，双平台已同步：https://comfyui-insight.pages.dev 与 https://winter971.github.io/comfyui-insight （2026-09-15 20:30 发布，Cloudflare 部署 ID `dfb9d68f`）。版本号只在 index.html（13 处）与 assets/js/app.js 的 `window.COMFY_APP_VER`，两者必须同步；`_sources/e2e_cloud.cjs` 里也写死了期望值。
+- **已上线（2026-09-15）：多主题层**——三主题（`c` 精装出版物 · 默认 / `f` 数据人文主义 / `base` 原版深色），顶栏右侧切换器 + 抽屉内切换器，`localStorage.cvgTheme` 记忆，`?theme=` 可直接指定。线上实测：默认主题 `c`、四个样式表 200、字体真实加载、切主题与刷新记忆正常、无 404 无 JS 错误；节点图画布底色与节点描边三主题一致，外框随主题。
 - **本次顺手修掉的两个既有 bug**（不是新增改动，是原版就有）：
   1. `index.html` 开头有 **6 个多余的 BOM 字符**，被解析器当成 `<body>` 里的文本节点 → 整站落入**怪异模式**（`document.compatMode === "BackCompat"`），每页顶部多出一条 **26px 空行**。重写 index.html 时清掉了；表格行高与代码块行距在 `style.css` 里显式写回，保证视觉不变。
-  2. 详情页在 390px 下横向溢出（工作流详情 +19px、工作流库详情 +121px）——**原版就有**，三主题都没让它变差，尚未修。
+  2. 详情页在 390px 下横向溢出（工作流详情 +19px、工作流库详情 +121px）——**原版就有**，三主题都没让它变差，**尚未修**。
 
 - 四大板块均已上线：一 · 架构解析；二 · 节点包全解（**23 包 / 792 节点**，参数覆盖 100%）；三 · 工作流图鉴（**32 条**，其中 25 条挂真实源文件）；四 · 真实工作流库（**2281 条**工作流卡片 / **2991 份**交互节点图）。
 - 已上线（2026-09-15）：第四部分 AI 精读进度 **498 份稿件**（主区可见卡片 426 张，variants 层 `ai:true` 924 个）。精读口径：新 schema（summary/useCases/difficulty/flow/tips/nodeAnalysis/stages）齐全才计入，重复组成员继承代表分析并标 `sameAs`。`_sources/ai_analysis/_reject/` 剩 5 份止损稿（需人工对照 workflow_json 重写）；剩余候选 2279 份。分派/发布/验收全流程见工作区根 AGENTS.md「方案四 AI 精读接手指南」，任务书在 `_sources/ai_analysis/TASK.md`。
