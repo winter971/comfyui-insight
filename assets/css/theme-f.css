@@ -70,6 +70,8 @@ html[data-theme="f"] {
   --scroll-thumb: #3a3a63;
   --scroll-thumb-h: #4d4d7d;
 
+  --fig-bleed-end: 0px;
+  --fig-bleed-start: 332px;   /* F 的 .arch-toc 浮在左侧：298 + 34 */
   --page-max: 1440px;
   --page-pad: 38px;
   --f-hand: 'Architects Daughter','PingFang SC','Microsoft YaHei',cursive;
@@ -340,7 +342,8 @@ html[data-theme="f"] .prose li { color: var(--tx-strong-2); }
 html[data-theme="f"] .prose strong, html[data-theme="f"] .prose b { color: var(--f-paper); }
 html[data-theme="f"] .arch-figure {
   border: 1.3px solid var(--border); border-radius: 10px 3px 9px 4px;
-  padding: 12px; background: var(--panel); margin: 18px 0;
+  padding: 12px; background: var(--panel);
+  margin: 18px calc(-1 * var(--fig-bleed-end, 0px)) 18px calc(-1 * var(--fig-bleed-start, 0px));
 }
 html[data-theme="f"] .arch-figure .figcap { font-family: var(--f-hand); font-size: 12.5px; color: var(--tx-strong-2); margin-top: 8px; }
 html[data-theme="f"] .timeline { border-left: 1px dashed var(--border); padding-left: 22px; }
@@ -714,6 +717,7 @@ html[data-theme="f"] .cv-fc-link { color: var(--accent); }
 
 /* ============ 移动端 ≤1180 ============ */
 @media (max-width: 1180px) {
+  html[data-theme="f"] .arch-figure { margin-right: 0; margin-left: 0; }
   html[data-theme="f"] { --page-pad: 18px; }
   html[data-theme="f"] .header-inner { height: 58px; gap: 12px; }
   html[data-theme="f"] .brandname { font-size: 14px; }
@@ -756,7 +760,8 @@ html[data-theme="f"] .cv-fc-link { color: var(--accent); }
   html[data-theme="f"] .wf-card:nth-child(3n+2), html[data-theme="f"] .wf-card:nth-child(3n) { transform: none; }
   html[data-theme="f"] .arch-toc {
     float: none; width: auto; margin: 0 0 18px; border-left: none;
-    border-bottom: 1px dashed var(--border); padding: 0 0 14px; position: static;
+    border-bottom: 1px dashed var(--border); padding: 0 0 14px;
+    position: static; top: auto; max-height: none; overflow: visible;
   }
   html[data-theme="f"] .path-grid { grid-template-columns: 1fr; }
   html[data-theme="f"] .graph-shell svg { min-width: 820px; }
@@ -776,3 +781,12 @@ html[data-theme="f"] .np-mock-wrap {
   background-color: var(--canvas-bg);
 }
 html[data-theme="f"] .np-mock-wrap { background-size: 22px 22px; }
+
+/* 宽幅图形溢出提示 + 目录折叠开关（Riso 语言） */
+html[data-theme="f"] .scrollhint { font-family: var(--f-hand); font-size: 12.5px; color: var(--faint); }
+html[data-theme="f"] .sidecol-toggle {
+  background: var(--panel); border: 1.2px solid var(--border-2); border-radius: 9px 3px 8px 4px;
+  font-family: var(--f-flow); font-size: 17px; color: var(--accent);
+}
+html[data-theme="f"] .sidecol-toggle:hover { border-color: var(--accent); }
+html[data-theme="f"] .sidecol-toggle .tri { border-left-color: var(--accent); }

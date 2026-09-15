@@ -771,7 +771,7 @@
     });
     return '<div class="cv-digest">'
       + '<div class="cv-digest-tabs"><button type="button" class="cv-digest-tab active" data-pane="flow">' + ICO.svg("compass", 14) + '流程图</button><button type="button" class="cv-digest-tab" data-pane="text">文字讲解</button></div>'
-      + '<div class="cv-digest-pane" data-pane="flow"><div class="cv-mc-board"><svg viewBox="0 0 ' + W + " " + H + '" role="img">' + defs + edges + body + "</svg></div>"
+      + '<div class="cv-digest-pane" data-pane="flow"><div class="cv-mc-board"><svg viewBox="0 0 ' + W + " " + H + '" role="img" style="min-width:' + W + 'px">' + defs + edges + body + "</svg></div>"
       + '<div class="cv-fc-hint">点击节点块 → 下方交互图高亮对应阶段' + (forks.length ? " · 虚线为被旁路/静音的可启用支线" : "") + '</div><div class="cv-fc-dock" hidden></div></div>'
       + textPane
       + '<script type="application/json" class="cv-fc-data">' + JSON.stringify(data).replace(/</g, "\\u003c") + "</" + "script>"

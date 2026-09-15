@@ -33,10 +33,12 @@
 1. **不许新写硬编码色**。一律用 `style.css :root` 的中间 token（`--acc-rgb` / `--acc-soft` / `--tx-strong-2` / `--page-max` …），否则新颜色不跟主题走。
 2. **主题文件不许写裸选择器**。`theme-c.css` / `theme-f.css` 每条规则都要带 `html[data-theme="x"]` 前缀。
 3. **原生渲染岛的范围必须收在 `svg` 上**，不能落在容器上——落在容器上会把容器自己的 `--border-2` 一起复原，外框就不跟主题了。节点图画布保持 ComfyUI 原生深色。
-4. **桌面段设过 `position` / `transform` / `display` 的元素，移动段必须整套重写**。媒体查询不加特异性，桌面段的高特异性规则会盖掉基础样式的移动端规则（曾导致抽屉退化成文档流、移动端溢出 400px）。
+4. **桌面段设过 `position` / `top` / `float` / `transform` / `display` / `max-height` / `overflow` 的元素，移动段必须整套重写**。媒体查询不加特异性，桌面段的高特异性规则会盖掉基础样式的移动端规则——已两次踩到：抽屉退化成文档流（溢出 400px）、`.arch-toc` 残留 `position: sticky` 浮在正文上重叠。只写 `float: none` 是不够的。
 5. **`pre > code { display: block }` 不能删**（管着代码块行距）；**`#wfJsonPre` 是裸文本 pre，不要动 `pre` 的 `font-size`**。
 
 `assets/fonts/*.woff2`（448KB / 11 个文件）是本地字体，**必须随仓库发布**——站点零外部网络依赖。
+
+宽幅图形（架构页示意图、迷你画布）**一律给足固有宽度 + 横向滚动，不做等比缩放**——缩到 390px 时图内文字会掉到 4px，而 `getComputedStyle` 读的是声明值，字号断言照样通过。详见 [docs/themes.md](../docs/themes.md)。
 
 
 ## 目录与数据约定

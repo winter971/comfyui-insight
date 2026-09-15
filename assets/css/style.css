@@ -62,6 +62,8 @@
   --scroll-thumb-h: #3c4460;
   --canvas-bg: #101218;
   --surface-3: #1b1e2b;
+  --fig-bleed-end: 248px;   /* 宽幅图形突破正文栏的量：base 的 .arch-toc 浮在右侧，占 220+28 */
+  --fig-bleed-start: 0px;
   --page-max: 1280px;
   --page-pad: 24px;
 }
@@ -788,7 +790,15 @@ table.data-table, .cv-table, .cv-backup-table { line-height: normal; }
 .arch-toc a { display: block; color: var(--muted); padding: 4px 0; border-left: 2px solid transparent; padding-left: 10px; }
 .arch-toc a:hover { color: var(--text); text-decoration: none; }
 .arch-toc a.h2 { color: var(--tx-strong-2); }
-@media (max-width: 1180px) { .arch-toc { display: none; } }
+/* 窄屏：目录不再整块隐藏，改成「折叠开关 + 展开后可见」——
+   原先直接 display:none，等于手机上完全没有目录。 */
+@media (max-width: 1180px) {
+  .arch-toc {
+    display: block; float: none; width: auto; position: static;
+    margin: 0 0 18px; padding: 0; border: none; border-radius: 0;
+    background: transparent; max-height: none; overflow: visible;
+  }
+}
 
 .prose h2 { font-size: 24px; margin: 44px 0 12px; padding-top: 8px; scroll-margin-top: 80px; }
 .prose h3 { font-size: 18.5px; margin: 30px 0 10px; scroll-margin-top: 80px; color: var(--tx-strong); }
@@ -1574,3 +1584,55 @@ td.num { font-family: Consolas, monospace; text-align: right; color: var(--tx-so
   .theme-switch.ts-drawer .ts-btn.on .ts-lb { color: var(--text); }
   .theme-switch.ts-drawer .ts-btn::after { display: none; }
 }
+
+/* ============================================================
+   宽幅图形与长文目录的交互补强（2026-09-15）
+   背景：架构页三张示意图 viewBox 宽 1160px，原先用 width:100% 等比缩放，
+   在 390px 手机上缩到 0.31×，图内 12px 标注的视觉字号掉到 4px —— 完全不可读，
+   而 getComputedStyle 读的仍是声明值，字号断言照样通过。
+   解法与设计稿一致：给足固有宽度 + 横向滚动 + 溢出提示，绝不缩到读不清。
+   ============================================================ */
+
+/* 图形突破正文栏：正文栏被右侧浮动目录挤窄（base 984px），
+   而图形固有宽度 1160px —— 突破后桌面端可 1:1 显示，不必缩放。 */
+.arch-figure {
+  margin-right: calc(-1 * var(--fig-bleed-end, 0px));
+  margin-left: calc(-1 * var(--fig-bleed-start, 0px));
+}
+.figscroll { overflow-x: auto; overflow-y: hidden; max-width: 100%; }
+.figscroll > .arch-svg { display: block; width: 100%; min-width: 1160px; height: auto; }
+.figscroll > .data-table { min-width: 760px; }
+
+/* 溢出提示：只在真的能横向滚动时才出现（JS 按 scrollWidth 判定后加 .on） */
+.scrollhint { display: none; margin: 7px 0 0; font-size: 12px; color: var(--faint); }
+.scrollhint.on { display: block; }
+
+/* 侧边目录折叠开关：桌面端不显示（目录本来就常驻） */
+.sidecol-toggle { display: none; }
+
+@media (max-width: 1180px) {
+  /* 窄屏：正文栏满宽，不需要突破 */
+  .arch-figure { margin-right: 0; margin-left: 0; }
+  /* 目录改为可折叠：默认收起，点「本页目录」展开 */
+  .sidecol-toggle {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    width: 100%; background: var(--panel); border: 1px solid var(--border-2);
+    border-radius: 9px; padding: 9px 13px; margin-bottom: 10px;
+    color: var(--text); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .sidecol-toggle .tri {
+    width: 0; height: 0; border-left: 5px solid var(--faint);
+    border-top: 4px solid transparent; border-bottom: 4px solid transparent;
+    transition: transform .18s ease;
+  }
+  .arch-toc.is-open .sidecol-toggle .tri { transform: rotate(90deg); }
+  .arch-toc .toc-title { display: none; }
+  .arch-toc .toc-body { display: none; }
+  .arch-toc.is-open .toc-body { display: block; }
+}
+
+/* 窄屏：三栏对比卡改单栏。
+   原先 .path-grid 恒为 3 列、每列最小内容宽约 120px，在 440px 以下必然撑破容器；
+   而 .prose 的 overflow:hidden 把它裁掉了 —— 内容看不见，但文档宽度没超，
+   所以从没被「零横向溢出」检查抓到。 */
+@media (max-width: 640px) { .path-grid { grid-template-columns: 1fr; } }

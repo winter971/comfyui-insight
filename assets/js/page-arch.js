@@ -9,6 +9,8 @@
     return String(s == null ? "" : s)
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
+  function $(sel, root) { return (root || document).querySelector(sel); }
+  function $all(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
 
   /* ---------------- SVG 图 1：前后端整体架构 ---------------- */
   var SVG_ARCH =
@@ -242,7 +244,10 @@
   function render() {
     var h = "";
     h += '<div class="container">';
-    h += '<aside class="arch-toc"><div class="toc-title">本页目录</div>'
+    h += '<aside class="arch-toc">'
+      + '<button class="sidecol-toggle" id="tocToggle" type="button" aria-expanded="false" aria-controls="tocBody"><span>本页目录</span><i class="tri"></i></button>'
+      + '<div class="toc-title">本页目录</div>'
+      + '<div class="toc-body" id="tocBody">'
       + tocAnchor("a-what", "ComfyUI 是什么")
       + tocAnchor("a-timeline", "发展时间线")
       + tocAnchor("a-arch", "整体架构：前后端分离")
@@ -253,9 +258,9 @@
       + tocAnchor("a-dev", "开发自己的节点")
       + tocAnchor("a-takeover", "接管 ComfyUI 可行吗")
       + tocAnchor("a-faq", "常见问题")
-      + "</aside>";
+      + "</div></aside>";
 
-    h += '<div class="prose" style="overflow:hidden">';
+    h += '<div class="prose" style="display:flow-root">';
     h += '<div class="sec-head"><h2>第一部分 · ComfyUI 架构解析</h2><span class="sec-en">ARCHITECTURE</span></div>'
       + '<p class="sec-desc">这一部分回答三个问题：ComfyUI 的整体框架是什么、它是怎么运转起来的、以及你想开发自己的组件或接管它时应该走哪条路。内容基于 ComfyUI v0.34.2 的真实源码结构整理。</p>';
 
@@ -263,11 +268,11 @@
     h += '<h2 id="a-what">ComfyUI 是什么</h2>'
       + '<p>ComfyUI 是一个<b>以「节点图」组织生成流程</b>的 Stable Diffusion 及多模态模型运行引擎。它把「加载模型 → 编码提示词 → 采样 → 解码 → 保存」拆成一个个节点，你用连线把它们组成一张有向无环图（DAG，Directed Acyclic Graph，即数据只朝一个方向流动、不构成环路的图）。点击 Queue 后，引擎按依赖顺序执行整张图。</p>'
       + '<p>它与 WebUI 类工具（如 A1111）的核心区别不在功能多少，而在<b>范式</b>：表单工具把流程写死、你只能填参数；节点工具把每个环节暴露成积木，你可以自由重组流程 —— 这正是复杂玩法（多 ControlNet 叠加、视频生成、区域控制）只在 ComfyUI 上先出现的原因。</p>'
-      + '<div class="arch-figure"><table class="data-table"><tr><th>维度</th><th>ComfyUI（节点图）</th><th>表单式 WebUI</th></tr>';
+      + '<div class="arch-figure"><div class="figscroll"><table class="data-table"><tr><th>维度</th><th>ComfyUI（节点图）</th><th>表单式 WebUI</th></tr>';
     COMPARE.forEach(function (r) {
       h += "<tr><td style=\"color:var(--text)\">" + esc(r[0]) + "</td><td style=\"color:var(--muted)\">" + esc(r[1]) + "</td><td style=\"color:var(--muted)\">" + esc(r[2]) + "</td></tr>";
     });
-    h += "</table><div class=\"figcap\">表 1 · ComfyUI 与表单式工具的范式对比</div></div>";
+    h += "</table></div><p class=\"scrollhint\">← 左右滑动查看完整表格 →</p><div class=\"figcap\">表 1 · ComfyUI 与表单式工具的范式对比</div></div>";
 
     /* 2. 时间线 */
     h += '<h2 id="a-timeline">发展时间线</h2><div class="timeline">';
@@ -279,13 +284,17 @@
     /* 3. 整体架构 */
     h += '<h2 id="a-arch">整体架构：前后端分离的图执行器</h2>'
       + '<p>ComfyUI 是标准的<b>前后端分离</b>结构：前端只负责「画图和收集参数」，后端负责「真正的校验与执行」。两者通过 HTTP + WebSocket 通信。这个设计带来一个重要能力：<b>前端可以整个换掉</b>（网页版、桌面版、第三方界面都只是不同的前端），后端执行引擎稳定不变。</p>'
-      + '<div class="arch-figure">' + SVG_ARCH + '<div class="figcap">图 1 · ComfyUI 前后端整体架构（右列模块名即真实源码文件）</div></div>'
+      + '<div class="arch-figure"><div class="figscroll">' + SVG_ARCH + '</div>'
+      + '<p class="scrollhint">← 左右滑动查看完整示意图 →</p>'
+      + '<div class="figcap">图 1 · ComfyUI 前后端整体架构（右列模块名即真实源码文件）</div></div>'
       + '<div class="callout info"><span class="co-ico"></span><div><span class="co-title">关键认知</span>你在画布上看到的「连线」并不直接执行任何东西 —— 前端只是把图序列化成 JSON 提交给后端；真正读懂这张图、决定先算谁后算谁、缓存什么，全部发生在后端的执行引擎里。</div></div>';
 
     /* 4. 生命周期 */
     h += '<h2 id="a-life">一次执行的生命周期：从点击 Queue 到图片落盘</h2>'
       + '<p>把一次生成拆开看，一共五步：提交 → 校验 → 排队 → 缓存判定 → 执行。理解这条链路，你就理解了 ComfyUI 的全部行为逻辑（为什么连错线立刻报错、为什么改提示词不用重新加载模型）。</p>'
-      + '<div class="arch-figure">' + SVG_LIFE + '<div class="figcap">图 2 · 一次执行的完整生命周期</div></div>';
+      + '<div class="arch-figure"><div class="figscroll">' + SVG_LIFE + '</div>'
+      + '<p class="scrollhint">← 左右滑动查看完整示意图 →</p>'
+      + '<div class="figcap">图 2 · 一次执行的完整生命周期</div></div>';
 
     /* 5. 引擎机制 */
     h += '<h2 id="a-engine">执行引擎三大机制</h2>'
@@ -302,11 +311,11 @@
     /* 7. 节点系统解剖 */
     h += '<h2 id="a-node-sys">节点系统解剖：一个节点的全部定义</h2>'
       + '<p>ComfyUI 里「节点」就是一个遵循极简协议的 Python 类。引擎靠四个约定认识它：</p>'
-      + '<table class="data-table"><tr><th>约定</th><th>作用</th><th>一句话理解</th></tr>'
+      + '<div class="figscroll"><table class="data-table"><tr><th>约定</th><th>作用</th><th>一句话理解</th></tr>'
       + '<tr><td class="mono" style="color:#f0c078">INPUT_TYPES()</td><td style="color:var(--muted)">声明输入：连接输入、控件（COMBO/INT/FLOAT/STRING…）及其默认值范围</td><td style="color:var(--muted)">「我需要什么」</td></tr>'
       + '<tr><td class="mono" style="color:#f0c078">RETURN_TYPES</td><td style="color:var(--muted)">声明输出类型元组</td><td style="color:var(--muted)">「我产出什么」</td></tr>'
       + '<tr><td class="mono" style="color:#f0c078">FUNCTION</td><td style="color:var(--muted)">真正执行的函数名（引擎按名调用）</td><td style="color:var(--muted)">「我干活的方法」</td></tr>'
-      + '<tr><td class="mono" style="color:#f0c078">CATEGORY</td><td style="color:var(--muted)">右键菜单 / 搜索里的分组路径</td><td style="color:var(--muted)">「我在菜单哪里」</td></tr></table>'
+      + '<tr><td class="mono" style="color:#f0c078">CATEGORY</td><td style="color:var(--muted)">右键菜单 / 搜索里的分组路径</td><td style="color:var(--muted)">「我在菜单哪里」</td></tr></table></div><p class="scrollhint">← 左右滑动查看完整表格 →</p>'
       + '<p style="margin-top:14px">类型的意义远不止显示：<b>连线合法性完全由类型匹配决定</b>（MODEL 接 MODEL、IMAGE 接 IMAGE），这使整张图在提交前就能被静态检查。下面是一个完整可用的最小自定义节点：</p>'
       + '<div class="code-head"><span>custom_nodes/my-nodes/__init__.py</span><span>最小自定义节点</span></div><pre><code>' + esc(CODE_MIN_NODE) + "</code></pre>";
 
@@ -318,7 +327,9 @@
       + '<div class="flow-step"><div class="fs-num">3</div><div><h4>（可选）加前端扩展</h4><p>在包里建 web/ 目录并声明 WEB_DIRECTORY = "./web"，目录里的 JS 会被前端自动加载。用 app.registerExtension() 可以自定义控件、右键菜单、甚至全新面板。</p></div></div>'
       + '<div class="flow-step"><div class="fs-num">4</div><div><h4>重启验证与调试</h4><p>重启后端后，在画布双击搜索节点名即可。调试用 print + 控制台日志；前端 JS 问题看浏览器 DevTools。打包发布就是把这个文件夹推到 GitHub —— ComfyUI-Manager 能直接从 Git 地址安装。</p></div></div>'
       + "</div>"
-      + '<div class="arch-figure">' + SVG_EXT + '<div class="figcap">图 3 · 自定义节点的加载与合并过程</div></div>'
+      + '<div class="arch-figure"><div class="figscroll">' + SVG_EXT + '</div>'
+      + '<p class="scrollhint">← 左右滑动查看完整示意图 →</p>'
+      + '<div class="figcap">图 3 · 自定义节点的加载与合并过程</div></div>'
       + '<div class="callout tip"><span class="co-ico"></span><div><span class="co-title">练手建议</span>从「封装你常用的一段连线」开始写第一个节点（比如「一键双层 CLIP 编码」），比直接读文档学得快。ComfyUI 自带的 example_node.py.example 是官方模板。</div></div>';
 
     /* 9. 接管 */
@@ -346,8 +357,38 @@
     return h;
   }
 
+  var bound = false;
+
+  /* 溢出提示：只在真的横向溢出时显示（窄屏固定宽度图形的可滑动提示） */
+  function paintFigHints() {
+    $all(".arch-figure").forEach(function (fig) {
+      var box = $(".figscroll", fig), hint = $(".scrollhint", fig);
+      if (!box || !hint) return;
+      hint.classList.toggle("on", box.scrollWidth > box.clientWidth + 2);
+    });
+  }
+
   function mount() {
-    /* 平滑滚动已由锚点 onclick 处理 */
+    /* 移动端侧边目录折叠（桌面端 .sidecol-toggle 是 display:none） */
+    $all(".arch-toc").forEach(function (toc) {
+      var btn = $(".sidecol-toggle", toc);
+      if (!btn || btn.getAttribute("data-bound") === "1") return;
+      btn.setAttribute("data-bound", "1");
+      btn.addEventListener("click", function () {
+        var open = toc.classList.toggle("is-open");
+        btn.setAttribute("aria-expanded", open ? "true" : "false");
+      });
+    });
+    paintFigHints();
+    /* 平滑滚动仍由锚点 onclick 处理 */
+    if (!bound) {
+      bound = true;
+      var t = null;
+      window.addEventListener("resize", function () {
+        if (t) clearTimeout(t);
+        t = setTimeout(paintFigHints, 150);
+      }, { passive: true });
+    }
   }
 
   function search(q) {

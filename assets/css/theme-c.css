@@ -72,6 +72,8 @@ html[data-theme="c"] {
   --scroll-thumb-h: #c9bda7;
 
   /* ---- 版心与字体 ---- */
+  --fig-bleed-end: 230px;    /* C 的 .arch-toc 浮在右侧：196 + 34 */
+  --fig-bleed-start: 0px;
   --page-max: 1440px;
   --page-pad: 64px;
   --c-sans: 'Inter','Helvetica Neue',-apple-system,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;
@@ -386,7 +388,8 @@ html[data-theme="c"] .prose strong { color: var(--text); font-weight: 600; }
 /* 图形：C 里做成「深色图版」——外围细线框 + 衬线图注 */
 html[data-theme="c"] .arch-figure {
   border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
-  padding: 12px 0 8px; margin: 18px 0; background: transparent;
+  padding: 12px 0 8px; background: transparent;
+  margin: 18px calc(-1 * var(--fig-bleed-end, 0px)) 18px calc(-1 * var(--fig-bleed-start, 0px));
 }
 html[data-theme="c"] .arch-figure .figcap {
   font-family: var(--c-serif); font-style: italic; font-size: 12.5px;
@@ -820,6 +823,7 @@ html[data-theme="c"] .arch-svg text { font-family: var(--c-sans); }
 
 /* ============ 移动端 ≤1180 ============ */
 @media (max-width: 1180px) {
+  html[data-theme="c"] .arch-figure { margin-right: 0; margin-left: 0; }
   html[data-theme="c"] { --page-pad: 16px; }
   html[data-theme="c"] .header-inner { height: 54px; }
   html[data-theme="c"] .brandname { font-size: 15.5px; }
@@ -857,7 +861,14 @@ html[data-theme="c"] .arch-svg text { font-family: var(--c-sans); }
   html[data-theme="c"] .wf-card, html[data-theme="c"] .wf-card:nth-child(3n+2), html[data-theme="c"] .wf-card:nth-child(3n) {
     padding: 14px 0; border-right: 0; min-height: 0;
   }
-  html[data-theme="c"] .arch-toc { float: none; width: auto; margin: 0 0 18px; border-right: 0; border-bottom: 1px solid var(--border); padding: 0 0 14px; }
+  /* 桌面段设过 position / top / max-height / overflow 的，移动段必须整套重写 ——
+     桌面规则特异性 (0,2,1) 高于基础样式的媒体查询规则 (0,1,0)，
+     只写 float: none 会留下 position: sticky，目录会浮在正文上重叠。 */
+  html[data-theme="c"] .arch-toc {
+    position: static; top: auto; float: none; width: auto;
+    margin: 0 0 18px; border-right: 0; border-bottom: 1px solid var(--border);
+    padding: 0 0 14px; max-height: none; overflow: visible;
+  }
   html[data-theme="c"] .prose h2 { font-size: 21px; }
   html[data-theme="c"] .path-grid { grid-template-columns: 1fr; }
   html[data-theme="c"] .path-card { border-right: 0; padding-right: 0; }
@@ -900,3 +911,12 @@ html[data-theme="c"] .np-mock-wrap {
   background-color: var(--canvas-bg);
 }
 html[data-theme="c"] .np-mock-wrap { background-size: 22px 22px; }
+
+/* 宽幅图形溢出提示 + 目录折叠开关（纸底语言） */
+html[data-theme="c"] .scrollhint { font-family: var(--c-mono); font-size: 12px; color: var(--faint); letter-spacing: -.02em; }
+html[data-theme="c"] .sidecol-toggle {
+  background: var(--bg-2); border: 1px solid var(--border-2); border-radius: 2px;
+  font-family: var(--c-serif); font-size: 15px; font-weight: 600; color: var(--text); letter-spacing: .02em;
+}
+html[data-theme="c"] .sidecol-toggle:hover { border-color: var(--accent); }
+html[data-theme="c"] .arch-toc.is-open .sidecol-toggle { border-color: var(--accent); }
