@@ -72,8 +72,6 @@ html[data-theme="c"] {
   --scroll-thumb-h: #c9bda7;
 
   /* ---- 版心与字体 ---- */
-  --fig-bleed-end: 230px;    /* C 的 .arch-toc 浮在右侧：196 + 34 */
-  --fig-bleed-start: 0px;
   --page-max: 1440px;
   --page-pad: 64px;
   --c-sans: 'Inter','Helvetica Neue',-apple-system,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;
@@ -389,7 +387,7 @@ html[data-theme="c"] .prose strong { color: var(--text); font-weight: 600; }
 html[data-theme="c"] .arch-figure {
   border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
   padding: 12px 0 8px; background: transparent;
-  margin: 18px calc(-1 * var(--fig-bleed-end, 0px)) 18px calc(-1 * var(--fig-bleed-start, 0px));
+  margin: 18px 0;
 }
 html[data-theme="c"] .arch-figure .figcap {
   font-family: var(--c-serif); font-style: italic; font-size: 12.5px;
@@ -823,7 +821,6 @@ html[data-theme="c"] .arch-svg text { font-family: var(--c-sans); }
 
 /* ============ 移动端 ≤1180 ============ */
 @media (max-width: 1180px) {
-  html[data-theme="c"] .arch-figure { margin-right: 0; margin-left: 0; }
   html[data-theme="c"] { --page-pad: 16px; }
   html[data-theme="c"] .header-inner { height: 54px; }
   html[data-theme="c"] .brandname { font-size: 15.5px; }

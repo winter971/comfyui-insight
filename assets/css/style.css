@@ -62,8 +62,6 @@
   --scroll-thumb-h: #3c4460;
   --canvas-bg: #101218;
   --surface-3: #1b1e2b;
-  --fig-bleed-end: 248px;   /* 宽幅图形突破正文栏的量：base 的 .arch-toc 浮在右侧，占 220+28 */
-  --fig-bleed-start: 0px;
   --page-max: 1280px;
   --page-pad: 24px;
 }
@@ -1593,15 +1591,11 @@ td.num { font-family: Consolas, monospace; text-align: right; color: var(--tx-so
    解法与设计稿一致：给足固有宽度 + 横向滚动 + 溢出提示，绝不缩到读不清。
    ============================================================ */
 
-/* 图形突破正文栏：正文栏被右侧浮动目录挤窄（base 984px），
-   而图形固有宽度 1160px —— 突破后桌面端可 1:1 显示，不必缩放。 */
-.arch-figure {
-  margin-right: calc(-1 * var(--fig-bleed-end, 0px));
-  margin-left: calc(-1 * var(--fig-bleed-start, 0px));
-}
+/* 注意：不要让 .arch-figure 用负 margin 突破正文栏 —— 侧边目录是浮动元素，
+   图形一旦压过去就会被目录盖住（实测重叠 196~220px）。桌面端保持等比缩放，
+   只有窄屏才切「固有宽度 + 横向滚动」，见下面的媒体查询。 */
 .figscroll { overflow-x: auto; overflow-y: hidden; max-width: 100%; }
-.figscroll > .arch-svg { display: block; width: 100%; min-width: 1160px; height: auto; }
-.figscroll > .data-table { min-width: 760px; }
+.figscroll > .arch-svg { display: block; width: 100%; height: auto; }
 
 /* 溢出提示：只在真的能横向滚动时才出现（JS 按 scrollWidth 判定后加 .on） */
 .scrollhint { display: none; margin: 7px 0 0; font-size: 12px; color: var(--faint); }
@@ -1611,8 +1605,10 @@ td.num { font-family: Consolas, monospace; text-align: right; color: var(--tx-so
 .sidecol-toggle { display: none; }
 
 @media (max-width: 1180px) {
-  /* 窄屏：正文栏满宽，不需要突破 */
-  .arch-figure { margin-right: 0; margin-left: 0; }
+  /* 窄屏：正文栏满宽，此时锁定图形的固有宽度、交给横向滚动，
+     而不是等比缩到 0.31x（图内 12px 标注会掉到 4px）。 */
+  .figscroll > .arch-svg { width: 1160px; max-width: none; }
+  .figscroll > .data-table { min-width: 760px; }
   /* 目录改为可折叠：默认收起，点「本页目录」展开 */
   .sidecol-toggle {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
