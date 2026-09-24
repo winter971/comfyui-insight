@@ -49,8 +49,8 @@
 - assets/js/theme.js：主题状态 + 切换器 + 抽屉关闭按钮。**不参与页面渲染**。
 - assets/css/theme-c.css / theme-f.css：两个新增主题，全部规则作用域在 `html[data-theme="c"|"f"]` 下，不写裸选择器。
 - assets/css/fonts.css + assets/fonts/*.woff2：本地字体（latin 子集），由 `_sources/fetch_fonts.cjs` 生成，勿手改。
-- assets/js/data/workflows-civitai.js：第四部分真实工作流库索引（2281 条，含 variants/dup/ai 覆盖标记），由工作区 _sources/build_site_data.cjs 生成，勿手改。
-- assets/files/civitai/graph/*.json：第四部分懒加载交互图（2991 份，{versionId}__{idx}.json），由 _sources/build_graphs.cjs 生成，勿手改；已做泄漏凭据消毒（_sources/sanitize_secrets.cjs）。
+- assets/js/data/workflows-civitai.js：第四部分真实工作流库索引（~2332 条，含 variants/dup/ai 覆盖标记），由工作区 _sources/build_site_data.cjs 生成，勿手改。
+- assets/files/civitai/graph/*.json：第四部分懒加载交互图（~3055 份，{versionId}__{idx}.json），由 _sources/build_graphs.cjs 生成，勿手改；已做泄漏凭据消毒（_sources/sanitize_secrets.cjs）。
 - assets/js/wfpanel.js：三合一面板通用组件（数据流/阶段拆解/逐节点分析，第三、四部分共用），skeleton+mount 两段式调用。
 - assets/js/page-civitai.js：第四部分页面（列表页主区只展示已 AI 精读工作流，未分析收进底部折叠备份区；详情页用 wfpanel.js 三合一面板 + 懒加载交互节点图，与第三部分同一套逻辑）。
 - assets/js/data/workflow-files.js：工作流真实文件溯源清单；assets/files/workflows/*.json 是从公开仓库下载的原始文件（25 个，改前先跑校验脚本）。
@@ -60,7 +60,7 @@
 ## 当前状态与下一步
 
 - **线上双平台**：https://comfyui-insight.pages.dev 与 https://winter971.github.io/comfyui-insight 。版本号只在 index.html（13 处）与 assets/js/app.js 的 `window.COMFY_APP_VER`，两者必须同步；`_sources/e2e_cloud.cjs` 里也写死了期望值。**当前线上版本以 index.html 为准，本页不重复记录。**
-- **板块与口径**：一 · 架构解析；二 · 节点包全解（23 包 / 792 节点）；三 · 工作流图鉴（32 条，其中 25 条挂真实源文件）；四 · 真实工作流库（2281 条卡片 / 2991 份交互节点图）。专题层 2 个（`video-gen` / `minimax-h3`），入口在第四部分页顶部 chip 条，路由 `#/civitai/topic`。**这些数字都会过期，动手前用脚本重估。**
-- **待办**：AI 精读按新 schema 继续磨（发布节奏每满 60 份一发布点；合格数已到 558，下一发布点 618）；工作流 graph 节点的 params 逐条增强（当前靠 widget-help.js 自动推导）；详情页 390px 横向溢出未修（原版就有，见 [docs/themes.md](../docs/themes.md) 末节）。
+- **板块与口径**：一 · 架构解析；二 · 节点包全解（23 包 / 792 节点）；三 · 工作流图鉴（32 条，其中 25 条挂真实源文件）；四 · 真实工作流库（~2332 条卡片 / ~3055 份交互节点图）。专题层 2 个（`video-gen` / `minimax-h3`），入口在第四部分页顶部 chip 条，路由 `#/civitai/topic`。**这些数字都会过期，动手前用脚本重估。**
+- **待办**：AI 精读按新 schema 继续磨（发布节奏每满 60 份一发布点；当前 aiDone ≈ 1025，下一发布点 1044）；工作流 graph 节点的 params 逐条增强（当前靠 widget-help.js 自动推导）；详情页 390px 横向溢出未修（原版就有，见 [docs/themes.md](../docs/themes.md) 末节）。
 - **敏感边界**：不托管模型文件、不提供下载渠道；换脸/人像内容必须带合规提示；NSFW 部分只做管线结构解析（18+）；发布前必须跑密钥消毒（civitai 抓取数据里发现过他人泄漏的 HF token）。
 - **历史踩坑（改样式时会再遇到）**：原 index.html 开头 6 个多余 BOM 字符曾使整站落入**怪异模式**（`document.compatMode === "BackCompat"`），造成每页顶部 26px 空行与表格行高异常；2026-09-15 已修，表格行高与代码块行距在 `style.css` 显式写回。**改样式后若发现页面高度/行距莫名变化，先查 `document.compatMode`。**
