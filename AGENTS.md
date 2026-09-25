@@ -61,6 +61,6 @@
 
 - **线上双平台**：https://comfyui-insight.pages.dev 与 https://winter971.github.io/comfyui-insight 。版本号只在 index.html（13 处）与 assets/js/app.js 的 `window.COMFY_APP_VER`，两者必须同步；`_sources/e2e_cloud.cjs` 里也写死了期望值。**当前线上版本以 index.html 为准，本页不重复记录。**
 - **板块与口径**：一 · 架构解析；二 · 节点包全解（23 包 / 792 节点）；三 · 工作流图鉴（32 条，其中 25 条挂真实源文件）；四 · 真实工作流库（~2332 条卡片 / ~3055 份交互节点图）。专题层 2 个（`video-gen` / `minimax-h3`），入口在第四部分页顶部 chip 条，路由 `#/civitai/topic`。**这些数字都会过期，动手前用脚本重估。**
-- **待办**：AI 精读按新 schema 继续磨（当前 aiDone = 1172，完成率突破 50% 大关，本轮完成 Batch 30 & 31 累计新增 16 篇；最新版本 20260924j，已推送 main）；工作流 graph 节点的 params 逐条增强（当前靠 widget-help.js 自动推导）；详情页 390px 横向溢出未修（原版就有，见 [docs/themes.md](../docs/themes.md) 末节）。
+- **待办**：AI 精读按新 schema 继续磨（当前 aiDone = 1188，完成率 50.94%，本轮完成 Batch 32 & 33 累计新增 16 篇；最新版本 20260924k，已推送 main）；工作流 graph 节点的 params 逐条增强（当前靠 widget-help.js 自动推导）；详情页 390px 横向溢出未修（原版就有，见 [docs/themes.md](../docs/themes.md) 末节）。
 - **敏感边界**：不托管模型文件、不提供下载渠道；换脸/人像内容必须带合规提示；NSFW 部分只做管线结构解析（18+）；发布前必须跑密钥消毒（civitai 抓取数据里发现过他人泄漏的 HF token）。
 - **历史踩坑（改样式时会再遇到）**：原 index.html 开头 6 个多余 BOM 字符曾使整站落入**怪异模式**（`document.compatMode === "BackCompat"`），造成每页顶部 26px 空行与表格行高异常；2026-09-15 已修，表格行高与代码块行距在 `style.css` 显式写回。**改样式后若发现页面高度/行距莫名变化，先查 `document.compatMode`。**
