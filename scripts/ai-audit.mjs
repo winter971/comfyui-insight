@@ -115,34 +115,10 @@ if (cmd === "apply") {
     process.exit(1);
   }
 
-  // 严格审核字段
-  const errs = [];
-  if (!aiContent.s || typeof aiContent.s !== "string" || aiContent.s.length < 50) {
-    errs.push("`s` (summary) 缺失或长度少于 50 字");
-  }
-  if (!Array.isArray(aiContent.u) || aiContent.u.length < 1) {
-    errs.push("`u` (use cases) 必须包含至少 1 项适用场景");
-  }
-  if (typeof aiContent.d !== "number" || aiContent.d < 1 || aiContent.d > 3) {
-    errs.push("`d` (difficulty) 必须是 1~3 的整数");
-  }
-  if (!Array.isArray(aiContent.st) || aiContent.st.length < 2) {
-    errs.push("`st` (stages) 阶段拆解必须至少包含 2 个阶段");
-  } else {
-    aiContent.st.forEach((st, idx) => {
-      if (!st.name) errs.push(`阶段 [${idx}] 缺少 name`);
-      if (!st.desc) errs.push(`阶段 [${idx}] 缺少 desc`);
-      if (!Array.isArray(st.nodes) || st.nodes.length === 0) {
-        errs.push(`阶段 [${idx}](${st.name}) 的 nodes 为空`);
-      } else {
-        st.nodes.forEach((nid) => {
-          if (!existingNodeIds.has(String(nid))) {
-            errs.push(`阶段 [${idx}](${st.name}) 引用的节点 ID [${nid}] 在图结构中不存在！`);
-          }
-        });
-      }
-    });
-  }
+  // 严格审核（2026-09-27 起走新门槛，与 ai_validate.mjs 同一把尺：s/u/d/st/na/覆盖度/卫生）
+  const { validatePack } = await import("./ai_validate.mjs");
+  const { fails } = validatePack(graph, aiContent);
+  const errs = fails.map((f) => "新门槛未过: " + f);
 
   if (errs.length > 0) {
     console.error("❌ 质量与结构校验未通过:");
