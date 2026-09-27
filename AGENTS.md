@@ -10,7 +10,7 @@
 - 工作流源文件校验：`node scripts/validate-workflows.mjs assets/files/workflows`（当前 25/25 通过）。
 - 数据文件语法检查：`node --check <文件>`；结构检查用 `node -e "global.window={};require('./assets/js/data/xxx.js')"` 后读取 window.COMFY_DATA（注意：数据文件是单行大 JSON，`grep -c` 只会返回 1，统计条目要用 node 解析）。
 - AI 精读的取料 / 落盘 / 验收（仓库内自足）：`ai-audit.mjs list|dump|apply`（apply 已升新门槛）、`ai_validate.mjs`（新门槛校验，`--all` 全库扫描出债表）、`apply_legacy_ai.mjs`（旧 schema 稿定向注入，先校验后写盘）、`fix_backticks.mjs`（ai 载荷反引号清零）、`sanitize_secrets.mjs`（发布前密钥消毒）、`publish.mjs`（数据层一条龙发布：预检→消毒→版本号→push→CF 部署→双域 E2E，可 `--from=N` 续跑）。批量并行时另有仓外工具链，见下「精读落盘工具链」。
-- 线上 E2E（发布后必跑）：`_sources/e2e_cloud.cjs`，35 项断言覆盖全站旅程 + 移动端零溢出 + 抽屉，两个域名都要跑；脚本内写死了期望版本号，每次发布升 `?v=` 后要同步改。**该脚本不在本仓库，缺则跑不了，此时改为本地手工核验并在摘要里说明。**
+- 线上 E2E（发布后必跑）：`_sources/e2e_cloud.cjs`，36 项断言覆盖全站旅程 + 移动端零溢出 + 抽屉，两个域名都要跑；期望版本号由脚本发布前从本地 `app.js` 现读，无需手改。**该脚本不在本仓库，缺则跑不了，此时改为本地手工核验并在摘要里说明。**
 
 ## 技术栈与硬约束
 - 原生 HTML/CSS/JS（ES5 风格 IIFE + window.COMFY_DATA 全局挂载），无框架、无构建、无外部网络依赖。
