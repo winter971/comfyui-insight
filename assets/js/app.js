@@ -3,7 +3,7 @@
    ============================================================ */
 (function () {
   "use strict";
-  window.COMFY_APP_VER = "20260927b";  /* 运行时版本标记（排查缓存用） */
+  window.COMFY_APP_VER = "20261012a";  /* 运行时版本标记（排查缓存用） */
 
   var D = function () { return window.COMFY_DATA || {}; };
   function pkgs() { return (D().nodePackages || []).slice().sort(function (a, b) { return (a.official === b.official) ? 0 : (a.official ? -1 : 1); }); }
@@ -314,14 +314,14 @@
     if (w.models && w.models.length) {
       html += '<div class="section" style="margin-top:26px"><div class="sec-head"><h2 style="font-size:20px">依赖清单</h2><span class="sec-en">REQUIRED MODELS</span>'
         + '<span style="font-size:12px;color:var(--faint)">共 ' + w.models.length + " 项，放到 models 对应子目录后刷新</span></div>"
-        + '<table class="data-table"><tr><th>类型</th><th>文件 / 要求</th><th>说明与获取指引</th></tr>';
+        + '<div class="tbl-scroll"><table class="data-table"><tr><th>类型</th><th>文件 / 要求</th><th>说明与获取指引</th></tr>';
       w.models.forEach(function (m) {
         var c = depBadge[m.type] || "#8a8078";
         html += "<tr><td><span style=\"font-size:11px;font-weight:600;padding:2px 10px;border-radius:99px;border:1px solid " + c + "55;background:" + c + "14;color:" + c + "\">" + esc(m.type) + "</span></td>"
           + '<td class="mono" style="color:#e8b98f">' + esc(m.name) + "</td>"
           + '<td style="color:var(--muted)">' + esc(m.note) + "</td></tr>";
       });
-      html += "</table>"
+      html += "</table></div>"
         + '<div class="callout info" style="margin-top:12px"><span class="co-ico"></span><div><span class="co-title">获取指引</span>官方模型优先从 Comfy Org 的 Hugging Face 页面获取（comfyanonymous/ComfyUI_docs 或对应官方仓库）；社区微调模型与 LoRA 常见来源为 Civitai 与 Hugging Face。下载后放入对应目录：Checkpoint → models/checkpoints，LoRA → models/loras，ControlNet → models/controlnet，VAE → models/vae，放大模型 → models/upscale_models。</div></div>'
         + "</div>";
     }
@@ -351,11 +351,11 @@
 
     /* 参数表 */
     if (w.params && w.params.length) {
-      html += '<div class="section"><div class="sec-head"><h2>关键参数参考</h2><span class="sec-en">PARAMETERS</span></div><table class="data-table"><tr><th>参数</th><th>图中取值</th><th>说明</th></tr>';
+      html += '<div class="section"><div class="sec-head"><h2>关键参数参考</h2><span class="sec-en">PARAMETERS</span></div><div class="tbl-scroll"><table class="data-table"><tr><th>参数</th><th>图中取值</th><th>说明</th></tr>';
       w.params.forEach(function (p) {
         html += "<tr><td class=\"mono\" style=\"color:#f0c078\">" + esc(p.name) + "</td><td class=\"mono\">" + esc(p.value) + "</td><td style=\"color:var(--muted)\">" + esc(p.desc) + "</td></tr>";
       });
-      html += "</table></div>";
+      html += "</table></div></div>";
     }
 
     if (w.tips && w.tips.length) {

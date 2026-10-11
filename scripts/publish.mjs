@@ -39,7 +39,7 @@ const SKIP_DEPLOY = has("skip-deploy");
 const SKIP_E2E = has("skip-e2e");
 if (!VER) { console.error("用法: node scripts/publish.mjs --v=<版本号> [--m=说明] [--from=N] [--dry]"); process.exit(2); }
 
-const WHITE = [/^index\.html$/, /^assets\/js\/app\.js$/, /^assets\//, /^scripts\//, /^AGENTS\.md$/];
+const WHITE = [/^index\.html$/, /^assets\/js\/app\.js$/, /^assets\//, /^scripts\//, /^AGENTS\.md$/, /^\.assetsignore$/];
 const git = (cmd, opts = {}) => execSync("git " + cmd, { cwd: ROOT, encoding: "utf8", ...opts });
 const say = (s) => console.log("[" + new Date().toISOString().slice(11, 19) + "] " + s);
 

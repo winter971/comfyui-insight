@@ -68,7 +68,7 @@
     if (!list.length) {
       html += '<p style="color:var(--muted);margin:10px 0">当前筛选条件下没有未精读的工作流。</p>';
     } else {
-      html += '<table class="data-table cv-backup-table"><tr><th>工作流</th><th>类别</th><th>底模</th><th>节点</th><th>下载</th><th>发布</th></tr>';
+      html += '<div class="tbl-scroll"><table class="data-table cv-backup-table"><tr><th>工作流</th><th>类别</th><th>底模</th><th>节点</th><th>下载</th><th>发布</th></tr>';
       list.slice(0, SHOW).forEach(function (w) {
         html += "<tr>"
           + '<td><a class="cv-tname" href="#/civitai/' + w.v + '">' + (w.nsfw ? '<span class="cv-nsfw-pill">18+</span>' : "") + esc(w.name) + "</a></td>"
@@ -79,7 +79,7 @@
           + '<td class="mono dim">' + esc(w.pub || "—") + "</td>"
           + "</tr>";
       });
-      html += "</table>";
+      html += "</table></div>";
       if (list.length > SHOW) html += '<p style="font-size:12px;color:var(--faint);margin-top:8px">仅显示下载量前 ' + SHOW + " 条（共 " + list.length + " 条），可用上方筛选器缩小范围。</p>";
     }
     html += "</div></div>";
@@ -694,21 +694,21 @@
 
     if (packs.length) {
       html += '<div class="section"><div class="sec-head"><h2 style="font-size:20px">需要安装的社区节点包</h2><span class="sec-en">REQUIRED NODE PACKS</span></div>'
-        + '<table class="data-table"><tr><th>节点包</th><th>用到的方法数</th><th>说明</th></tr>';
+        + '<div class="tbl-scroll"><table class="data-table"><tr><th>节点包</th><th>用到的方法数</th><th>说明</th></tr>';
       packs.forEach(function (p) {
         var note = p[0] === "其他自定义" ? "长尾社区节点，装 ComfyUI-Manager 后按节点名搜索安装" : "用 ComfyUI-Manager 按包名搜索安装";
         html += "<tr><td>" + esc(p[0] === "其他自定义" ? "其他 / 长尾社区节点" : p[0]) + "</td><td>" + p[1] + "</td><td style=\"color:var(--muted)\">" + note + "</td></tr>";
       });
-      html += "</table></div>";
+      html += "</table></div></div>";
     }
 
     if (models.length) {
       html += '<div class="section"><div class="sec-head"><h2 style="font-size:20px">引用的模型 / LoRA 文件</h2><span class="sec-en">MODEL REFERENCES</span></div>'
-        + '<table class="data-table"><tr><th>文件名</th><th>所在节点</th></tr>';
+        + '<div class="tbl-scroll"><table class="data-table"><tr><th>文件名</th><th>所在节点</th></tr>';
       models.forEach(function (m) {
         html += '<tr><td class="mono" style="color:#e8b98f">' + esc(m.f) + "</td><td style=\"color:var(--muted)\">" + esc(m.n) + "</td></tr>";
       });
-      html += "</table>"
+      html += "</table></div>"
         + '<div class="callout info" style="margin-top:12px"><span class="co-ico"></span><div><span class="co-title">说明</span>以上是这条工作流引用的模型文件名，按名字在 Civitai / Hugging Face 搜索下载，放入 models 对应子目录即可复跑。</div></div>'
         + "</div>";
     }
